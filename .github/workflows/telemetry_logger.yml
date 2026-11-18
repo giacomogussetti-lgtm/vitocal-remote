@@ -1,0 +1,57 @@
+name: Telemetry Cloud Logger (Vitocal & BTicino)
+
+on:
+  schedule:
+    # Esegue ogni 30 minuti (48 volte al giorno)
+    - cron: '*/30 * * * *'
+  workflow_dispatch: # Consente l'avvio manuale con pulsante
+
+concurrency:
+  group: telemetry-logger
+  cancel-in-progress: false
+
+jobs:
+  log-telemetry:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pydantic PyViCare python-dotenv
+
+      - name: Query Telemetry & Append Log
+        env:
+          VIESSMANN_USER: ${{ secrets.VIESSMANN_USER }}
+          VIESSMANN_PASSWORD: ${{ secrets.VIESSMANN_PASSWORD }}
+          VIESSMANN_CLIENT_ID: ${{ secrets.VIESSMANN_CLIENT_ID }}
+          NETATMO_CLIENT_ID: ${{ secrets.NETATMO_CLIENT_ID }}
+          NETATMO_CLIENT_SECRET: ${{ secrets.NETATMO_CLIENT_SECRET }}
+          NETATMO_REFRESH_TOKEN: ${{ secrets.NETATMO_REFRESH_TOKEN }}
+        run: |
+          python scripts/cloud_logger.py
+
+      - name: Commit & Push New Samples
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/cloud_telemetry.jsonl
+          if git diff --staged --quiet; then
+            echo "Nessun nuovo dato da inviare."
+          else
+            git commit -m "chore(telemetry): record cloud sample [skip ci]"
+            git push
+          fi
