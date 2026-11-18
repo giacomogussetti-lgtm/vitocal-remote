@@ -10,6 +10,7 @@ import math
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
+import requests
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QColor, QFont, QPen
@@ -273,7 +274,7 @@ class FetchDataWorker(QThread):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Vitocal 111-S & BTicino Smarther — Gestionale Impianto (Bratto)")
+        self.setWindowTitle("Vitocal 111-S & BTicino Smarther — Gestionale Impianto")
         self.resize(1300, 850)
 
         # Connectors & DB
@@ -323,8 +324,8 @@ class MainWindow(QMainWindow):
         self._init_timers()
         self._load_latest_db_sample()
 
-        # Connect on startup in background
-        QTimer.singleShot(100, self.refresh_data)
+        # Startup in offline/manual mode by default (no automatic API calls)
+        self.footer_label.setText("Pronto. Dati storici caricati da SQLite locale. Nessuna chiamata automatica alle API.")
 
     def _init_theme(self):
         self.setStyleSheet("""
@@ -565,16 +566,16 @@ class MainWindow(QMainWindow):
         title_label.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
         title_label.setStyleSheet("color: #38bdf8;")
 
-        subtitle = QLabel("Gestionale Unificato & Banchetto Prova — Bratto (BG)")
+        subtitle = QLabel("Gestionale Unificato & Banchetto Prova")
         subtitle.setStyleSheet("color: #9ca3af; margin-left: 10px;")
 
         top_bar.addWidget(title_label)
         top_bar.addWidget(subtitle)
         top_bar.addStretch()
 
-        # Polling Controls
+        # Polling Controls (Default OFF / Manual on startup)
         self.chk_auto_poll = QCheckBox("Auto-Logger")
-        self.chk_auto_poll.setChecked(True)
+        self.chk_auto_poll.setChecked(False)
         self.chk_auto_poll.toggled.connect(self._on_auto_poll_toggled)
 
         self.spin_interval = QSpinBox()
@@ -584,17 +585,17 @@ class MainWindow(QMainWindow):
         self.spin_interval.setSuffix(" min")
         self.spin_interval.valueChanged.connect(self._on_interval_changed)
 
-        self.lbl_countdown = QLabel("Prossimo: --:--")
-        self.lbl_countdown.setStyleSheet("color: #38bdf8; font-weight: bold; padding: 4px 8px; background: #1e293b; border-radius: 4px;")
+        self.lbl_countdown = QLabel("Auto-Logger: PAUSA")
+        self.lbl_countdown.setStyleSheet("color: #94a3b8; font-weight: bold; padding: 4px 8px; background: #1e293b; border-radius: 4px;")
 
         top_bar.addWidget(self.chk_auto_poll)
         top_bar.addWidget(self.spin_interval)
         top_bar.addWidget(self.lbl_countdown)
 
-        self.status_viessmann = QLabel("Viessmann: Connessione...")
-        self.status_viessmann.setStyleSheet("color: #f59e0b; font-weight: bold; padding: 4px 10px; background: #262117; border-radius: 4px;")
-        self.status_bticino = QLabel("BTicino: Connessione...")
-        self.status_bticino.setStyleSheet("color: #f59e0b; font-weight: bold; padding: 4px 10px; background: #262117; border-radius: 4px;")
+        self.status_viessmann = QLabel("Viessmann: Offline / Manuale")
+        self.status_viessmann.setStyleSheet("color: #94a3b8; font-weight: bold; padding: 4px 10px; background: #1f2937; border-radius: 4px;")
+        self.status_bticino = QLabel("BTicino: Offline / Manuale")
+        self.status_bticino.setStyleSheet("color: #94a3b8; font-weight: bold; padding: 4px 10px; background: #1f2937; border-radius: 4px;")
 
         self.btn_refresh = QPushButton("Aggiorna Ora")
         self.btn_refresh.setObjectName("btn-refresh")
@@ -1019,7 +1020,7 @@ class MainWindow(QMainWindow):
             "Temperatura Normale, Temperatura Ridotta, Modalità Operativa.\n"
             "• <b>Parametri BTicino:</b> Setpoint temperatura ambiente, modalità (Manuale / Programma Home / Antigelo HG) "
             "e consenso relè pompa Grundfos a pavimento.\n\n"
-            "💡 <b>Obiettivo Termodinamico Chiave (Bratto, BG):</b>\n"
+            "💡 <b>Obiettivo Termodinamico Chiave:</b>\n"
             "Sincronizzare l'accensione della PdC nelle ore centrali più calde (massimo COP) "
             "con l'avvio forzato della Grundfos per immagazzinare calore nel massetto radiante, "
             "evitando che la PdC da 11 kW saturi i soli 200 litri di puffer lavorando a cicli brevi."
@@ -1451,6 +1452,60 @@ class MainWindow(QMainWindow):
                         "mode": row["active_program"],
                     }
                     self.synoptic_widget.update_telemetry({**v_preload, **b_preload})
+
+                    # Preload Dashboard Tiles
+                    if row["external_temp_c"] is not None:
+                        self.val_ext_temp.setText(f"{row['external_temp_c']:.1f} °C")
+                    if row["buffer_temp_c"] is not None:
+                        self.val_buffer_temp.setText(f"{row['buffer_temp_c']:.1f} °C")
+                    if row["dhw_storage_temp_c"] is not None:
+                        self.val_dhw_temp.setText(f"{row['dhw_storage_temp_c']:.1f} °C")
+                    if row["pdc_supply_temp_c"] is not None:
+                        self.val_supply_temp.setText(f"{row['pdc_supply_temp_c']:.1f} °C")
+                    if row["pdc_return_temp_c"] is not None:
+                        self.val_return_temp.setText(f"{row['pdc_return_temp_c']:.1f} °C")
+                    if row["indoor_temp_bticino_c"] is not None:
+                        self.val_indoor_temp.setText(f"{row['indoor_temp_bticino_c']:.1f} °C")
+                    if row["indoor_setpoint_bticino_c"] is not None:
+                        self.val_indoor_setpoint.setText(f"{row['indoor_setpoint_bticino_c']:.1f} °C")
+                    if row["humidity_percent"] is not None:
+                        self.val_humidity.setText(f"{row['humidity_percent']:.0f} %")
+                    if row["compressor_hours"] is not None:
+                        self.val_comp_hours.setText(f"{row['compressor_hours']} h ({row['compressor_starts']} avvii)")
+                    if row["hot_gas_pressure_bar"] is not None:
+                        self.val_gas_pressure.setText(f"{row['hot_gas_pressure_bar']} bar")
+                    if row["cop_heating"] is not None:
+                        self.val_cop_heating.setText(str(row["cop_heating"]))
+                    if row["cop_dhw"] is not None:
+                        self.val_cop_dhw.setText(str(row["cop_dhw"]))
+
+                    slope = row["heating_curve_slope"]
+                    shift = row["heating_curve_shift"]
+                    if slope is not None and shift is not None:
+                        self.val_curve.setText(f"Slope: {slope} | Shift: {shift}")
+                        self.saved_slope = float(slope)
+                        self.saved_shift = int(shift)
+                        self.spin_slope.blockSignals(True)
+                        self.spin_slope.setValue(self.saved_slope)
+                        self.spin_slope.blockSignals(False)
+                        self.spin_shift.blockSignals(True)
+                        self.spin_shift.setValue(self.saved_shift)
+                        self.spin_shift.blockSignals(False)
+                        self._check_curve_sync_state()
+
+                    comp_on = (row["compressor_active"] or 0) > 0 or (row["compressor_modulation_percent"] or 0) > 0
+                    self.val_comp_status.setText("ATTIVO" if comp_on else "SPENTO")
+                    self.val_comp_status.setStyleSheet("color: #10b981;" if comp_on else "color: #9ca3af;")
+                    self.val_comp_modul.setText(f"{row['compressor_modulation_percent'] or 0} %")
+
+                    pump_active = row["grundfos_pump_active"]
+                    if pump_active == 1:
+                        self.banner_grundfos.setText("POMPA GRUNDFOS: ACCESA (Rilancio attivo al pavimento radiante)")
+                        self.banner_grundfos.setStyleSheet("background-color: #065f46; color: #6ee7b7; padding: 16px; border-radius: 8px; margin-top: 10px;")
+                    else:
+                        self.banner_grundfos.setText("POMPA GRUNDFOS: SPENTA (Massetto isolato, riscalda solo Puffer)")
+                        self.banner_grundfos.setStyleSheet("background-color: #374151; color: #d1d5db; padding: 16px; border-radius: 8px; margin-top: 10px;")
+
                     self._update_charts()
         except Exception as e:
             logger.debug("Preload DB sample: %s", e)
@@ -2259,18 +2314,45 @@ class MainWindow(QMainWindow):
     # Cloud Sync with GitHub Actions Telemetry Logs
     # --------------------------------------------------------------------------
     def _on_sync_cloud_clicked(self):
+        self.btn_cloud_sync.setEnabled(False)
+        self.btn_cloud_sync.setText("☁️ Download Cloud...")
+        self.footer_label.setText("Connessione a GitHub Cloud per scaricare i campioni...")
+        QApplication.processEvents()
+
+        raw_url = f"https://raw.githubusercontent.com/{Config.GITHUB_REPO}/main/data/cloud_telemetry.jsonl"
         cloud_file = Config.DATA_DIR / "cloud_telemetry.jsonl"
-        if not cloud_file.exists():
+        cloud_file.parent.mkdir(parents=True, exist_ok=True)
+
+        headers = {}
+        if Config.GITHUB_TOKEN:
+            headers["Authorization"] = f"token {Config.GITHUB_TOKEN}"
+
+        download_ok = False
+        try:
+            resp = requests.get(raw_url, headers=headers, timeout=12)
+            if resp.status_code == 200 and resp.text.strip():
+                with open(cloud_file, "w", encoding="utf-8") as f:
+                    f.write(resp.text)
+                download_ok = True
+                logger.info("Scaricato con successo file telemetria da GitHub!")
+            elif resp.status_code == 404:
+                logger.info("Repo privato o file non trovato con HTTP 404 senza token.")
+        except Exception as net_err:
+            logger.warning("Download diretto da GitHub non riuscito (%s).", net_err)
+
+        self.btn_cloud_sync.setEnabled(True)
+        self.btn_cloud_sync.setText("☁️ Sync Cloud (GitHub)")
+
+        if not cloud_file.exists() or cloud_file.stat().st_size == 0:
             QMessageBox.information(
                 self,
-                "Sincronizzazione Cloud (GitHub Actions)",
-                "Il file locale 'data/cloud_telemetry.jsonl' non è ancora presente.\n\n"
-                "📌 Come attivare il logging 24/7 con GitHub Actions:\n"
-                "1. Esegui il push del repository su GitHub.\n"
-                "2. Aggiungi i Secrets di Viessmann e Netatmo nelle impostazioni del repo GitHub.\n"
-                "3. Il workflow GitHub registrerà automaticamente i campioni ogni 30 minuti.\n"
-                "4. Quando fai 'git pull' o scarichi il file 'data/cloud_telemetry.jsonl', questo pulsante "
-                "importerà istantaneamente tutti i campioni registrati nel database SQLite locale!"
+                "Sincronizzazione Cloud GitHub",
+                f"Impossibile scaricare direttamente dal repository GitHub:\n{Config.GITHUB_REPO}\n\n"
+                "📌 Motivo:\n"
+                "Il repository GitHub è impostato su 'Private', quindi richiede autorizzazione per il download automatico.\n\n"
+                "💡 Per abilitare la sincronizzazione automatica con 1 clic:\n"
+                "• Opzione A (Più comoda): Rendi il repo Pubblico su GitHub (i segreti sono nei Secrets crittografati, e i minuti GitHub diventano infiniti!).\n"
+                "• Opzione B: Inserisci un GITHUB_TOKEN nel file .env."
             )
             return
 
@@ -2292,7 +2374,7 @@ class MainWindow(QMainWindow):
                             continue
                         cur.execute("SELECT 1 FROM telemetry_samples WHERE timestamp_utc = ? LIMIT 1", (ts,))
                         if cur.fetchone():
-                            continue  # Record già presente nel database
+                            continue  # Record già presente
                         sample = TelemetrySample(**record)
                         self.db.insert_sample(sample)
                         imported_count += 1
@@ -2300,20 +2382,24 @@ class MainWindow(QMainWindow):
                         logger.debug("Skip riga non valida cloud: %s", parse_err)
 
             if imported_count > 0:
+                self._load_latest_db_sample()
                 self._update_charts()
+                self.footer_label.setText(f"Sincronizzazione completata: {imported_count} nuovi campioni importati dal Cloud.")
                 QMessageBox.information(
                     self,
                     "Sincronizzazione Riuscita",
-                    f"Importati con successo {imported_count} nuovi campioni registrati dal Cloud!"
+                    f"✅ Scaricati e importati con successo {imported_count} nuovi campioni registrati da GitHub Cloud!\n\n"
+                    "Grafici, sinottico e dashboard aggiornati con le ultime letture."
                 )
             else:
+                self.footer_label.setText("Database locale già allineato con il Cloud GitHub.")
                 QMessageBox.information(
                     self,
-                    "Database Aggiornato",
-                    f"Tutti i campioni presenti nel file Cloud ({len(lines)} righe) sono già registrati nel database SQLite."
+                    "Database Già Aggiornato",
+                    f"Tutti i campioni presenti nel file Cloud ({len(lines)} righe) sono già archiviati nel database SQLite locale."
                 )
         except Exception as e:
-            QMessageBox.warning(self, "Errore Sincronizzazione Cloud", f"Impossibile leggere il file cloud:\n{e}")
+            QMessageBox.warning(self, "Errore Sincronizzazione Cloud", f"Impossibile completare la sincronizzazione:\n{e}")
 
     def _on_placeholder_preset_clicked(self):
         QMessageBox.information(
@@ -2330,7 +2416,7 @@ class MainWindow(QMainWindow):
         reply = QMessageBox.question(
             self,
             f"Conferma Preset: {preset_name}",
-            f"Sei sicuro di voler applicare il preset '{preset_name}' all'impianto di Bratto?\n"
+            f"Sei sicuro di voler applicare il preset '{preset_name}' all'impianto?\n"
             "Questo modificherà contemporaneamente i parametri della Vitocal e del termostato BTicino.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )

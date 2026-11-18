@@ -232,7 +232,7 @@ class BTicinoConnector:
         boiler_status = any(
             m.get("boiler_status")
             for m in modules
-            if m.get("id") == "00:03:50:cc:f2:b8" or m.get("type") == "BNS"
+            if m.get("type") == "BNS" or "smarther" in str(m.get("type", "")).lower() or m.get("boiler_status") is not None
         )
         is_demanding_heat = (heating_power_request and heating_power_request > 0) or boiler_status
 

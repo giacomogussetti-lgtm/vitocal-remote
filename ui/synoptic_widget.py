@@ -69,7 +69,7 @@ class SynopticCanvas(QWidget):
         puffer_h = 440
         puffer_rect = QRectF(puffer_x, puffer_y, puffer_w, puffer_h)
 
-        # Zone C: Abitazione Bratto (width: at least 410, stretches with window)
+        # Zone C: Abitazione (width: at least 410, stretches with window)
         # Secondary pipe span = house_x - (puffer_x + puffer_w) = 870 - 715 = 155px!
         house_x = 870
         house_w = max(410, w - house_x - 30)
@@ -277,9 +277,9 @@ class SynopticCanvas(QWidget):
         )
 
         # -------------------------------------------------------------
-        # 6. ZONE C: ABITAZIONE BRATTO & TERMOSTATO BTICINO
+        # 6. ZONE C: ABITAZIONE & TERMOSTATO BTICINO
         # -------------------------------------------------------------
-        self._draw_block(painter, house_rect, "ABITAZIONE BRATTO (Circuito Secondario)", "#161f30", "#10b981")
+        self._draw_block(painter, house_rect, "ABITAZIONE (Circuito Secondario - Pavimento Radiante)", "#161f30", "#10b981")
 
         # Underfloor radiant coil symbol
         coil_y = house_rect.top() + 45
@@ -503,7 +503,7 @@ class PlantSynopticWidget(QWidget):
 
         # Thermodynamic Insight Footer
         footer = QLabel(
-            "⚙️ <b>Logica Idraulica Impianto di Bratto:</b> Il circuito primario alimenta esclusivamente il Puffer da 200L. "
+            "⚙️ <b>Logica Idraulica Impianto:</b> Il circuito primario alimenta esclusivamente il Puffer da 200L. "
             "Il rilancio verso il pavimento radiante è comandato dal termostato BTicino tramite la pompa Grundfos. "
             "Quando la Grundfos è spenta, la PdC satura rapidamente il solo puffer lavorando a cicli brevi."
         )

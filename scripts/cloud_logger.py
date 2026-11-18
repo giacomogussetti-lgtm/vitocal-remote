@@ -29,7 +29,7 @@ logger = logging.getLogger("cloud_logger")
 
 
 def log_sample() -> bool:
-    logger.info("Avvio campionamento telemetria cloud (Bratto, BG)...")
+    logger.info("Avvio campionamento telemetria cloud (Vitocal 111-S & BTicino)...")
 
     # Validate configurations
     ok_v, msg_v = Config.validate_viessmann()

@@ -31,6 +31,10 @@ class Config:
     DATA_DIR = BASE_DIR / "data"
     DUMPS_DIR = DATA_DIR / "dumps"
 
+    # GitHub Cloud Integration
+    GITHUB_REPO = os.getenv("GITHUB_REPO", "giacomogussetti-lgtm/vitocal-remote")
+    GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+
     @classmethod
     def validate_viessmann(cls) -> tuple[bool, str]:
         if not cls.VIESSMANN_CLIENT_ID:

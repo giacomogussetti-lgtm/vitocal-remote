@@ -1,6 +1,6 @@
 # REGISTRO STATO DI PROGETTO E CHANGELOG
-**Progetto**: Gestionale Unificato Viessmann Vitocal 111-S + BTicino Smarther (Bratto, BG)  
-**Ultimo aggiornamento**: 18 Novembre 2026  
+**Progetto**: Gestionale Unificato Viessmann Vitocal 111-S + BTicino Smarther (Abitazione Climatica Montana - Zona E)  
+**Ultimo aggiornamento**: 19 Novembre 2026  
 **Autore / Assistente**: Antigravity AI & Giacomo  
 
 ---
@@ -19,7 +19,7 @@
   - Implementati metodi di scrittura sicura con *read-back check*: curva climatica (slope/shift), temperature setpoint (normale/ridotta) e modalità.
 - [x] **Connettore BTicino Smarther (`api/bticino.py`)**:
   - Risolto problema degli scope: abilitati `read_smarther` e `write_smarther`.
-  - Rilevata con successo l'abitazione `Bratto`, stanza `Corridoio`, e termostato `00:03:50:cc:f2:b8` (Smarther firmware 40).
+  - Rilevata con successo l'abitazione, stanza `Corridoio`, e termostato modulo Smarther `BNS` (firmware 40).
   - Lettura in tempo reale: temperatura ambiente (**7.8 °C**), setpoint (**7.0 °C**), umidità (**61%**), stato relè/pompa Grundfos (0/1).
   - **Risolto Bug di Scrittura Setpoint (Errore 403 Code 13)**:
     - Identificato che per moduli Smarther (`BNS`), l'endpoint Netatmo Energy `/setroomthermpoint` è bloccato da API (`Operation is forbidden`).
@@ -48,7 +48,7 @@
       * Diagnostica: Ore di funzionamento compressore, numero di avvii totali, Curva Climatica (Slope/Shift), Programma e Modo.
     - Puffer inerziale 200L con sfumatura di stratificazione termica e sonda di accumulo.
     - Pompa di rilancio secondaria Grundfos con simbolo SCADA illuminato verde quando attiva.
-    - Abitazione Bratto con serpentina massetto radiante (200 m²), scheda termostato BTicino Smarther (Corridoio) con temperatura ambiente, setpoint, umidità e stato consenso relè.
+    - Abitazione con serpentina massetto radiante (200 m²), scheda termostato BTicino Smarther (Corridoio) con temperatura ambiente, setpoint, umidità e stato consenso relè.
     - **Precaricamento Istantaneo all'Avvio**: la finestra principale precarica l'ultimo campione da SQLite all'apertura, popolando subito il sinottico senza attendere il primo polling cloud.
   - **Nuovo Grafico Interattivo Curva Climatica LWT vs OAT (`ui/heating_curve_widget.py`)**:
     - Visualizzazione grafica della temperatura di mandata calcolata in funzione della temperatura esterna (-20 °C a +20 °C).
@@ -108,14 +108,20 @@
   - Rilassato il clamp minimo a 18.0 °C per consentire la corretta visualizzazione delle rette anche con shift negativi.
 - [x] **Architettura di Logging Cloud 24/7 (GitHub Actions)**:
   - Creato script headless `scripts/cloud_logger.py`: interroga le API cloud di Viessmann e BTicino senza bisogno di interfaccia grafica o PC acceso, con salvataggio append in formato JSON Lines `data/cloud_telemetry.jsonl`.
-  - Creato workflow automatico `.github/workflows/telemetry_logger.yml`: gira ogni 30 minuti (48 run/giorno) sui runner gratuiti di GitHub Actions, archiviando la telemetria continua dell'impianto di Bratto.
+  - Creato workflow automatico `.github/workflows/telemetry_logger.yml`: gira ogni 5 minuti (288 run/giorno a minuti illimitati su repo pubblico), archiviando la telemetria continua dell'impianto con risoluzione ad alta densità per catturare ogni ciclo del compressore e della pompa Grundfos.
+    - **Collaudato con successo sul repository reale** (`giacomogussetti-lgtm/vitocal-remote` run #3: **SUCCESS in 21s**, lettura e auto-commit verificati).
   - Aggiunto pulsante `☁️ Sync Cloud (GitHub)` nella barra superiore dell'app desktop: importa con un clic tutti i nuovi campioni registrati dal cloud direttamente nel database SQLite locale, ignorando i duplicati.
   - **Auto-Logger Integrato nella UI**:
     - Timer con conto alla rovescia in tempo reale nella barra superiore (`Prossimo: MM:SS`).
     - Intervallo regolabile (5-60 min) per storicizzare automaticamente su SQLite senza dover cliccare a mano.
   - Creato file launcher per Windows `avvia_gestionale.bat`.
+- [x] **Sicurezza, Privacy e Controllo Preventivo Pre-Commit**:
+  - Creato script di audit `scripts/security_check.py`: esegue scansione con regex su credenziali, token, email personali, MAC address e toponimi geografici.
+  - Creato script di esportazione sicura `scripts/prepare_github_export.py`: genera la cartella pulita `github_ready/` escludendo file bytecode, database locali e segreti, eseguendo l'audit automatico prima di confermare.
+  - Definita regola permanente Antigravity in `.agents/rules/security-and-privacy.md`: obbligo per tutti gli agenti di verificare l'assenza di dati sensibili prima di qualsiasi push su GitHub.
+  - Anonimizzati i riferimenti geografici e personali nei file del codice, sinottico e documentazione.
 - [x] **Memoria Persistente di Progetto**:
-  - Creato `AGENTS.md` per consentire a qualsiasi nuovo agente in nuove chat di riprendere il lavoro immediatamente senza perdere il contesto.
+  - Creato e aggiornato `AGENTS.md` per consentire a qualsiasi nuovo agente in nuove chat di riprendere il lavoro immediatamente senza perdere il contesto.
   - Creata la Skill dedicata `.agents/skills/vitocal-remote-expert/SKILL.md`.
 
 ---
@@ -134,7 +140,7 @@
 | **Compressore Stato** | Spento (0% modulazione) | 212 avvii, 153.3 ore totali |
 | **Curva Climatica Attuale** | Inclinazione = 0.6 \| Livello = 0 | Setpoint target: 12 °C Normale / 12 °C Ridotta |
 | **COP Calcolati da Macchina** | Riscaldamento: 3.1 \| ACS: 2.5 \| Totale: 3.0 | COP istantanei/cumulati |
-| **Termostato BTicino** | Smarther Thermostat (`BNS`) | MAC `00:03:50:cc:f2:b8`, FW 40 |
+| **Termostato BTicino** | Smarther Thermostat (`BNS`) | Modulo Smarther, FW 40 |
 | **Temp. Interna Corridoio** | 7.8 °C | Misurata dal termostato BTicino |
 | **Setpoint BTicino** | 7.0 °C (Modo: `home`) | Soglia di consenso |
 | **Umidità Corridoio** | 61 % | Sonda igrometrica integrata |

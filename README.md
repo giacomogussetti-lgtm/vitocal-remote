@@ -1,5 +1,5 @@
 # Gestionale Unificato Viessmann Vitocal 111-S & Termostato BTicino Smarther
-**Abitazione di Bratto (Castione della Presolana, BG)**
+**Impianto Residenziale in Zona Climatica Montana (Zona E)**
 
 Piattaforma software per il controllo centralizzato, il data logging termodinamico e la gestione tramite preset multi-dispositivo dell'impianto di riscaldamento a pompa di calore e pavimento radiante.
 
@@ -36,7 +36,7 @@ python test_bench.py
    * Circuito primario (mandata calda rossa e ritorno freddo blu tra PdC Vitocal e serbatoio inerziale).
    * Puffer 200 Litri disaccoppiatore con sonda top di accumulo.
    * Pompa di rilancio secondaria Grundfos con animazione/indicatore di stato dinamico (verde se attiva, grigio a riposo).
-   * Abitazione Bratto con serpentina massetto radiante (200 m²) e centralina termostato BTicino Smarther a parete.
+   * Abitazione con serpentina massetto radiante (200 m²) e centralina termostato BTicino Smarther a parete.
 
 3. **🎛️ Banchetto Comandi & Preset + Curva Climatica Grafica**:
    * **Visualizzatore Interattivo Curva Climatica LWT vs OAT**:

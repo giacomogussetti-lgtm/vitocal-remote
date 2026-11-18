@@ -5,7 +5,7 @@
 
 ---
 
-## 1. CONTESTO DELL'IMPIANTO FISICO (Bratto, Castione della Presolana, BG)
+## 1. CONTESTO DELL'IMPIANTO FISICO (Abitazione di Montagna - Zona Climatica E)
 L'abitazione è una seconda casa di montagna non presidiata nei giorni feriali, soggetta a rigide temperature invernali e rischio gelo per radiante e tubazioni nei muri perimetrali.
 L'impianto è idraulicamente disaccoppiato in due sottosistemi tramite un **Puffer parallelo da 200 litri**:
 
@@ -16,7 +16,7 @@ L'impianto è idraulicamente disaccoppiato in due sottosistemi tramite un **Puff
    * **Regolazione**: Curva climatica con Inclinazione (Slope) = 0.6, Livello (Shift) = 0, mandata max 40 °C. Setpoint Normale/Ridotta = 12 °C (o 10 °C baseline).
 2. **Circuito Secondario (Puffer <-> Pavimento)**:
    * **Rilancio**: Circolatore Grundfos a velocità fissa che pesca dal puffer 200 L e alimenta i collettori del riscaldamento a pavimento.
-   * **Termostato Ambiente**: BTicino Smarther (modello `BNS`, MAC `00:03:50:cc:f2:b8`, firmware 40) installato in "Corridoio", account `donata.chiarello@gmail.com`.
+   * **Termostato Ambiente**: BTicino Smarther (modello `BNS`, firmware 40) installato in "Corridoio".
    * **Comando**: Il consenso ON/OFF del termostato comanda direttamente la pompa Grundfos.
 3. **Criticità Termodinamica Risolta dal Software**:
    * Se la Grundfos è spenta, la PdC da 11 kW satura rapidamente i soli 200 L di puffer e lavora a cicli brevi ad alto consumo.
@@ -101,49 +101,70 @@ L'impianto è idraulicamente disaccoppiato in due sottosistemi tramite un **Puff
 
 ### D. Architettura Cloud Logging GitHub Actions (24/7 Headless):
 1. **Cron e Limiti API**:
-   * Il workflow `.github/workflows/telemetry_logger.yml` gira su cron ogni 30 minuti (`*/30 * * * *`).
+   * Repository GitHub collegato: `giacomogussetti-lgtm/vitocal-remote` (collaudato con successo, run #3 `Success` in 21s).
+   * Il workflow `.github/workflows/telemetry_logger.yml` gira su cron ogni 5 minuti (`*/5 * * * *`).
    * Esegue `scripts/cloud_logger.py`, che interroga Viessmann e BTicino (1 sola chiamata ciascuno) e fa append a `data/cloud_telemetry.jsonl`.
-   * Consumo API: 48 chiamate/giorno su 1.440 consentite da Viessmann (3.3%) e su 500 consentite da Netatmo (9.6%).
+   * Consumo API: 288 chiamate/giorno su 1.440 consentite da Viessmann (~20%) e su oltre 4.000 consentite da Netatmo. Risoluzione temporale ottimale per catturare ogni ciclo del compressore e della pompa Grundfos.
 2. **Sincronizzazione Cloud -> SQLite**:
    * L'applicazione desktop dispone del pulsante `☁️ Sync Cloud (GitHub)` nella barra superiore, che importa i campioni da `cloud_telemetry.jsonl` nel database SQLite locale scartando i duplicati basandosi sull'indice `timestamp_utc`.
+
+### E. Regole Mandatorie di Sicurezza, Privacy e Controllo Pre-Commit:
+1. **Anonimizzazione Geografica e Dati Personali (Anti-Intrusione)**:
+   * Nei file pubblici, esportati o versionati non devono MAI comparire toponimi di comuni/paesi specifici né indirizzi email personali o MAC address fisici.
+   * **Motivo di sicurezza fisica**: trattandosi di una seconda casa non presidiata nei feriali, associare la località con le letture di temperatura o setpoint (es. 7.0 °C fissa) rivelerebbe che la casa è disabitata.
+   * Usare sempre definizioni tecniche generiche: *"Abitazione di Montagna (Zona Climatica E)"*, *"Circuito Secondario"*.
+2. **Scanner di Sicurezza Automatico**:
+   * Prima di caricare file su GitHub o modificare `github_ready/`, eseguire sempre:
+     `python scripts/prepare_github_export.py`
+     oppure:
+     `python scripts/security_check.py`
+   * Lo script blocca l'operazione con codice di errore se rileva password, token, email personali o toponimi geografici.
 
 ---
 
 ## 3. STRUTTURA DEL REPOSITORY
 ```text
 vitocal remote/
+├── .agents/
+│   ├── rules/
+│   │   └── security-and-privacy.md # Regola permanente di audit pre-commit
+│   └── skills/
+│       └── vitocal-remote-expert/  # Skill runbook, architettura e troubleshooting
 ├── .github/
 │   └── workflows/
-│       └── telemetry_logger.yml # Workflow GitHub Actions 24/7 (cron ogni 30 min)
-├── .env                         # Credenziali e token (NON versionare)
-├── .env.example                 # Template credenziali
-├── .gitignore                   # Esclusioni git (token, cache, db, dumps)
-├── requirements_cloud.txt       # Dipendenze headless minime per GitHub Actions
-├── config.py                    # Validazione e caricamento impostazioni
-├── app.py                       # ENTRY POINT APPLICAZIONE DESKTOP PYQT6
-├── avvia_gestionale.bat         # Launcher doppio-clic per Windows
-├── test_bench.py                # Banchetto prova interattivo CLI
+│       └── telemetry_logger.yml    # Workflow GitHub Actions 24/7 (cron ogni 30 min)
+├── .env                            # Credenziali e token (NON versionare)
+├── .env.example                    # Template credenziali anonimizzato
+├── .gitignore                      # Esclusioni git (token, cache, db, dumps)
+├── requirements_cloud.txt          # Dipendenze headless minime per GitHub Actions
+├── config.py                       # Validazione e caricamento impostazioni
+├── app.py                          # ENTRY POINT APPLICAZIONE DESKTOP PYQT6
+├── avvia_gestionale.bat            # Launcher doppio-clic per Windows
+├── test_bench.py                   # Banchetto prova interattivo CLI
 ├── api/
-│   ├── viessmann.py             # Connettore Viessmann PyViCare (lettura/scrittura verificata)
-│   └── bticino.py               # Connettore Netatmo/BTicino Smarther (read_smarther)
+│   ├── viessmann.py                # Connettore Viessmann PyViCare (lettura/scrittura verificata)
+│   └── bticino.py                  # Connettore Netatmo/BTicino Smarther (read_smarther)
 ├── storage/
-│   └── database.py              # Manager SQLite (tabella telemetry_samples versionata)
+│   └── database.py                 # Manager SQLite (tabella telemetry_samples versionata)
 ├── models/
-│   └── telemetry.py             # Modelli Pydantic per telemetria
+│   └── telemetry.py                # Modelli Pydantic per telemetria
 ├── ui/
-│   ├── main_window.py           # Interfaccia grafica PyQt6 (5 Tab, steppers, crosshair, HUD)
-│   ├── heating_curve_widget.py  # Visualizzatore dinamico interattivo Curva Climatica LWT vs OAT
-│   └── synoptic_widget.py       # Sinottico SCADA vettoriale impianto idraulico e mappatura sonde
+│   ├── main_window.py              # Interfaccia grafica PyQt6 (5 Tab, steppers, crosshair, HUD)
+│   ├── heating_curve_widget.py     # Visualizzatore dinamico interattivo Curva Climatica LWT vs OAT
+│   └── synoptic_widget.py          # Sinottico SCADA vettoriale impianto idraulico e mappatura sonde
 ├── scripts/
-│   ├── feature_dumper.py        # Diagnostica completa e dump 193 features
-│   └── cloud_logger.py          # Logger headless 24/7 per GitHub Actions
+│   ├── feature_dumper.py           # Diagnostica completa e dump 193 features
+│   ├── cloud_logger.py             # Logger headless 24/7 per GitHub Actions
+│   ├── security_check.py           # Scanner preventivo di privacy e sicurezza pre-commit
+│   └── prepare_github_export.py    # Preparatore automatico cartella github_ready/
+├── github_ready/                   # Cartella pulita, verificata e anonimizzata per upload Git
 ├── data/
-│   ├── vitocal_telemetry.db     # Database SQLite locale
-│   ├── cloud_telemetry.jsonl    # Log telemetrico continuo registrato dal cloud
-│   └── dumps/                   # Dump JSON reali delle API
-├── AGENTS.md                    # Questa memoria persistente per tutte le chat
-├── PROJECT_STATUS.md            # Registro avanzamento e changelog
-└── README.md                    # Istruzioni d'uso
+│   ├── vitocal_telemetry.db        # Database SQLite locale
+│   ├── cloud_telemetry.jsonl       # Log telemetrico continuo registrato dal cloud
+│   └── dumps/                      # Dump JSON reali delle API
+├── AGENTS.md                       # Questa memoria persistente per tutte le chat
+├── PROJECT_STATUS.md               # Registro avanzamento e changelog
+└── README.md                       # Istruzioni d'uso
 ```
 
 ---
