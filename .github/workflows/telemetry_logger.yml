@@ -2,8 +2,8 @@ name: Telemetry Cloud Logger (Vitocal & BTicino)
 
 on:
   schedule:
-    # Esegue ogni 30 minuti (48 volte al giorno)
-    - cron: '*/30 * * * *'
+    # Esegue ogni 5 minuti (288 volte al giorno)
+    - cron: '*/5 * * * *'
   workflow_dispatch: # Consente l'avvio manuale con pulsante
 
 concurrency:
