@@ -1,12 +1,8 @@
 {
-  "timestamp_utc": "2026-11-19T21:24:10.088931+00:00",
-  "command": "bticino_setpoint",
-  "params": {
-    "mode": "manual",
-    "temp": 7.0,
-    "duration_minutes": 180
-  },
+  "timestamp_utc": "2026-11-19T23:27:05.104919+00:00",
+  "command": "cronjob_test",
+  "params": {},
   "success": true,
-  "message": "Setpoint BTicino aggiornato con successo a 7.0 °C (modalità: manual)",
-  "sample_logged": true
+  "message": "Secrets cron-job.org OK! Job #8895676 (ATTIVO), minuti=[0,5,10,15,20,25...]",
+  "sample_logged": false
 }
