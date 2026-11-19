@@ -5,7 +5,7 @@
   "cycle_started_utc": null,
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-19T22:55:52.197406+00:00",
+  "last_eval_utc": "2026-11-19T23:01:41.641279+00:00",
   "last_action_utc": null,
   "last_action_reason": "In attesa di attivazione dalla PWA",
   "indoor_slope_c_per_h": 0.0,
