@@ -7,6 +7,7 @@ import bisect
 import json
 import logging
 import math
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -39,6 +40,8 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QListWidget,
     QListWidgetItem,
+    QScrollArea,
+    QFrame,
 )
 import pyqtgraph as pg
 from rapidfuzz import fuzz, process
@@ -47,6 +50,7 @@ from config import Config
 from api.viessmann import ViessmannConnector
 from api.bticino import BTicinoConnector
 from storage.database import DatabaseManager
+from storage.analytics import analyze_telemetry_period
 from models.telemetry import TelemetrySample
 from ui.heating_curve_widget import HeatingCurveWidget
 from ui.synoptic_widget import PlantSynopticWidget
@@ -618,17 +622,20 @@ class MainWindow(QMainWindow):
         self.tab_control = QWidget()
         self.tab_inspector = QWidget()
         self.tab_history = QWidget()
+        self.tab_analytics = QWidget()
 
         self.tabs.addTab(self.tab_dashboard, "📊 Dashboard Live")
         self.tabs.addTab(self.synoptic_widget, "🗺️ Sinottico Impianto & Sonde")
         self.tabs.addTab(self.tab_control, "🎛️ Banchetto Comandi & Preset")
         self.tabs.addTab(self.tab_inspector, "🔍 JSON Feature Inspector (193+ Parametri)")
         self.tabs.addTab(self.tab_history, "📈 Grafici & Cicli Compressore (SQLite)")
+        self.tabs.addTab(self.tab_analytics, "⏱️ Statistiche & Efficienza (X Ore)")
 
         self._build_dashboard_tab()
         self._build_control_tab()
         self._build_inspector_tab()
         self._build_history_tab()
+        self._build_analytics_tab()
 
         main_layout.addWidget(self.tabs)
 
@@ -1421,66 +1428,71 @@ class MainWindow(QMainWindow):
                 cur.execute("SELECT * FROM telemetry_samples ORDER BY id DESC LIMIT 1")
                 row = cur.fetchone()
                 if row:
+                    row_dict = dict(row)
                     v_preload = {
-                        "outside_temp_c": row["external_temp_c"],
-                        "supply_temp_c": row["pdc_supply_temp_c"],
-                        "return_temp_c": row["pdc_return_temp_c"],
-                        "buffer_temp_c": row["buffer_temp_c"],
-                        "dhw_storage_temp_c": row["dhw_storage_temp_c"],
-                        "hot_gas_pressure_bar": row["hot_gas_pressure_bar"],
-                        "hot_gas_temp_c": row["hot_gas_temp_c"],
-                        "liquid_gas_temp_c": row["liquid_gas_temp_c"],
-                        "suction_gas_temp_c": row["suction_gas_temp_c"],
-                        "compressor_active": row["compressor_active"],
-                        "compressor_modulation_percent": row["compressor_modulation_percent"],
-                        "primary_pump_rotation_percent": row["primary_pump_rotation_percent"],
-                        "cop_heating": row["cop_heating"],
-                        "cop_dhw": row["cop_dhw"],
-                        "cop_total": row["cop_total"],
-                        "compressor_hours": row["compressor_hours"],
-                        "compressor_starts": row["compressor_starts"],
-                        "heating_curve_slope": row["heating_curve_slope"],
-                        "heating_curve_shift": row["heating_curve_shift"],
-                        "active_mode": row["active_mode"],
-                        "active_program": row["active_program"],
+                        "outside_temp_c": row_dict.get("external_temp_c"),
+                        "supply_temp_c": row_dict.get("pdc_supply_temp_c"),
+                        "return_temp_c": row_dict.get("pdc_return_temp_c"),
+                        "buffer_temp_c": row_dict.get("buffer_temp_c"),
+                        "dhw_storage_temp_c": row_dict.get("dhw_storage_temp_c"),
+                        "hot_gas_pressure_bar": row_dict.get("hot_gas_pressure_bar"),
+                        "hot_gas_temp_c": row_dict.get("hot_gas_temp_c"),
+                        "liquid_gas_temp_c": row_dict.get("liquid_gas_temp_c"),
+                        "suction_gas_temp_c": row_dict.get("suction_gas_temp_c"),
+                        "compressor_active": row_dict.get("compressor_active"),
+                        "compressor_modulation_percent": row_dict.get("compressor_modulation_percent"),
+                        "primary_pump_rotation_percent": row_dict.get("primary_pump_rotation_percent"),
+                        "cop_heating": row_dict.get("cop_heating"),
+                        "cop_dhw": row_dict.get("cop_dhw"),
+                        "cop_total": row_dict.get("cop_total"),
+                        "compressor_hours": row_dict.get("compressor_hours"),
+                        "compressor_starts": row_dict.get("compressor_starts"),
+                        "heating_curve_slope": row_dict.get("heating_curve_slope"),
+                        "heating_curve_shift": row_dict.get("heating_curve_shift"),
+                        "active_mode": row_dict.get("active_mode"),
+                        "active_program": row_dict.get("active_program"),
                     }
                     b_preload = {
-                        "indoor_temp_c": row["indoor_temp_bticino_c"],
-                        "setpoint_c": row["indoor_setpoint_bticino_c"],
-                        "humidity_percent": row["humidity_corridoio_percent"],
-                        "grundfos_pump_active": row["grundfos_pump_active"],
-                        "mode": row["active_program"],
+                        "indoor_temp_c": row_dict.get("indoor_temp_bticino_c"),
+                        "setpoint_c": row_dict.get("indoor_setpoint_bticino_c"),
+                        "humidity_percent": row_dict.get("humidity_percent"),
+                        "grundfos_pump_active": row_dict.get("grundfos_pump_active"),
+                        "mode": row_dict.get("active_program"),
                     }
+                    self.latest_v_data = v_preload
+                    self.latest_b_data = b_preload
+
+                    # Refresh Synoptic SCADA Canvas
                     self.synoptic_widget.update_telemetry({**v_preload, **b_preload})
 
                     # Preload Dashboard Tiles
-                    if row["external_temp_c"] is not None:
-                        self.val_ext_temp.setText(f"{row['external_temp_c']:.1f} °C")
-                    if row["buffer_temp_c"] is not None:
-                        self.val_buffer_temp.setText(f"{row['buffer_temp_c']:.1f} °C")
-                    if row["dhw_storage_temp_c"] is not None:
-                        self.val_dhw_temp.setText(f"{row['dhw_storage_temp_c']:.1f} °C")
-                    if row["pdc_supply_temp_c"] is not None:
-                        self.val_supply_temp.setText(f"{row['pdc_supply_temp_c']:.1f} °C")
-                    if row["pdc_return_temp_c"] is not None:
-                        self.val_return_temp.setText(f"{row['pdc_return_temp_c']:.1f} °C")
-                    if row["indoor_temp_bticino_c"] is not None:
-                        self.val_indoor_temp.setText(f"{row['indoor_temp_bticino_c']:.1f} °C")
-                    if row["indoor_setpoint_bticino_c"] is not None:
-                        self.val_indoor_setpoint.setText(f"{row['indoor_setpoint_bticino_c']:.1f} °C")
-                    if row["humidity_percent"] is not None:
-                        self.val_humidity.setText(f"{row['humidity_percent']:.0f} %")
-                    if row["compressor_hours"] is not None:
-                        self.val_comp_hours.setText(f"{row['compressor_hours']} h ({row['compressor_starts']} avvii)")
-                    if row["hot_gas_pressure_bar"] is not None:
-                        self.val_gas_pressure.setText(f"{row['hot_gas_pressure_bar']} bar")
-                    if row["cop_heating"] is not None:
-                        self.val_cop_heating.setText(str(row["cop_heating"]))
-                    if row["cop_dhw"] is not None:
-                        self.val_cop_dhw.setText(str(row["cop_dhw"]))
+                    if row_dict.get("external_temp_c") is not None:
+                        self.val_ext_temp.setText(f"{row_dict['external_temp_c']:.1f} °C")
+                    if row_dict.get("buffer_temp_c") is not None:
+                        self.val_buffer_temp.setText(f"{row_dict['buffer_temp_c']:.1f} °C")
+                    if row_dict.get("dhw_storage_temp_c") is not None:
+                        self.val_dhw_temp.setText(f"{row_dict['dhw_storage_temp_c']:.1f} °C")
+                    if row_dict.get("pdc_supply_temp_c") is not None:
+                        self.val_supply_temp.setText(f"{row_dict['pdc_supply_temp_c']:.1f} °C")
+                    if row_dict.get("pdc_return_temp_c") is not None:
+                        self.val_return_temp.setText(f"{row_dict['pdc_return_temp_c']:.1f} °C")
+                    if row_dict.get("indoor_temp_bticino_c") is not None:
+                        self.val_indoor_temp.setText(f"{row_dict['indoor_temp_bticino_c']:.1f} °C")
+                    if row_dict.get("indoor_setpoint_bticino_c") is not None:
+                        self.val_indoor_setpoint.setText(f"{row_dict['indoor_setpoint_bticino_c']:.1f} °C")
+                    if row_dict.get("humidity_percent") is not None:
+                        self.val_humidity.setText(f"{row_dict['humidity_percent']:.0f} %")
+                    if row_dict.get("compressor_hours") is not None:
+                        self.val_comp_hours.setText(f"{row_dict['compressor_hours']} h ({row_dict.get('compressor_starts', 0)} avvii)")
+                    if row_dict.get("hot_gas_pressure_bar") is not None:
+                        self.val_gas_pressure.setText(f"{row_dict['hot_gas_pressure_bar']} bar")
+                    if row_dict.get("cop_heating") is not None:
+                        self.val_cop_heating.setText(str(row_dict["cop_heating"]))
+                    if row_dict.get("cop_dhw") is not None:
+                        self.val_cop_dhw.setText(str(row_dict["cop_dhw"]))
 
-                    slope = row["heating_curve_slope"]
-                    shift = row["heating_curve_shift"]
+                    slope = row_dict.get("heating_curve_slope")
+                    shift = row_dict.get("heating_curve_shift")
                     if slope is not None and shift is not None:
                         self.val_curve.setText(f"Slope: {slope} | Shift: {shift}")
                         self.saved_slope = float(slope)
@@ -1493,12 +1505,23 @@ class MainWindow(QMainWindow):
                         self.spin_shift.blockSignals(False)
                         self._check_curve_sync_state()
 
-                    comp_on = (row["compressor_active"] or 0) > 0 or (row["compressor_modulation_percent"] or 0) > 0
+                    # Heating Curve Widget update
+                    if row_dict.get("external_temp_c") is not None:
+                        self.heating_curve_widget.set_current_oat(float(row_dict["external_temp_c"]))
+                    if slope is not None and shift is not None:
+                        self.heating_curve_widget.set_parameters(
+                            float(slope),
+                            float(shift),
+                            current_oat=float(row_dict.get("external_temp_c", 5.9)),
+                            t_room_normal=self.saved_temp_norm,
+                        )
+
+                    comp_on = (row_dict.get("compressor_active") or 0) > 0 or (row_dict.get("compressor_modulation_percent") or 0) > 0
                     self.val_comp_status.setText("ATTIVO" if comp_on else "SPENTO")
                     self.val_comp_status.setStyleSheet("color: #10b981;" if comp_on else "color: #9ca3af;")
-                    self.val_comp_modul.setText(f"{row['compressor_modulation_percent'] or 0} %")
+                    self.val_comp_modul.setText(f"{row_dict.get('compressor_modulation_percent') or 0} %")
 
-                    pump_active = row["grundfos_pump_active"]
+                    pump_active = row_dict.get("grundfos_pump_active")
                     if pump_active == 1:
                         self.banner_grundfos.setText("POMPA GRUNDFOS: ACCESA (Rilancio attivo al pavimento radiante)")
                         self.banner_grundfos.setStyleSheet("background-color: #065f46; color: #6ee7b7; padding: 16px; border-radius: 8px; margin-top: 10px;")
@@ -1508,7 +1531,7 @@ class MainWindow(QMainWindow):
 
                     self._update_charts()
         except Exception as e:
-            logger.debug("Preload DB sample: %s", e)
+            logger.error("Preload DB sample: %s", e)
 
     # --------------------------------------------------------------------------
     # Data Refresh & UI Update
@@ -1631,8 +1654,9 @@ class MainWindow(QMainWindow):
                 t_room_normal=float(norm_t) if norm_t is not None else 12.0,
             )
 
-        # Update History Charts
+        # Update History Charts & Analytics
         self._update_charts()
+        self._calculate_analytics()
 
         now_str = datetime.now().strftime("%H:%M:%S")
         self.footer_label.setText(f"Ultimo aggiornamento: {now_str} — Campione ID {sample_id} salvato su SQLite.")
@@ -2319,11 +2343,15 @@ class MainWindow(QMainWindow):
         self.footer_label.setText("Connessione a GitHub Cloud per scaricare i campioni...")
         QApplication.processEvents()
 
-        raw_url = f"https://raw.githubusercontent.com/{Config.GITHUB_REPO}/main/data/cloud_telemetry.jsonl"
+        # Cache-busting query parameter + headers to bypass GitHub Fastly CDN 300s cache
+        raw_url = f"https://raw.githubusercontent.com/{Config.GITHUB_REPO}/main/data/cloud_telemetry.jsonl?t={int(time.time())}"
         cloud_file = Config.DATA_DIR / "cloud_telemetry.jsonl"
         cloud_file.parent.mkdir(parents=True, exist_ok=True)
 
-        headers = {}
+        headers = {
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+        }
         if Config.GITHUB_TOKEN:
             headers["Authorization"] = f"token {Config.GITHUB_TOKEN}"
 
@@ -2384,19 +2412,24 @@ class MainWindow(QMainWindow):
             if imported_count > 0:
                 self._load_latest_db_sample()
                 self._update_charts()
+                self._calculate_analytics()
                 self.footer_label.setText(f"Sincronizzazione completata: {imported_count} nuovi campioni importati dal Cloud.")
                 QMessageBox.information(
                     self,
                     "Sincronizzazione Riuscita",
                     f"✅ Scaricati e importati con successo {imported_count} nuovi campioni registrati da GitHub Cloud!\n\n"
-                    "Grafici, sinottico e dashboard aggiornati con le ultime letture."
+                    "Grafici, sinottico, statistiche e dashboard aggiornati con le ultime letture."
                 )
             else:
+                self._load_latest_db_sample()
+                self._update_charts()
+                self._calculate_analytics()
                 self.footer_label.setText("Database locale già allineato con il Cloud GitHub.")
                 QMessageBox.information(
                     self,
                     "Database Già Aggiornato",
-                    f"Tutti i campioni presenti nel file Cloud ({len(lines)} righe) sono già archiviati nel database SQLite locale."
+                    f"Tutti i campioni presenti nel file Cloud ({len(lines)} righe) sono già archiviati nel database SQLite locale.\n\n"
+                    "Sinottico, dashboard, statistiche e grafici ricaricati con l'ultimo campione disponibile."
                 )
         except Exception as e:
             QMessageBox.warning(self, "Errore Sincronizzazione Cloud", f"Impossibile completare la sincronizzazione:\n{e}")
@@ -2440,3 +2473,419 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Preset Inviato", f"Preset '{preset_name}' inviato con successo!")
             self.refresh_data()
             self.refresh_data()
+
+    # --------------------------------------------------------------------------
+    # Tab 6: Advanced Analytics & Thermodynamic Efficiency Engine
+    # --------------------------------------------------------------------------
+    def _build_analytics_tab(self):
+        tab_layout = QVBoxLayout(self.tab_analytics)
+        tab_layout.setContentsMargins(0, 0, 0, 0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("background-color: #0c1322; border: none;")
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setSpacing(14)
+        layout.setContentsMargins(18, 18, 18, 18)
+
+        # 1. TOP BAR: TIMEFRAME SELECTOR & CONTROLS
+        top_box = QFrame()
+        top_box.setStyleSheet("background-color: #161f30; border: 1px solid #334155; border-radius: 10px; padding: 10px;")
+        t_lay = QVBoxLayout(top_box)
+        t_lay.setSpacing(10)
+
+        r1 = QHBoxLayout()
+        lbl_title = QLabel("⏱️ Analisi & Statistiche di Funzionamento (Finestra Personalizzabile)")
+        lbl_title.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        lbl_title.setStyleSheet("color: #38bdf8;")
+        r1.addWidget(lbl_title)
+        r1.addStretch()
+
+        # Preset Buttons
+        self.preset_btn_group = []
+        for hours_val, label in [(6, "6h"), (12, "12h"), (24, "24h"), (48, "48h"), (72, "72h"), (168, "7 Giorni"), (0, "Tutto")]:
+            btn = QPushButton(label)
+            btn.setCheckable(True)
+            if hours_val == 24:
+                btn.setChecked(True)
+            btn.setStyleSheet("""
+                QPushButton { background: #0f172a; border: 1px solid #334155; color: #94a3b8; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 11px; }
+                QPushButton:checked { background: #38bdf8; color: #04121e; border-color: #38bdf8; font-weight: bold; }
+                QPushButton:hover:!checked { background: #1e293b; color: #f8fafc; }
+            """)
+            btn.clicked.connect(lambda checked, h=hours_val, b=btn: self._on_analytics_preset_clicked(h, b))
+            r1.addWidget(btn)
+            self.preset_btn_group.append((btn, hours_val))
+
+        t_lay.addLayout(r1)
+
+        # Row 2: Custom Hours Spinbox + Cost + Calc Button
+        r2 = QHBoxLayout()
+        r2.setSpacing(10)
+
+        lbl_custom = QLabel("Finestra Ore Personalizzata:")
+        lbl_custom.setStyleSheet("color: #cbd5e1; font-weight: 600; font-size: 11px;")
+        r2.addWidget(lbl_custom)
+
+        self.spin_analytics_hours = QSpinBox()
+        self.spin_analytics_hours.setRange(1, 720)
+        self.spin_analytics_hours.setValue(24)
+        self.spin_analytics_hours.setSuffix(" ore")
+        self.spin_analytics_hours.setFixedWidth(110)
+        self.spin_analytics_hours.setStyleSheet("background: #0f172a; color: #38bdf8; border: 1px solid #334155; border-radius: 6px; padding: 4px; font-weight: bold;")
+        self.spin_analytics_hours.valueChanged.connect(self._on_custom_hours_spin_changed)
+
+        btn_h_minus = QPushButton("-")
+        btn_h_minus.setFixedSize(26, 26)
+        btn_h_minus.setStyleSheet("background: #1e293b; color: #38bdf8; border: 1px solid #334155; border-radius: 4px; font-weight: bold;")
+        btn_h_minus.clicked.connect(lambda: self.spin_analytics_hours.setValue(max(1, self.spin_analytics_hours.value() - 6)))
+
+        btn_h_plus = QPushButton("+")
+        btn_h_plus.setFixedSize(26, 26)
+        btn_h_plus.setStyleSheet("background: #1e293b; color: #38bdf8; border: 1px solid #334155; border-radius: 4px; font-weight: bold;")
+        btn_h_plus.clicked.connect(lambda: self.spin_analytics_hours.setValue(min(720, self.spin_analytics_hours.value() + 6)))
+
+        r2.addWidget(btn_h_minus)
+        r2.addWidget(self.spin_analytics_hours)
+        r2.addWidget(btn_h_plus)
+
+        r2.addSpacing(14)
+        lbl_cost = QLabel("Costo Elettricità:")
+        lbl_cost.setStyleSheet("color: #cbd5e1; font-weight: 600; font-size: 11px;")
+        r2.addWidget(lbl_cost)
+
+        self.spin_analytics_cost = QDoubleSpinBox()
+        self.spin_analytics_cost.setRange(0.05, 1.50)
+        self.spin_analytics_cost.setSingleStep(0.01)
+        self.spin_analytics_cost.setValue(0.25)
+        self.spin_analytics_cost.setSuffix(" €/kWh")
+        self.spin_analytics_cost.setFixedWidth(100)
+        self.spin_analytics_cost.setStyleSheet("background: #0f172a; color: #facc15; border: 1px solid #334155; border-radius: 6px; padding: 4px; font-weight: bold;")
+        self.spin_analytics_cost.valueChanged.connect(self._calculate_analytics)
+        r2.addWidget(self.spin_analytics_cost)
+
+        r2.addSpacing(14)
+        self.btn_calc_analytics = QPushButton("🔄 Calcola")
+        self.btn_calc_analytics.setStyleSheet("""
+            QPushButton { background: #0284c7; color: white; border: none; border-radius: 6px; padding: 6px 14px; font-weight: bold; font-size: 11px; }
+            QPushButton:hover { background: #0369a1; }
+        """)
+        self.btn_calc_analytics.clicked.connect(self._calculate_analytics)
+        r2.addWidget(self.btn_calc_analytics)
+
+        r2.addStretch()
+        self.lbl_analytics_effective_range = QLabel("Analisi in corso...")
+        self.lbl_analytics_effective_range.setStyleSheet("color: #94a3b8; font-size: 11px; font-style: italic;")
+        r2.addWidget(self.lbl_analytics_effective_range)
+
+        t_lay.addLayout(r2)
+        layout.addWidget(top_box)
+
+        # 2. ANTI-FROST SAFETY BANNER
+        self.banner_frost_safety = QFrame()
+        self.banner_frost_safety.setStyleSheet("background-color: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 10px; padding: 12px;")
+        b_lay = QVBoxLayout(self.banner_frost_safety)
+        b_lay.setSpacing(6)
+
+        b_top = QHBoxLayout()
+        self.lbl_safety_verdict = QLabel("🛡️ CASA AL SICURO DAL GELO")
+        self.lbl_safety_verdict.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        self.lbl_safety_verdict.setStyleSheet("color: #6ee7b7;")
+        b_top.addWidget(self.lbl_safety_verdict)
+        b_top.addStretch()
+
+        self.lbl_safety_margin = QLabel("+2.8 °C")
+        self.lbl_safety_margin.setStyleSheet("background: rgba(16, 185, 129, 0.25); color: #10b981; font-weight: bold; font-size: 13px; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.5);")
+        b_top.addWidget(self.lbl_safety_margin)
+        b_lay.addLayout(b_top)
+
+        self.lbl_safety_advice = QLabel("Caricamento consigli operativi...")
+        self.lbl_safety_advice.setStyleSheet("color: #cbd5e1; font-size: 11.5px; line-height: 1.4;")
+        self.lbl_safety_advice.setWordWrap(True)
+        b_lay.addWidget(self.lbl_safety_advice)
+        layout.addWidget(self.banner_frost_safety)
+
+        # 3. KPI CARDS GRID (4 Cards)
+        kpi_row = QHBoxLayout()
+        kpi_row.setSpacing(12)
+
+        def make_kpi_card(title_txt, color_hex):
+            card = QFrame()
+            card.setStyleSheet("background-color: #161f30; border: 1px solid #334155; border-radius: 10px; padding: 12px;")
+            c_lay = QVBoxLayout(card)
+            c_lay.setContentsMargins(10, 10, 10, 10)
+            c_lay.setSpacing(4)
+            lbl_t = QLabel(title_txt.upper())
+            lbl_t.setStyleSheet("font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 0.5px;")
+            c_lay.addWidget(lbl_t)
+            lbl_val = QLabel("--")
+            lbl_val.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+            lbl_val.setStyleSheet(f"color: {color_hex};")
+            c_lay.addWidget(lbl_val)
+            lbl_sub = QLabel("--")
+            lbl_sub.setStyleSheet("font-size: 10px; color: #64748b;")
+            c_lay.addWidget(lbl_sub)
+            return card, lbl_val, lbl_sub
+
+        card1, self.kpi_starts_val, self.kpi_starts_sub = make_kpi_card("Avviamenti Compressore", "#38bdf8")
+        card2, self.kpi_dur_val, self.kpi_dur_sub = make_kpi_card("Durata Media Ciclo", "#f59e0b")
+        card3, self.kpi_run_val, self.kpi_run_sub = make_kpi_card("Ore Marcia PdC", "#10b981")
+        card4, self.kpi_cost_val, self.kpi_cost_sub = make_kpi_card("Spesa Stimata Periodo", "#facc15")
+
+        kpi_row.addWidget(card1)
+        kpi_row.addWidget(card2)
+        kpi_row.addWidget(card3)
+        kpi_row.addWidget(card4)
+        layout.addLayout(kpi_row)
+
+        # 4. MODULATION QUALITY BOX ("Ha modulato bene?")
+        mod_box = QFrame()
+        mod_box.setStyleSheet("background-color: #161f30; border: 1px solid #334155; border-radius: 10px; padding: 14px;")
+        m_lay = QVBoxLayout(mod_box)
+        m_lay.setSpacing(8)
+
+        m_top = QHBoxLayout()
+        lbl_mod_hdr = QLabel("🎯 Diagnostica Qualità Modulazione Inverter")
+        lbl_mod_hdr.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        lbl_mod_hdr.setStyleSheet("color: #38bdf8;")
+        m_top.addWidget(lbl_mod_hdr)
+        m_top.addStretch()
+
+        self.lbl_mod_score = QLabel("Score 95/100")
+        self.lbl_mod_score.setStyleSheet("background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-weight: bold; font-size: 12px; padding: 3px 10px; border-radius: 6px; border: 1px solid rgba(56, 189, 248, 0.3);")
+        m_top.addWidget(self.lbl_mod_score)
+        m_lay.addLayout(m_top)
+
+        self.lbl_mod_verdict = QLabel("Valutazione in corso...")
+        self.lbl_mod_verdict.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        self.lbl_mod_verdict.setStyleSheet("color: #f8fafc;")
+        m_lay.addWidget(self.lbl_mod_verdict)
+
+        self.lbl_mod_diagnosis = QLabel("Dettagli diagnosi...")
+        self.lbl_mod_diagnosis.setStyleSheet("color: #cbd5e1; font-size: 11.5px; line-height: 1.4;")
+        self.lbl_mod_diagnosis.setWordWrap(True)
+        m_lay.addWidget(self.lbl_mod_diagnosis)
+
+        # Ripartizione Carico Inverter
+        load_strip = QFrame()
+        load_strip.setStyleSheet("background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px; margin-top: 6px;")
+        ls_lay = QHBoxLayout(load_strip)
+        ls_lay.setContentsMargins(10, 8, 10, 8)
+
+        self.lbl_load_low = QLabel("🟢 Basso Carico (1-30%): <b>0%</b>")
+        self.lbl_load_low.setStyleSheet("color: #10b981; font-size: 11px;")
+        self.lbl_load_mid = QLabel("🔵 Medio Carico (31-60%): <b>0%</b>")
+        self.lbl_load_mid.setStyleSheet("color: #38bdf8; font-size: 11px;")
+        self.lbl_load_high = QLabel("🔴 Alto Carico (>60%): <b>0%</b>")
+        self.lbl_load_high.setStyleSheet("color: #f43f5e; font-size: 11px;")
+        self.lbl_max_mod = QLabel("Picco Max: <b>0%</b>")
+        self.lbl_max_mod.setStyleSheet("color: #facc15; font-size: 11px;")
+
+        ls_lay.addWidget(self.lbl_load_low)
+        ls_lay.addStretch()
+        ls_lay.addWidget(self.lbl_load_mid)
+        ls_lay.addStretch()
+        ls_lay.addWidget(self.lbl_load_high)
+        ls_lay.addStretch()
+        ls_lay.addWidget(self.lbl_max_mod)
+        m_lay.addWidget(load_strip)
+
+        layout.addWidget(mod_box)
+
+        # 5. ELECTRICAL CONSUMPTION & POWER BOX
+        cons_box = QFrame()
+        cons_box.setStyleSheet("background-color: #161f30; border: 1px solid #334155; border-radius: 10px; padding: 14px;")
+        c_lay = QVBoxLayout(cons_box)
+        c_lay.setSpacing(8)
+
+        c_top = QHBoxLayout()
+        lbl_cons_hdr = QLabel("⚡ Bilancio Energetico & Stima Spesa Elettrica")
+        lbl_cons_hdr.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        lbl_cons_hdr.setStyleSheet("color: #facc15;")
+        c_top.addWidget(lbl_cons_hdr)
+        c_top.addStretch()
+
+        self.lbl_cop_avg = QLabel("COP Medio: 3.10")
+        self.lbl_cop_avg.setStyleSheet("background: rgba(52, 211, 153, 0.15); color: #34d399; font-weight: bold; font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(52, 211, 153, 0.3);")
+        c_top.addWidget(self.lbl_cop_avg)
+        c_lay.addLayout(c_top)
+
+        self.lbl_cons_desc = QLabel(
+            "Stima basata sulla potenza modulante del compressore Vitocal 111-S (11-12 kW nominali), "
+            "assorbimento inverter, circolatore primario integrato e consumo standby dei controlli elettronici."
+        )
+        self.lbl_cons_desc.setStyleSheet("color: #94a3b8; font-size: 11px;")
+        self.lbl_cons_desc.setWordWrap(True)
+        c_lay.addWidget(self.lbl_cons_desc)
+
+        cons_stats_row = QHBoxLayout()
+        self.lbl_elec_kwh_detail = QLabel("Energia Totale: <b>-- kWh</b>")
+        self.lbl_elec_kwh_detail.setStyleSheet("color: #facc15; font-size: 11.5px;")
+        self.lbl_power_avg_detail = QLabel("Potenza Media: <b>-- kW</b>")
+        self.lbl_power_avg_detail.setStyleSheet("color: #38bdf8; font-size: 11.5px;")
+        self.lbl_cost_detail = QLabel("Costo Periodo: <b>-- €</b>")
+        self.lbl_cost_detail.setStyleSheet("color: #4ade80; font-size: 11.5px;")
+        self.lbl_daily_cost_detail = QLabel("Proiezione Giornaliera: <b>-- €/giorno</b>")
+        self.lbl_daily_cost_detail.setStyleSheet("color: #cbd5e1; font-size: 11.5px;")
+
+        cons_stats_row.addWidget(self.lbl_elec_kwh_detail)
+        cons_stats_row.addStretch()
+        cons_stats_row.addWidget(self.lbl_power_avg_detail)
+        cons_stats_row.addStretch()
+        cons_stats_row.addWidget(self.lbl_cost_detail)
+        cons_stats_row.addStretch()
+        cons_stats_row.addWidget(self.lbl_daily_cost_detail)
+        c_lay.addLayout(cons_stats_row)
+
+        layout.addWidget(cons_box)
+
+        # 6. DETAILED TABLE OF DETECTED CYCLES
+        tbl_box = QFrame()
+        tbl_box.setStyleSheet("background-color: #161f30; border: 1px solid #334155; border-radius: 10px; padding: 12px;")
+        tb_lay = QVBoxLayout(tbl_box)
+        tb_lay.setSpacing(8)
+
+        lbl_tbl_hdr = QLabel("📋 Dettaglio Singoli Cicli Accesi Rilevati")
+        lbl_tbl_hdr.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        lbl_tbl_hdr.setStyleSheet("color: #38bdf8;")
+        tb_lay.addWidget(lbl_tbl_hdr)
+
+        self.table_analytics_cycles = QTableWidget()
+        self.table_analytics_cycles.setColumnCount(6)
+        self.table_analytics_cycles.setHorizontalHeaderLabels([
+            "#", "Ora Inizio", "Ora Fine", "Durata (min)", "Carico Inverter (%)", "T Mandata PdC (°C)"
+        ])
+        self.table_analytics_cycles.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table_analytics_cycles.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.table_analytics_cycles.setStyleSheet("""
+            QTableWidget { background-color: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 6px; }
+            QHeaderView::section { background-color: #1e293b; color: #38bdf8; font-weight: bold; padding: 4px; border: 1px solid #334155; }
+        """)
+        self.table_analytics_cycles.setFixedHeight(180)
+        tb_lay.addWidget(self.table_analytics_cycles)
+        layout.addWidget(tbl_box)
+
+        scroll.setWidget(container)
+        tab_layout.addWidget(scroll)
+
+        # Initial calculation
+        self._calculate_analytics()
+
+    def _on_analytics_preset_clicked(self, hours: int, clicked_btn: QPushButton):
+        for btn, h in self.preset_btn_group:
+            btn.setChecked(btn == clicked_btn)
+        if hours > 0:
+            self.spin_analytics_hours.blockSignals(True)
+            self.spin_analytics_hours.setValue(hours)
+            self.spin_analytics_hours.blockSignals(False)
+        self._calculate_analytics()
+
+    def _on_custom_hours_spin_changed(self, val: int):
+        for btn, h in self.preset_btn_group:
+            btn.setChecked(h == val)
+        self._calculate_analytics()
+
+    def _calculate_analytics(self):
+        hours = float(self.spin_analytics_hours.value())
+        # Check if "Tutto" was clicked
+        for btn, h in self.preset_btn_group:
+            if btn.isChecked() and h == 0:
+                hours = 8760.0  # 1 year / all
+
+        cost = float(self.spin_analytics_cost.value())
+
+        # Load samples from SQLite database
+        try:
+            with self.db._get_connection() as conn:
+                rows = [dict(r) for r in conn.execute("SELECT * FROM telemetry_samples ORDER BY id ASC").fetchall()]
+        except Exception as e:
+            logger.error("Errore lettura database per analytics: %s", e)
+            return
+
+        res = analyze_telemetry_period(rows, hours_requested=hours, cost_per_kwh=cost)
+
+        # Update Effective Range Header
+        p = res["period"]
+        self.lbl_analytics_effective_range.setText(
+            f"Analisi su {p['effective_hours']} ore effettive ({p['samples_analyzed']} campioni)"
+        )
+
+        # Update Frost Safety Banner
+        sf = res["anti_frost_safety"]
+        self.lbl_safety_verdict.setText(sf["verdict"])
+        self.lbl_safety_margin.setText(f"+{sf['safety_margin_c']} °C" if sf['safety_margin_c'] is not None else "--")
+        self.lbl_safety_advice.setText(sf["advice"])
+
+        if sf["status"] == "safe":
+            self.banner_frost_safety.setStyleSheet("background-color: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 10px; padding: 12px;")
+            self.lbl_safety_verdict.setStyleSheet("color: #6ee7b7;")
+            self.lbl_safety_margin.setStyleSheet("background: rgba(16, 185, 129, 0.25); color: #10b981; font-weight: bold; font-size: 13px; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.5);")
+        elif sf["status"] == "caution":
+            self.banner_frost_safety.setStyleSheet("background-color: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 10px; padding: 12px;")
+            self.lbl_safety_verdict.setStyleSheet("color: #facc15;")
+            self.lbl_safety_margin.setStyleSheet("background: rgba(245, 158, 11, 0.25); color: #f59e0b; font-weight: bold; font-size: 13px; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(245, 158, 11, 0.5);")
+        else:
+            self.banner_frost_safety.setStyleSheet("background-color: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 10px; padding: 12px;")
+            self.lbl_safety_verdict.setStyleSheet("color: #f87171;")
+            self.lbl_safety_margin.setStyleSheet("background: rgba(239, 68, 68, 0.25); color: #ef4444; font-weight: bold; font-size: 13px; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.5);")
+
+        # Update KPI Cards
+        sc = res["starts_and_cycles"]
+        self.kpi_starts_val.setText(str(sc["total_starts"]))
+        self.kpi_starts_sub.setText(f"Duty Cycle: {sc['duty_cycle_percent']}% | Hardware Δ: {sc['starts_from_hardware']}")
+
+        self.kpi_dur_val.setText(f"{sc['duration_avg_minutes']} min")
+        self.kpi_dur_sub.setText(f"Min: {sc['duration_min_minutes']}m | Max: {sc['duration_max_minutes']}m")
+
+        self.kpi_run_val.setText(f"{sc['total_run_hours']} h")
+        self.kpi_run_sub.setText(f"Standby: {sc['standby_hours']} h ({100 - sc['duty_cycle_percent']:.1f}%)")
+
+        cs = res["consumption"]
+        self.kpi_cost_val.setText(f"{cs['estimated_cost_eur']:.2f} €")
+        self.kpi_cost_sub.setText(f"Proiezione: {cs['projected_daily_cost_eur']:.2f} €/giorno")
+
+        # Update Modulation Box
+        mo = res["modulation"]
+        self.lbl_mod_score.setText(f"Score {mo['score']}/100")
+        self.lbl_mod_score.setStyleSheet(
+            f"background: rgba(56, 189, 248, 0.15); color: {'#10b981' if mo['score'] >= 80 else ('#facc15' if mo['score'] >= 50 else '#f87171')}; "
+            "font-weight: bold; font-size: 12px; padding: 3px 10px; border-radius: 6px; border: 1px solid #334155;"
+        )
+        self.lbl_mod_verdict.setText(mo["verdict"])
+        self.lbl_mod_diagnosis.setText(mo["diagnosis"])
+
+        self.lbl_load_low.setText(f"🟢 Basso Carico (1-30%): <b>{mo['low_load_percent']}%</b>")
+        self.lbl_load_mid.setText(f"🔵 Medio Carico (31-60%): <b>{mo['mid_load_percent']}%</b>")
+        self.lbl_load_high.setText(f"🔴 Alto Carico (>60%): <b>{mo['high_load_percent']}%</b>")
+        self.lbl_max_mod.setText(f"Picco Inverter: <b>{mo['max_modulation_percent']}%</b>")
+
+        # Update Consumption Box
+        self.lbl_cop_avg.setText(f"COP Medio: {cs['avg_cop']:.2f}")
+        self.lbl_elec_kwh_detail.setText(f"Energia Totale: <b>{cs['total_elec_kwh']:.2f} kWh</b>")
+        self.lbl_power_avg_detail.setText(f"Potenza Media: <b>{cs['avg_power_kw']:.3f} kW</b>")
+        self.lbl_cost_detail.setText(f"Costo Periodo: <b>{cs['estimated_cost_eur']:.2f} €</b>")
+        self.lbl_daily_cost_detail.setText(f"Proiezione Giornaliera: <b>{cs['projected_daily_cost_eur']:.2f} €/giorno</b>")
+
+        # Update Detected Cycles Table
+        cycles = sc["cycles_list"]
+        self.table_analytics_cycles.setRowCount(0)
+        if cycles:
+            self.table_analytics_cycles.setRowCount(len(cycles))
+            for i, c in enumerate(cycles):
+                self.table_analytics_cycles.setItem(i, 0, QTableWidgetItem(f"#{i+1}"))
+                self.table_analytics_cycles.setItem(i, 1, QTableWidgetItem(str(c.get("start", ""))[:19].replace("T", " ")))
+                self.table_analytics_cycles.setItem(i, 2, QTableWidgetItem(str(c.get("end", ""))[:19].replace("T", " ")))
+                self.table_analytics_cycles.setItem(i, 3, QTableWidgetItem(f"{c.get('duration_minutes', 0):.1f} min"))
+                self.table_analytics_cycles.setItem(i, 4, QTableWidgetItem(f"{c.get('avg_modulation', 0):.0f}% (max {c.get('max_modulation', 0):.0f}%)"))
+                t_m = c.get('avg_supply_temp')
+                self.table_analytics_cycles.setItem(i, 5, QTableWidgetItem(f"{t_m:.1f} °C" if t_m is not None else "--"))
+        else:
+            self.table_analytics_cycles.setRowCount(1)
+            self.table_analytics_cycles.setItem(0, 0, QTableWidgetItem("-"))
+            self.table_analytics_cycles.setItem(0, 1, QTableWidgetItem("Nessun ciclo attivo continuo rilevato"))
+            self.table_analytics_cycles.setItem(0, 2, QTableWidgetItem("Standby protettivo attivo"))
+            self.table_analytics_cycles.setItem(0, 3, QTableWidgetItem("0 min"))
+            self.table_analytics_cycles.setItem(0, 4, QTableWidgetItem("0%"))
+            self.table_analytics_cycles.setItem(0, 5, QTableWidgetItem("--"))

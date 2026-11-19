@@ -100,6 +100,13 @@ class DatabaseManager:
             row = cursor.fetchone()
             return dict(row) if row else None
 
+    def get_samples(self, limit: int = 200) -> list[dict]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM telemetry_samples ORDER BY id DESC LIMIT ?", (limit,))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
     def get_samples_count(self) -> int:
         with self._get_connection() as conn:
             cursor = conn.cursor()
