@@ -99,14 +99,22 @@ L'impianto è idraulicamente disaccoppiato in due sottosistemi tramite un **Puff
 3. **Conferma Modale Obbligatoria prima dell'Invio**:
    * Nessun comando di scrittura verso Viessmann o BTicino deve partire senza un `QMessageBox.question` di riepilogo con pulsante di default su `No`.
 
-### D. Architettura Cloud Logging GitHub Actions (24/7 Headless):
-1. **Cron e Limiti API**:
-   * Repository GitHub collegato: `giacomogussetti-lgtm/vitocal-remote` (collaudato con successo, run #3 `Success` in 21s).
-   * Il workflow `.github/workflows/telemetry_logger.yml` gira su cron ogni 5 minuti (`*/5 * * * *`).
+### D. Architettura Cloud Logging GitHub Actions & cron-job.org (24/7 Headless):
+1. **Orchestrazione Ibrida e Bypass Limitazioni Cron**:
+   * Repository GitHub collegato: `giacomogussetti-lgtm/vitocal-remote`.
+   * Per evitare i ritardi imprevedibili (20-45 min) dello scheduler `cron` interno dei runner gratuiti di GitHub, il campionamento è pilotato via HTTPS da `cron-job.org` tramite `POST .../dispatches` con token PAT (`workflow_dispatch`).
    * Esegue `scripts/cloud_logger.py`, che interroga Viessmann e BTicino (1 sola chiamata ciascuno) e fa append a `data/cloud_telemetry.jsonl`.
-   * Consumo API: 288 chiamate/giorno su 1.440 consentite da Viessmann (~20%) e su oltre 4.000 consentite da Netatmo. Risoluzione temporale ottimale per catturare ogni ciclo del compressore e della pompa Grundfos.
+   * Il workflow gestisce la concorrenza con `concurrency: group: telemetry-logger`, impedendo sovrapposizioni.
+   * Consumo API: a 10-15 minuti di intervallo, consumo Viessmann 96-144 chiamate/giorno su 1.440 (~7-10%). Precisione al secondo.
 2. **Sincronizzazione Cloud -> SQLite**:
    * L'applicazione desktop dispone del pulsante `☁️ Sync Cloud (GitHub)` nella barra superiore, che importa i campioni da `cloud_telemetry.jsonl` nel database SQLite locale scartando i duplicati basandosi sull'indice `timestamp_utc`.
+   * **Bypass Cache CDN Fastly GitHub (300s)**: `raw.githubusercontent.com` applica una cache CDN di 5 minuti. L'URL include `?t={int(time.time())}` con intestazioni `Cache-Control: no-cache` e `Pragma: no-cache` per garantire che ogni clic scarichi sempre l'ultimo commit in tempo reale senza attendere il refresh della CDN.
+3. **Politica di Ritenzione Dati & Rotazione Hot/Cold (Campionamento 5 Minuti)**:
+   * Con campionamento ogni 5 minuti (288 campioni/giorno = 8.640 campioni/mese), un log continuo non segmentato raggiungerebbe 72 MB/anno, rallentando l'app mobile ed eccedendo i limiti di commit Git.
+   * `scripts/cloud_logger.py` adotta una **sliding window di 30 giorni** (`MAX_HOT_SAMPLES = 8640`, soglia isteresi `ROTATION_THRESHOLD = 9000`).
+   * `cloud_telemetry.jsonl` conserva sempre gli ultimi 30 giorni completi (~5.8 MB raw, solo ~600 KB trasferiti su 4G grazie a gzip HTTP), garantendo boot istantaneo e grafici fino a 30gg su smartphone.
+   * I campioni eccedenti vengono automaticamente compressi e archiviati per mese in `data/archive/telemetry_YYYY-MM.jsonl.gz`.
+   * `DatabaseManager.import_file()` su desktop supporta in modo trasparente sia `.jsonl` che `.jsonl.gz`, archiviando a lungo termine tutto lo storico su SQLite (`vitocal_telemetry.db`).
 
 ### E. Regole Mandatorie di Sicurezza, Privacy e Controllo Pre-Commit:
 1. **Anonimizzazione Geografica e Dati Personali (Anti-Intrusione)**:
@@ -120,6 +128,37 @@ L'impianto è idraulicamente disaccoppiato in due sottosistemi tramite un **Puff
      `python scripts/security_check.py`
    * Lo script blocca l'operazione con codice di errore se rileva password, token, email personali o toponimi geografici.
 
+### F. Gestione Precaricamento SQLite & Sincronizzazione Cloud:
+1. **Estrazione Sicura Dizionario da SQLite**:
+   * La funzione `_load_latest_db_sample` usa `row_dict = dict(row)` con `.get()` per evitare `IndexError`/`KeyError` in caso di variazioni schema tra migrazioni.
+   * Il campo umidità nel database è `humidity_percent`.
+2. **Refresh Grafico su Sincronizzazione**:
+   * Nel metodo `_on_sync_cloud_clicked`, il richiamo di `_load_latest_db_sample()` e `_update_charts()` è eseguito sia quando vengono aggiunti nuovi record (`imported_count > 0`), sia nel ramo `else` (quando i dati scaricati sono già archiviati), garantendo il ricaricamento istantaneo del sinottico e dei grafici.
+
+### I. Gestione Automatica dei Workflow YAML & CI/CD:
+1. **Responsabilità Esclusiva dell'Agente AI**:
+   - L'utente non deve mai comporre o correggere a mano file YAML o workflow di GitHub Actions.
+   - L'agente genera, modifica e valida direttamente tutti i file `.github/workflows/*.yml` nel workspace.
+   - Ogni modifica viene replicata in `github_ready/` ed esportata tramite `python scripts/prepare_github_export.py`.
+
+### J. Architettura Comandi Remoti da Mobile (Scrittura Setpoint & Curva Climatica):
+1. **Stesse API Cloud del Desktop (Zero Duplicazione Credenziali)**:
+   - Le credenziali API Viessmann e BTicino/Netatmo appartengono all'impianto (alla caldaia e al termostato), NON ai singoli smartphone.
+   - Non serve rigenerare token diversi per ogni dispositivo o per ogni smartphone: tutti fanno riferimento allo stesso impianto.
+2. **Esecuzione Comandi via Cloud Executor (GitHub Actions)**:
+   - I browser mobili su GitHub Pages non possono fare chiamate dirette a PyViCare a causa del CORS e per ragioni di sicurezza (mai esporre password Viessmann nel frontend web).
+   - Soluzione: l'app mobile invia un `workflow_dispatch` con parametri (es. `action: set_temperature`, `target: bticino`, `value: 12.0`) a un workflow dedicato (`apply_command.yml`).
+   - Il runner GitHub esegue lo script Python in ambiente isolato usando i **GitHub Secrets** già memorizzati (`VIESSMANN_USER`, `NETATMO_REFRESH_TOKEN`), verifica il read-back e conferma il risultato all'app mobile.
+   - In questo modo sul cellulare serve SOLO il Personal Access Token di GitHub (PAT), garantendo massima sicurezza e funzionamento 24/7 in 4G/5G ovunque nel mondo.
+
+### K. Grafici Web / PWA Mobile (Chart.js Continuous Time vs Category Scale):
+1. **Pitfall Scala a Categorie in Chart.js**:
+   - Se a Chart.js vengono passati `labels: [...]` e un array ordinario di valori `data: [y1, y2, ...]`, la libreria usa di default una **Category Scale**.
+   - Nella scala a categorie, ogni campione è distanziato a intervalli orizzontali identici indipendentemente dall'orario reale (un salto di 1 ora occuperebbe lo stesso spazio a video di un intervallo di 1 minuto, falsando visivamente la pendenza termica).
+   - Per una telemetria termodinamica coerente, si DEVE usare una scala temporale continua: `type: 'time'` con date adapter (`chartjs-adapter-date-fns`).
+   - I punti nei dataset devono avere coordinate `{ x: timestamp_ms, y: value }`. In questo modo la coordinata orizzontale riflette i minuti effettivi, le tacche orarie vengono calcolate ad intervalli uniformi (es. 01:00, 01:30, 02:00) e l'interazione touch (`mode: 'nearest', axis: 'x'`) aggancia la fetta temporale corretta con tooltip completo.
+   - Le librerie (`chart.min.js` e `chartjs-adapter-date-fns.bundle.min.js`) sono salvate in `web/js/` e gestite dal Service Worker (`sw.js`) in modalità offline-first, funzionando senza necessità di connessione a CDN esterne.
+
 ---
 
 ## 3. STRUTTURA DEL REPOSITORY
@@ -132,15 +171,28 @@ vitocal remote/
 │       └── vitocal-remote-expert/  # Skill runbook, architettura e troubleshooting
 ├── .github/
 │   └── workflows/
-│       └── telemetry_logger.yml    # Workflow GitHub Actions 24/7 (cron ogni 30 min)
+│       ├── telemetry_logger.yml    # Workflow GitHub Actions 24/7 (cron ogni 5 min)
+│       └── deploy_pwa.yml          # Deploy automatico dell'app web PWA su GitHub Pages
 ├── .env                            # Credenziali e token (NON versionare)
 ├── .env.example                    # Template credenziali anonimizzato
 ├── .gitignore                      # Esclusioni git (token, cache, db, dumps)
 ├── requirements_cloud.txt          # Dipendenze headless minime per GitHub Actions
 ├── config.py                       # Validazione e caricamento impostazioni
 ├── app.py                          # ENTRY POINT APPLICAZIONE DESKTOP PYQT6
-├── avvia_gestionale.bat            # Launcher doppio-clic per Windows
+├── web_server.py                   # SERVER FLASK PER APP MOBILE ANDROID (PWA)
+├── avvia_gestionale.bat            # Launcher desktop Windows doppio-clic
+├── avvia_app_mobile.bat            # Launcher server mobile Android doppio-clic
 ├── test_bench.py                   # Banchetto prova interattivo CLI
+├── web/                            # Frontend Web & PWA per Smartphone Android
+│   ├── index.html                  # Layout mobile SCADA con 4 Tab (Sinottico, Grafici, Sonde, Sync)
+│   ├── manifest.json               # Manifest per installazione nativa Android
+│   ├── sw.js                       # Service Worker per caching e offline
+│   ├── css/styles.css              # Tema SCADA scuro industriale per schermi touch
+│   ├── icons/                      # Icone 192px e 512px per Android
+│   └── js/
+│       ├── synoptic.js             # Motore di rendering SVG del Sinottico animato
+│       ├── charts.js               # Grafici interattivi touch Chart.js
+│       └── app.js                  # Controller PWA, sync GitHub e trigger on-demand
 ├── api/
 │   ├── viessmann.py                # Connettore Viessmann PyViCare (lettura/scrittura verificata)
 │   └── bticino.py                  # Connettore Netatmo/BTicino Smarther (read_smarther)
@@ -149,9 +201,9 @@ vitocal remote/
 ├── models/
 │   └── telemetry.py                # Modelli Pydantic per telemetria
 ├── ui/
-│   ├── main_window.py              # Interfaccia grafica PyQt6 (5 Tab, steppers, crosshair, HUD)
-│   ├── heating_curve_widget.py     # Visualizzatore dinamico interattivo Curva Climatica LWT vs OAT
-│   └── synoptic_widget.py          # Sinottico SCADA vettoriale impianto idraulico e mappatura sonde
+│   ├── main_window.py              # Interfaccia grafica desktop PyQt6
+│   ├── heating_curve_widget.py     # Visualizzatore dinamico Curva Climatica LWT vs OAT
+│   └── synoptic_widget.py          # Sinottico SCADA vettoriale desktop
 ├── scripts/
 │   ├── feature_dumper.py           # Diagnostica completa e dump 193 features
 │   ├── cloud_logger.py             # Logger headless 24/7 per GitHub Actions
@@ -160,7 +212,8 @@ vitocal remote/
 ├── github_ready/                   # Cartella pulita, verificata e anonimizzata per upload Git
 ├── data/
 │   ├── vitocal_telemetry.db        # Database SQLite locale
-│   ├── cloud_telemetry.jsonl       # Log telemetrico continuo registrato dal cloud
+│   ├── cloud_telemetry.jsonl       # Log telemetrico rolling live (ultimi 30 giorni a 5 min)
+│   ├── archive/                    # Archivi mensili compressi (telemetry_YYYY-MM.jsonl.gz)
 │   └── dumps/                      # Dump JSON reali delle API
 ├── AGENTS.md                       # Questa memoria persistente per tutte le chat
 ├── PROJECT_STATUS.md               # Registro avanzamento e changelog
@@ -173,5 +226,6 @@ vitocal remote/
 Se l'utente apre una nuova chat e chiede di continuare:
 1. Leggi questo `AGENTS.md` e `PROJECT_STATUS.md`.
 2. Verifica che i connettori `api/viessmann.py` e `api/bticino.py` siano integri.
-3. Se l'utente vuole avviare l'app grafica: invitalo a cliccare su `avvia_gestionale.bat` o lancia `Start-Process python -ArgumentList "app.py"`.
-4. Mantieni sempre la sincronizzazione tra modifiche al codice e documentazione.
+3. Se l'utente vuole avviare l'app desktop: invitalo a cliccare su `avvia_gestionale.bat`.
+4. Se l'utente vuole avviare l'app mobile Android: invitalo a cliccare su `avvia_app_mobile.bat` o lanciare `python web_server.py`.
+5. Mantieni sempre la sincronizzazione tra modifiche al codice e documentazione.

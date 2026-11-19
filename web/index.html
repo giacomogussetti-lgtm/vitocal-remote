@@ -16,8 +16,9 @@
   <!-- CSS Stylesheet -->
   <link rel="stylesheet" href="css/styles.css">
 
-  <!-- Chart.js for Responsive Touch Charts -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Chart.js & Continuous Time Date Adapter (Offline First & PWA Ready) -->
+  <script src="js/chart.min.js"></script>
+  <script src="js/chartjs-adapter-date-fns.bundle.min.js"></script>
 </head>
 <body>
 
@@ -106,8 +107,9 @@
           <div class="chart-filters">
             <button class="btn-filter" data-hours="6">6h</button>
             <button class="btn-filter active" data-hours="24">24h</button>
-            <button class="btn-filter" data-hours="72">3 Giorni</button>
-            <button class="btn-filter" data-hours="0">Tutti</button>
+            <button class="btn-filter" data-hours="72">3gg</button>
+            <button class="btn-filter" data-hours="168">7gg</button>
+            <button class="btn-filter" data-hours="0">30gg (Tutti)</button>
           </div>
         </div>
 

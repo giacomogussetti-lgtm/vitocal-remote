@@ -84,7 +84,7 @@ def scan_directory(target_path: Path) -> List[Tuple[str, int, str, str, str]]:
                 continue
 
             # Skip binary / bytecode files or self
-            if fname.endswith((".pyc", ".png", ".jpg", ".jpeg", ".ico", ".db", ".exe")) or fname == "security_check.py":
+            if fname.endswith((".pyc", ".png", ".jpg", ".jpeg", ".ico", ".db", ".exe", ".gz")) or fname == "security_check.py":
                 continue
 
             # Read text content

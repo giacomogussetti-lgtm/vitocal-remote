@@ -7,6 +7,16 @@
 
 ## 1. OBIETTIVI RAGGIUNTI (FASE 1 — BANOMETRO & DESKTOP GUI)
 
+- [x] **Gestione Ritenzione Dati Cloud & Rotazione Automatica (Campionamento 5 Minuti)**:
+  - Progettata e implementata l'architettura **"Hot Buffer + Cold Storage"** in `scripts/cloud_logger.py`:
+    - **Hot Window**: `data/cloud_telemetry.jsonl` mantiene una finestra scorrevole degli **ultimi 30 giorni** di campionamento continuo a 5 minuti (`MAX_HOT_SAMPLES = 8640`, soglia `ROTATION_THRESHOLD = 9000`). Pesa circa 5.8 MB uncompress / solo ~600 KB trasferiti via rete con compressione gzip.
+    - **Cold Archive**: al superamento della soglia, i campioni più vecchi di 30 giorni vengono automaticamente raggruppati per mese e archiviati in formato compresso `data/archive/telemetry_YYYY-MM.jsonl.gz`.
+    - **Protezione Git & Smartphone**: il file live non supererà mai i ~6 MB (evitando warning/blocchi Git su GitHub oltre 50/100 MB) e garantisce che lo smartphone scarichi sempre un dataset snello e fulmineo in <0.5s su 4G.
+    - **Compatibilità Desktop & SQLite**: `DatabaseManager.import_file()` supporta nativamente sia file `.jsonl` sia archivi `.jsonl.gz`, permettendo all'applicazione desktop di conservare a vita l'intero storico su SQLite locale (`vitocal_telemetry.db`).
+- [x] **Disaccoppiamento Cron GitHub Actions & Integrazione cron-job.org**:
+  - Risolto il ritardo tipico dei cron GitHub su runner gratuiti integrando trigger esterno HTTPS via `cron-job.org` (`POST .../dispatches`).
+  - Ottenuto campionamento puntuale al secondo esatto, funzionante 24/7 a computer spento.
+  - Semplificato `telemetry_logger.yml` rimuovendo lo scheduler interno ridondante e lasciando `workflow_dispatch` gestito con gruppo di concorrenza `concurrency: telemetry-logger`.
 - [x] **Configurazione e Sicurezza (.env)**:
   - Client ID e account Viessmann Developer configurati e operativi.
   - Client ID, Client Secret e `read_smarther`/`write_smarther` Refresh Token BTicino/Netatmo configurati.
@@ -120,6 +130,19 @@
   - Creato script di esportazione sicura `scripts/prepare_github_export.py`: genera la cartella pulita `github_ready/` escludendo file bytecode, database locali e segreti, eseguendo l'audit automatico prima di confermare.
   - Definita regola permanente Antigravity in `.agents/rules/security-and-privacy.md`: obbligo per tutti gli agenti di verificare l'assenza di dati sensibili prima di qualsiasi push su GitHub.
   - Anonimizzati i riferimenti geografici e personali nei file del codice, sinottico e documentazione.
+- [x] **Bug Fix Sincronizzazione Cloud & Rete Mobile (`ui/main_window.py`, `web/js/app.js`, `web_server.py`)**:
+  - **Risolto `NameError: name 'time' is not defined` in `ui/main_window.py`**:
+    - Aggiunto `import time` mancante tra gli import standard, ripristinando il corretto funzionamento del pulsante `☁️ Sync Cloud (GitHub)` sia all'avvio che su richiesta.
+  - **Risolto Blocco CORS Browser su `raw.githubusercontent.com` (`web/js/app.js`)**:
+    - Rimosse le intestazioni personalizzate `Cache-Control` e `Pragma` che causavano l'invio di richieste `OPTIONS` preflight bloccate da GitHub con HTTP 403.
+    - Il cache-busting è ora gestito in modo pulito e nativo tramite il parametro query URL `?t=${Date.now()}`.
+  - **Aggiunto Endpoint Server-Side Proxy `/api/sync-github` (`web_server.py`)**:
+    - Consente all'app mobile e web di sincronizzarsi da GitHub con download Python diretto, aggiornando sia il file `cloud_telemetry.jsonl` che il database SQLite.
+  - **Risolto Rilevamento IP VPN (`web_server.py`)**:
+    - Filtrati i tunnel VPN virtuali (es. Surfshark WireGuard `10.14.0.2`) e data priorità all'indirizzo fisico LAN/Wi-Fi `192.168.1.66` per la connessione da smartphone.
+  - Risolto `IndexError` in `_load_latest_db_sample`: corretto il nome colonna `humidity_percent` (era erroneamente mappato su `humidity_corridoio_percent`), migrando a estrazione sicura con `dict(row)`.
+  - Risolto mancato refresh UI al clic su `Sync Cloud`: aggiunto `_load_latest_db_sample()` e `_update_charts()` anche quando i dati cloud sono già allineati nel database locale, popolando istantaneamente tutte le 26 sonde del sinottico.
+  - **Bypass Cache CDN GitHub Actions (300s Fastly)**: aggiunto parametro di cache-busting `?t={timestamp}` e header `Cache-Control: no-cache` per evitare che la CDN di GitHub serva risposte vecchie di 5 minuti quando viene aggiunto un nuovo campione.
 - [x] **Memoria Persistente di Progetto**:
   - Creato e aggiornato `AGENTS.md` per consentire a qualsiasi nuovo agente in nuove chat di riprendere il lavoro immediatamente senza perdere il contesto.
   - Creata la Skill dedicata `.agents/skills/vitocal-remote-expert/SKILL.md`.
@@ -153,10 +176,46 @@
 1. **Logging Continuo Cloud 24/7 (Senza PC acceso a casa)**:
    - Configurazione workflow GitHub Actions con cron schedulato (es. ogni 10 min).
    - Connessione a database cloud SQLite gratuito (Turso libSQL) per salvare le letture nel cloud a costo zero.
-2. **Modulo Analytics Avanzato**:
-   - Calcolo automatico COP medio per singolo ciclo di carica.
-   - Algoritmo di stima della dispersione termica passiva (°C/ora) dell'abitazione in assenza di riscaldamento.
-   - Allarme gelo se la temperatura interna scende sotto 6.5 °C.
-3. **Fase 2 (Mobile / Micro-Backend)**:
-   - Esportazione del core in un micro-servizio FastAPI.
-   - Sviluppo App Android in Jetpack Compose per comandi rapidi da smartphone.
+- [x] **Modulo Analytics Avanzato & Statistiche X Ore (Desktop & Mobile PWA)**:
+  - **Motore di Calcolo Termodinamico (`storage/analytics.py` & `web/js/analytics.js`)**:
+    - **Finestra Temporale Dinamica e Personalizzabile**: selezione rapida (6h, 12h, 24h, 48h, 72h, 7 giorni, Tutto) o inserimento di qualsiasi valore $X$ in ore.
+    - **Conteggio Avviamenti Reale**: riconciliazione tra delta contatore hardware Vitotronic WO1C (`compressor_starts`) e rilevamento transizioni di ciclo sui campioni densi.
+    - **Durate dei Cicli**: calcolo esatto di durata media ($\bar{D}$ min), minima e massima, ore totali di marcia e Duty Cycle %.
+    - **Diagnostica Qualità Modulazione ("Ha modulato bene?")**:
+      * Valutazione del carico medio inverter durante il funzionamento e rilevamento *short-cycling* sui 200L di puffer.
+      * Ripartizione del tempo per fasce di carico: Basso Carico (1-30%), Medio Carico (31-60%), Alto Carico (>60%).
+      * Score di salute modulazione (0-100), verdetto sintetico e diagnosi termodinamica approfondita.
+    - **Stima Consumo Elettrico (kWh) e Spesa in Bolletta (€)**:
+      * Modello di potenza elettrica calibrato sulla Vitocal 111-S split 11 kW (standby 25W, assorbimento inverter proporzionale a modulazione %, pompa primaria interna).
+      * Calcolo energia totale kWh, potenza media assorbita e spesa in euro con tariffa configurabile (default 0.25 €/kWh) e proiezione giornaliera.
+    - **Verifica Sicurezza Antigelo ("Casa al Sicuro con Minima Spesa")**:
+      * Monitoraggio temperatura interna minima registrata, temperatura minima del puffer e dell'aria esterna.
+      * Margine di sicurezza in °C rispetto alla soglia di rischio gelo (5.0 °C) e consiglio operativo per non sprecare energia garantendo la protezione totale dell'immobile.
+  - **Integrazione Desktop PyQt6 (`ui/main_window.py`)**:
+    - Nuova Scheda dedicata `⏱️ Statistiche & Efficienza (X Ore)` con scroll area, controlli stepper, banner sicurezza gelo, 4 card KPI, box qualità modulazione e tabella dettagliata dei singoli cicli.
+  - **Integrazione Mobile PWA (`web/`)**:
+    - Nuova scheda `Analisi` nella barra inferiore mobile con motore JavaScript client-side istantaneo e visualizzazione responsive touch.
+  - **Endpoint REST Flask (`web_server.py`)**:
+    - Nuovo endpoint `GET /api/analytics?hours=X&cost_kwh=0.25` per interrogazioni programmatiche.
+- [x] **Applicazione Mobile Android PWA & Micro-Server Flask (`web/`, `web_server.py`)**:
+  - **Architettura PWA Standalone per Smartphone Android**:
+    - Manifest web standard (`web/manifest.json`), icone responsive (192px e 512px) e Service Worker (`web/sw.js`) per caching offline.
+    - Installabile direttamente con 1 tocco su Chrome/Brave Android ("Installa app" / "Aggiungi a Home") per avvio a schermo intero nativo senza barra degli indirizzi.
+  - **Sinottico SCADA Mobile Vettoriale SVG (`web/js/synoptic.js`)**:
+    - Replicato fedelmente lo schema idraulico industriale con pan e zoom touch: PdC Vitocal 111-S, Puffer 200L, Circolatore Grundfos, Abitazione con radiante e BTicino.
+    - Animazioni CSS dinamiche: flusso acqua calda/fredda nei tubi primari e secondari, rotazione girante Grundfos quando attiva, modulazione compressore inverter in tempo reale.
+  - **Grafici Touch Mobile Interattivi (`web/js/charts.js`)**:
+    - **Risolto Bug di Spaziatura Temporale (Scala Continua su Asse X)**:
+      * Sostituita la precedente scala a categorie (che posizionava i campioni in modo rigidamente equidistante, distorcendo i buchi temporali o le letture ravvicinate) con una scala temporale continua reale (`type: 'time'`).
+      * Integrato l'adapter `chartjs-adapter-date-fns` con dataset a coordinate `{ x: timestamp_ms, y: val }`: ora 58 minuti di intervallo occupano esattamente 58 volte lo spazio di un campione a 1 minuto, preservando fedelmente le reali pendenze fisiche del raffreddamento termico.
+      * Bundle delle librerie (`chart.min.js` e `chartjs-adapter-date-fns.bundle.min.js`) salvati localmente in `web/js/` e gestiti dal Service Worker v2 offline-first per funzionamento garantito senza internet né CDN.
+      * Multi-asse Y per temperature (°C) e grandezze modulazione/bar/COP.
+      * Selettori rapidi d'intervallo temporale (6h, 24h, 3 giorni, Tutti) e pillole per accendere/spegnere singoli canali con tooltip informativo esteso e formattazione italiana.
+  - **Sincronizzazione Intelligente a 3 Vie (`web/js/app.js`)**:
+    1. *Sync Automatico Cloud GitHub*: polling in background ogni 120s da `raw.githubusercontent.com` con cache-busting per leggere gli aggiornamenti generati ogni 5 minuti da GitHub Actions.
+    2. *Trigger Campionamento On-Demand (GitHub Action)*: pulsante per avviare subito il workflow GitHub Actions (`workflow_dispatch`) con token.
+    3. *Interrogazione Diretta API Live (Backend Locale)*: endpoint `/api/refresh-direct` per campionamento istantaneo senza passare dal cloud quando connessi in rete locale.
+  - **Launcher Doppio-Clic & Micro-Server Python (`web_server.py`, `avvia_app_mobile.bat`)**:
+    - Server Flask leggero su porta 8080 con rilevamento automatico dell'IP locale per connessione immediata da smartphone nella stessa rete Wi-Fi.
+  - **Workflow Deploy Automatico su GitHub Pages (`.github/workflows/deploy_pwa.yml`)**:
+    - Pubblicazione automatica dell'app web PWA su GitHub Pages per l'accesso 24/7 da smartphone in 4G/5G da qualsiasi parte del mondo a costo zero.

@@ -112,3 +112,44 @@ class DatabaseManager:
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM telemetry_samples")
             return cursor.fetchone()[0]
+
+    def import_file(self, file_path: Path) -> int:
+        """
+        Imports telemetry samples from a .jsonl or .jsonl.gz file into SQLite.
+        Skips samples that already exist based on timestamp_utc.
+        Returns the number of newly imported records.
+        """
+        import gzip
+        import json
+
+        if not file_path.exists() or file_path.stat().st_size == 0:
+            return 0
+
+        is_gz = file_path.suffix == ".gz" or file_path.name.endswith(".jsonl.gz")
+        open_fn = gzip.open if is_gz else open
+
+        imported = 0
+        try:
+            with open_fn(file_path, "rt", encoding="utf-8") as f:
+                lines = [ln.strip() for ln in f if ln.strip()]
+
+            with self._get_connection() as conn:
+                cur = conn.cursor()
+                for ln in lines:
+                    try:
+                        data = json.loads(ln)
+                        ts = data.get("timestamp_utc")
+                        if not ts:
+                            continue
+                        cur.execute("SELECT 1 FROM telemetry_samples WHERE timestamp_utc = ? LIMIT 1", (ts,))
+                        if cur.fetchone():
+                            continue
+                        sample = TelemetrySample(**data)
+                        self.insert_sample(sample)
+                        imported += 1
+                    except Exception:
+                        pass
+        except Exception as e:
+            logger.error("Errore importazione file %s in SQLite: %s", file_path.name, e)
+
+        return imported

@@ -7,6 +7,7 @@ and Netatmo Connect APIs and appends it to data/cloud_telemetry.jsonl.
 import os
 import sys
 import json
+import gzip
 import logging
 from pathlib import Path
 from datetime import datetime, timezone
@@ -138,7 +139,89 @@ def log_sample() -> bool:
         f.write(record_json + "\n")
 
     logger.info("Campione registrato con successo in: %s", cloud_file)
+
+    # 5. Rotate buffer if threshold exceeded (30-day sliding window for fast mobile loading)
+    rotate_hot_buffer_if_needed(cloud_file)
     return True
+
+
+# Retention policy for 5-minute sampling:
+# 12 samples/hour * 24 hours = 288 samples/day.
+# 30 days = 8,640 samples (~5.8 MB uncompressed JSONL, ~600 KB gzipped).
+MAX_HOT_SAMPLES = 8640  # Rolling window: last 30 days of 5-minute telemetry
+ROTATION_THRESHOLD = 9000  # Hysteresis buffer (~1.25 extra days before triggering rotation batch)
+MIN_BYTES_BEFORE_CHECK = 5_500_000  # Quick O(1) file size check to avoid line counting when small
+
+
+def rotate_hot_buffer_if_needed(cloud_file: Path):
+    """
+    Ensures data/cloud_telemetry.jsonl remains a lightweight sliding buffer (last 30 days)
+    for fast mobile PWA loading over 4G, while archiving older samples into monthly compressed
+    files in data/archive/telemetry_YYYY-MM.jsonl.gz.
+    """
+    if not cloud_file.exists():
+        return
+
+    # O(1) Fast exit if file is significantly smaller than the threshold
+    try:
+        if cloud_file.stat().st_size < MIN_BYTES_BEFORE_CHECK:
+            return
+    except Exception:
+        pass
+
+    try:
+        with open(cloud_file, "r", encoding="utf-8") as f:
+            lines = [ln.strip() for ln in f if ln.strip()]
+
+        total_lines = len(lines)
+        if total_lines < ROTATION_THRESHOLD:
+            return
+
+        num_to_archive = total_lines - MAX_HOT_SAMPLES
+        lines_to_archive = lines[:num_to_archive]
+        hot_lines = lines[num_to_archive:]
+
+        # Group lines to archive by YYYY-MM
+        archive_groups = {}
+        for ln in lines_to_archive:
+            ym = None
+            try:
+                rec = json.loads(ln)
+                ts = rec.get("timestamp_utc", "")
+                if len(ts) >= 7 and ts[4] == "-":
+                    ym = ts[:7]
+            except Exception:
+                pass
+            if not ym:
+                ym = datetime.now(timezone.utc).strftime("%Y-%m")
+            archive_groups.setdefault(ym, []).append(ln)
+
+        # Write to compressed monthly archive
+        archive_dir = cloud_file.parent / "archive"
+        archive_dir.mkdir(parents=True, exist_ok=True)
+
+        for ym, group_lines in archive_groups.items():
+            archive_path = archive_dir / f"telemetry_{ym}.jsonl.gz"
+            with gzip.open(archive_path, "at", encoding="utf-8") as gz:
+                for item in group_lines:
+                    gz.write(item + "\n")
+            logger.info("Archiviati %d campioni storici in: %s", len(group_lines), archive_path.name)
+
+        # Atomic replacement of cloud_file with hot_lines
+        temp_file = cloud_file.with_suffix(".tmp")
+        with open(temp_file, "w", encoding="utf-8") as f:
+            for item in hot_lines:
+                f.write(item + "\n")
+        temp_file.replace(cloud_file)
+
+        logger.info(
+            "Rotazione completata: archiviati %d campioni, mantenuti %d campioni (~30 giorni a 5 min) nel file live %s",
+            num_to_archive,
+            len(hot_lines),
+            cloud_file.name,
+        )
+    except Exception as e:
+        logger.error("Errore durante la rotazione automatica del buffer cloud: %s", e)
 
 
 if __name__ == "__main__":

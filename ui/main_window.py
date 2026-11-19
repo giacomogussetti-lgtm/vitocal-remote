@@ -2385,29 +2385,16 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            imported_count = 0
-            with open(cloud_file, "r", encoding="utf-8") as f:
-                lines = f.readlines()
+            imported_count = self.db.import_file(cloud_file)
 
-            with self.db._get_connection() as conn:
-                cur = conn.cursor()
-                for line in lines:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        record = json.loads(line)
-                        ts = record.get("timestamp_utc")
-                        if not ts:
-                            continue
-                        cur.execute("SELECT 1 FROM telemetry_samples WHERE timestamp_utc = ? LIMIT 1", (ts,))
-                        if cur.fetchone():
-                            continue  # Record già presente
-                        sample = TelemetrySample(**record)
-                        self.db.insert_sample(sample)
-                        imported_count += 1
-                    except Exception as parse_err:
-                        logger.debug("Skip riga non valida cloud: %s", parse_err)
+            # Controlla anche eventuali archivi storici mensili compressi (.jsonl.gz)
+            archive_dir = Config.DATA_DIR / "archive"
+            if archive_dir.exists():
+                for arch_file in sorted(archive_dir.glob("*.jsonl.gz")):
+                    arch_imported = self.db.import_file(arch_file)
+                    if arch_imported > 0:
+                        imported_count += arch_imported
+                        logger.info("Importati %d campioni storici da archivio %s", arch_imported, arch_file.name)
 
             if imported_count > 0:
                 self._load_latest_db_sample()
