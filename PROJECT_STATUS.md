@@ -211,9 +211,14 @@
   - **Architettura PWA Standalone per Smartphone Android**:
     - Manifest web standard (`web/manifest.json`), icone responsive (192px e 512px) e Service Worker (`web/sw.js`) per caching offline.
     - Installabile direttamente con 1 tocco su Chrome/Brave Android ("Installa app" / "Aggiungi a Home") per avvio a schermo intero nativo senza barra degli indirizzi.
-  - **Sinottico SCADA Mobile Vettoriale SVG (`web/js/synoptic.js`)**:
-    - Replicato fedelmente lo schema idraulico industriale con pan e zoom touch: PdC Vitocal 111-S, Puffer 200L, Circolatore Grundfos, Abitazione con radiante e BTicino.
-    - Animazioni CSS dinamiche: flusso acqua calda/fredda nei tubi primari e secondari, rotazione girante Grundfos quando attiva, modulazione compressore inverter in tempo reale.
+  - **Sinottico SCADA Mobile Vettoriale SVG Responsive (`web/js/synoptic.js`)**:
+    - Layout adattivo automatico su dimensione schermo e orientamento: **Verticale Portrait** (`0 0 420 850`, a tutta larghezza senza scroll orizzontale, KPI compatti 3×2) e **Orizzontale Landscape** (`0 0 1260 560`, schema SCADA orizzontale esteso).
+    - Schematizzati tutti gli organi principali: **Circolatore Primario PdC (`P1`)** con girante rotante e %, circolatore Grundfos secondario, ventola evaporatore, mini bollitore ACS 220L, Puffer 200L con stratificazione cromatica dinamica e **casetta con tetto a falde** che confronta visivamente **Aria Esterna (OAT)** e **Aria Interna (BTicino Smarther)** con serpentina radiante collegata al circuito secondario.
+  - **Grafici Touch Mobile Avanzati (`web/js/charts.js`, Service Worker `vitocal-remote-v4`)**:
+    - **Zoom/Pan Solo X a 2 Dita & Toggle Minimale**: pinch + drag con 2 dita esclusivamente su asse X mantenendo la lettura valori a 1 dito in `👆 Leggi`; toggle compatto in alto a destra per passare a `✋ Sposta` (pan a 1 dito) + pulsante `↺ Reset`.
+    - **Asse Y Bloccato & Range Tappabile**: durante zoom/pan in X gli assi Y restano fissi; toccando l'asse Y sinistro/destro o le pillole `°C: Auto` / `%: Auto` si imposta e blocca `Y Min`/`Y Max` (con preset rapidi e salvataggio in `localStorage`).
+    - **Area Grafico Verticale Amplificata**: barra filtri compatta su riga singola scorrevole e altezza dinamica `clamp(320px, 50dvh, 560px)`.
+    - **Bande Verticali Stato Impianto a 3 Colori**: plugin Chart.js `beforeDatasetsDraw` con fasce traslucide e nastro superiore da 6px per distinguere a colpo d'occhio `Solo PdC` (Ambra), `Solo Grundfos` (Ciano) e `PdC + Grundfos` (Verde), con stato incluso anche nel tooltip.
   - **Grafici Touch Mobile Interattivi (`web/js/charts.js`)**:
     - **Risolto Bug di Spaziatura Temporale (Scala Continua su Asse X)**:
       * Sostituita la precedente scala a categorie (che posizionava i campioni in modo rigidamente equidistante, distorcendo i buchi temporali o le letture ravvicinate) con una scala temporale continua reale (`type: 'time'`).

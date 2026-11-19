@@ -48,7 +48,7 @@
     <!-- TAB 1: SINOTTICO SCADA & STATO LIVE -->
     <section id="tab-synoptic" class="tab-content active">
       <!-- Quick Metric Cards -->
-      <div class="cards-grid">
+      <div class="cards-grid synoptic-kpi-grid">
         <div class="status-card">
           <span class="card-label">T Esterna OAT</span>
           <span class="card-value" id="cardOat" style="color: #38bdf8;">--</span>
@@ -88,13 +88,13 @@
       </div>
 
       <!-- Industrial SCADA Schematic SVG Canvas -->
-      <div class="synoptic-wrapper" style="margin-top: 12px;">
+      <div class="synoptic-wrapper" style="margin-top: 10px;">
         <div class="synoptic-toolbar">
-          <span>SINOTTICO IDRAULICO IMPIANTO (Touch Pan & Zoom)</span>
-          <span style="color: var(--accent-cyan); font-weight: 600;">SCHEMA ATTIVO</span>
+          <span id="synopticToolbarTitle">SINOTTICO IDRAULICO IMPIANTO</span>
+          <span id="synopticOrientationBadge" style="color: var(--accent-cyan); font-weight: 600;">SCHEMA ATTIVO</span>
         </div>
         <div class="synoptic-scroll-area">
-          <svg id="synopticSvg" viewBox="0 0 1300 600" preserveAspectRatio="xMidYMid meet"></svg>
+          <svg id="synopticSvg" preserveAspectRatio="xMidYMid meet"></svg>
         </div>
       </div>
     </section>
@@ -103,15 +103,33 @@
     <section id="tab-charts" class="tab-content">
       <div class="chart-container-card">
         <div class="chart-header">
-          <div class="chart-title">📊 Andamento Telemetrico Temporale</div>
-          <div class="chart-filters">
-            <button class="btn-filter" data-hours="6">6h</button>
-            <button class="btn-filter active" data-hours="24">24h</button>
-            <button class="btn-filter" data-hours="72">3gg</button>
-            <button class="btn-filter" data-hours="168">7gg</button>
-            <button class="btn-filter" data-hours="720">30gg</button>
-            <button class="btn-filter" data-hours="2160">3 Mesi</button>
-            <button class="btn-filter" data-hours="0">6 Mesi (Tutti)</button>
+          <div class="chart-header-top">
+            <div class="chart-title">📊 Telemetria Temporale</div>
+            <div class="chart-tools-minimal">
+              <button type="button" class="btn-mini-tool" id="btnResetChartZoom" style="display: none;" title="Ripristina zoom asse X">↺ Reset</button>
+              <button type="button" class="btn-mini-tool" id="btnChartModeToggle" title="Gesto 1 dito: Leggi valori o Sposta asse X">👆 Leggi</button>
+            </div>
+          </div>
+          <div class="chart-filters" id="chartTimeframeButtons">
+            <button type="button" class="btn-filter" data-hours="6">6h</button>
+            <button type="button" class="btn-filter active" data-hours="24">24h</button>
+            <button type="button" class="btn-filter" data-hours="72">3gg</button>
+            <button type="button" class="btn-filter" data-hours="168">7gg</button>
+            <button type="button" class="btn-filter" data-hours="720">30gg</button>
+            <button type="button" class="btn-filter" data-hours="2160">3M</button>
+            <button type="button" class="btn-filter" data-hours="0">Tutti</button>
+          </div>
+        </div>
+
+        <div class="chart-meta-strip">
+          <div class="activity-legend">
+            <span class="activity-legend-item"><i class="band-swatch swatch-pdc"></i>Solo PdC</span>
+            <span class="activity-legend-item"><i class="band-swatch swatch-gf"></i>Solo GF</span>
+            <span class="activity-legend-item"><i class="band-swatch swatch-both"></i>PdC + GF</span>
+          </div>
+          <div class="axis-pills">
+            <button type="button" class="axis-pill" id="btnScaleYTemp" title="Tocca per fissare scala °C">°C: Auto</button>
+            <button type="button" class="axis-pill" id="btnScaleYOther" title="Tocca per fissare scala %/bar">%: Auto</button>
           </div>
         </div>
 
@@ -322,6 +340,33 @@
       <span>Sync & Info</span>
     </button>
   </nav>
+
+  <!-- Y-Axis Range Modal -->
+  <div id="yAxisModal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="yAxisModalTitle">
+      <div class="modal-header">
+        <h4 id="yAxisModalTitle">Scala Asse Y</h4>
+        <button type="button" class="modal-close-btn" id="btnCloseYAxisModal" aria-label="Chiudi">✕</button>
+      </div>
+      <p id="yAxisModalHint" class="modal-hint"></p>
+      <div id="yAxisPresets" class="modal-presets"></div>
+      <div class="modal-inputs-row">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="inputYMin">Y Min</label>
+          <input type="number" step="0.5" inputmode="decimal" id="inputYMin" class="form-input">
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="inputYMax">Y Max</label>
+          <input type="number" step="0.5" inputmode="decimal" id="inputYMax" class="form-input">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-action btn-primary" id="btnApplyYScale">🔒 Applica e Blocca</button>
+        <button type="button" class="btn-action btn-secondary" id="btnResetYScale" style="margin-top: 0;">✨ Auto</button>
+        <button type="button" class="btn-action btn-secondary" id="btnCancelYScale" style="margin-top: 0;">Annulla</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Toast Notification element -->
   <div id="toast"></div>

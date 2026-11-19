@@ -28,6 +28,9 @@ document.addEventListener("DOMContentLoaded", () => {
   initSettingsForm();
   initActionButtons();
   initAnalyticsListeners();
+  if (typeof initChartControls === "function") {
+    initChartControls();
+  }
 
   // Initial Sync
   loadCachedSamples();
@@ -67,15 +70,17 @@ function initNavigation() {
           setTimeout(() => updateChartData(state.samples), 50);
         } else if (tabId === "tab-analytics") {
           updateAnalyticsUI(state.analyticsHours);
+        } else if (tabId === "tab-synoptic" && state.latestSample) {
+          renderSynoptic(state.latestSample);
         }
       }
     });
   });
 
-  // Chart timeframe filter buttons
-  document.querySelectorAll(".btn-filter").forEach(btn => {
+  // Chart timeframe filter buttons (strictly scoped to chart tab)
+  document.querySelectorAll("#chartTimeframeButtons .btn-filter").forEach(btn => {
     btn.addEventListener("click", () => {
-      const hours = parseInt(btn.dataset.hours);
+      const hours = parseInt(btn.dataset.hours, 10);
       setChartTimeframe(hours);
     });
   });
