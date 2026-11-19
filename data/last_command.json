@@ -1,12 +1,12 @@
 {
-  "timestamp_utc": "2026-11-19T21:08:40.432898+00:00",
-  "command": "viessmann_temps",
+  "timestamp_utc": "2026-11-19T21:12:51.358512+00:00",
+  "command": "bticino_setpoint",
   "params": {
-    "normal": 11,
-    "reduced": 11,
-    "dhw": 10
+    "mode": "manual",
+    "temp": 6.0,
+    "duration_minutes": 180
   },
   "success": true,
-  "message": "Temperatura Normale impostata e verificata con successo: 11 °C | Temperatura Ridotta impostata e verificata con successo: 11 °C | Temperatura Bollitore ACS impostata e verificata con successo: 10 °C",
+  "message": "Setpoint BTicino aggiornato con successo a 6.0 °C (modalità: manual)",
   "sample_logged": true
 }
