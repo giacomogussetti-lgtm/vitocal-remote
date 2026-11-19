@@ -1,12 +1,12 @@
 {
-  "timestamp_utc": "2026-11-19T21:12:51.358512+00:00",
+  "timestamp_utc": "2026-11-19T21:14:53.006779+00:00",
   "command": "bticino_setpoint",
   "params": {
     "mode": "manual",
-    "temp": 6.0,
+    "temp": 7.5,
     "duration_minutes": 180
   },
   "success": true,
-  "message": "Setpoint BTicino aggiornato con successo a 6.0 °C (modalità: manual)",
+  "message": "Setpoint BTicino aggiornato con successo a 7.5 °C (modalità: manual)",
   "sample_logged": true
 }
