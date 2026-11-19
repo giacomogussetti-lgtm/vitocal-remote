@@ -37,4 +37,8 @@ class TelemetrySample(BaseModel):
     cop_dhw: Optional[float] = None
     cop_total: Optional[float] = None
     humidity_percent: Optional[float] = None
+    target_supply_temp_c: Optional[float] = None
+    normal_setpoint_c: Optional[float] = None
+    reduced_setpoint_c: Optional[float] = None
+    dhw_setpoint_c: Optional[float] = None
     active_preset: Optional[str] = "manual"

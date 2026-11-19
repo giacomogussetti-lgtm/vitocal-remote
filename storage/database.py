@@ -65,6 +65,10 @@ class DatabaseManager:
                 ("cop_dhw", "REAL"),
                 ("cop_total", "REAL"),
                 ("humidity_percent", "REAL"),
+                ("target_supply_temp_c", "REAL"),
+                ("normal_setpoint_c", "REAL"),
+                ("reduced_setpoint_c", "REAL"),
+                ("dhw_setpoint_c", "REAL"),
             ]
             cursor.execute("PRAGMA table_info(telemetry_samples);")
             existing_cols = {row["name"] for row in cursor.fetchall()}

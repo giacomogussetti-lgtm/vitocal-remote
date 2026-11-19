@@ -214,11 +214,17 @@
   - **Sinottico SCADA Mobile Vettoriale SVG Responsive (`web/js/synoptic.js`)**:
     - Layout adattivo automatico su dimensione schermo e orientamento: **Verticale Portrait** (`0 0 420 850`, a tutta larghezza senza scroll orizzontale, KPI compatti 3×2) e **Orizzontale Landscape** (`0 0 1260 560`, schema SCADA orizzontale esteso).
     - Schematizzati tutti gli organi principali: **Circolatore Primario PdC (`P1`)** con girante rotante e %, circolatore Grundfos secondario, ventola evaporatore, mini bollitore ACS 220L, Puffer 200L con stratificazione cromatica dinamica e **casetta con tetto a falde** che confronta visivamente **Aria Esterna (OAT)** e **Aria Interna (BTicino Smarther)** con serpentina radiante collegata al circuito secondario.
-  - **Grafici Touch Mobile Avanzati (`web/js/charts.js`, Service Worker `vitocal-remote-v4`)**:
+  - **Grafici Touch Mobile Avanzati (`web/js/charts.js`, Service Worker `vitocal-remote-v5`)**:
     - **Zoom/Pan Solo X a 2 Dita & Toggle Minimale**: pinch + drag con 2 dita esclusivamente su asse X mantenendo la lettura valori a 1 dito in `👆 Leggi`; toggle compatto in alto a destra per passare a `✋ Sposta` (pan a 1 dito) + pulsante `↺ Reset`.
     - **Asse Y Bloccato & Range Tappabile**: durante zoom/pan in X gli assi Y restano fissi; toccando l'asse Y sinistro/destro o le pillole `°C: Auto` / `%: Auto` si imposta e blocca `Y Min`/`Y Max` (con preset rapidi e salvataggio in `localStorage`).
     - **Area Grafico Verticale Amplificata**: barra filtri compatta su riga singola scorrevole e altezza dinamica `clamp(320px, 50dvh, 560px)`.
-    - **Bande Verticali Stato Impianto a 3 Colori**: plugin Chart.js `beforeDatasetsDraw` con fasce traslucide e nastro superiore da 6px per distinguere a colpo d'occhio `Solo PdC` (Ambra), `Solo Grundfos` (Ciano) e `PdC + Grundfos` (Verde), con stato incluso anche nel tooltip.
+    - **Bande Verticali Stato Impianto Adiacenti & Disattivabili**: plugin Chart.js `beforeDatasetsDraw` con fasce traslucide e nastro superiore da 6px per `Solo PdC` (Ambra), `Solo Grundfos` (Ciano) e `PdC + Grundfos` (Verde), attivabili/disattivabili singolarmente da legenda e saldate senza buchi tra cambi di stato adiacenti.
+    - **Traccia Target LWT Curva (PdC) & Fix Isteresi BTicino**: traccia calcolata `Target LWT Curva (PdC)` basata sulla formula ufficiale Viessmann WO1C `variant2` (attiva fuori da `standby`); `Setpoint BTicino` disattivato di default per evitare compressioni verticali da picchi anti-grippaggio (30 °C), con riepilogo casa/setpoint sempre nel tooltip. Risolto inoltre il bug `setpoint <= temp` in `api/bticino.py` (`setpoint < temp - 0.3`) che mascherava i cicli PID della Grundfos a soglia `8.5 == 8.5 °C`.
+  - **App Mobile PWA Bidirezionale (`tab-commands`, `web/js/commands.js`, `scripts/cloud_commander.py`, `.github/workflows/apply_command.yml`, `web_server.py`)**:
+    - **Controllo Remoto Completo (4G/5G + LAN)**: nuova scheda `🎛️ Comandi` con conferma modale obbligatoria, LED `🟢 Sincronizzato / 🟠 Da inviare`, stepper e preview Target LWT dal vivo.
+    - **Comandi Viessmann Vitocal**: cambio modalità (`standby`/`dhw`/`dhwAndHeating`), curva climatica (`slope`/`shift`), temperature (`Normale`/`Ridotta`/`ACS`), carica rapida ACS e programmazione fasce orarie settimanali (`setHeatingSchedule`).
+    - **Comandi BTicino Smarther & Preset Sincronizzati**: setpoint manuale con durata, cambio modalità (`home`/`hg`/`away`), cambio programmazione oraria (`POST /api/switchhomeschedule`), e pulsanti rapidi sincronizzati PdC + Grundfos (`Avvia Ciclo Sincronizzato` / `Tutto Standby`).
+    - **Sicurezza & Ricevuta Cloud**: in LAN invio diretto tramite `POST /api/command`; da remoto in 4G/5G `workflow_dispatch` su `apply_command.yml` usando i GitHub Secrets, verifica read-back, aggiornamento telemetria e ricevuta in `data/last_command.json`.
   - **Grafici Touch Mobile Interattivi (`web/js/charts.js`)**:
     - **Risolto Bug di Spaziatura Temporale (Scala Continua su Asse X)**:
       * Sostituita la precedente scala a categorie (che posizionava i campioni in modo rigidamente equidistante, distorcendo i buchi temporali o le letture ravvicinate) con una scala temporale continua reale (`type: 'time'`).
@@ -244,16 +250,8 @@
 
 ## 3. WORK IN PROGRESS & ROADMAP (FASE 2)
 
-### A. App Mobile PWA Bidirezionale (Comandi Remoti di Scrittura)
-- **Obiettivo**: Permettere all'utente di comandare l'impianto dallo smartphone ovunque si trovi in 4G/5G, non solo in lettura ma anche in scrittura.
-- **Funzionalità in Sviluppo**:
-  1. *Regolazione Setpoint Corridoio (BTicino Smarther)*: cambiare setpoint da 7.0 °C (antigelo infrasettimanale) a 12.0 °C / 18.0 °C prima dell'arrivo nel weekend.
-  2. *Regolazione Curva Climatica (Viessmann Vitocal)*: modifica da remoto di Inclinazione (Slope) e Livello (Shift) con stepper numerici touch.
-  3. *Regolazione Temperature Mandata PdC*: impostazione T Normale (12 °C) e Ridotta (10 °C).
-  4. *Preset Sincronizzati Weekend*: pulsante unico *"Attiva Pre-Riscaldamento Weekend"* che alza contemporaneamente la mandata PdC e accende la pompa Grundfos per caricare termicamente il massetto radiante prima del soggiorno.
-- **Architettura di Sicurezza (Cloud Command Dispatcher)**:
-  - Per evitare di esporre le password Viessmann o i client secret Netatmo nel browser del telefono, l'app mobile invia un ordine parametrico via `workflow_dispatch` a un workflow isolato GitHub Actions (`apply_command.yml`).
-  - Il runner GitHub esegue lo script con i GitHub Secrets protetti, effettua la verifica di read-back con PyViCare/Netatmo e aggiorna subito lo stato.
+### A. Strategia Adattiva Anti-ON/OFF & Regolazione Dinamica (Prossimo Step)
+- Analisi approfondita dei primi log 24/7 e definizione strategia basata su feedback reale della temperatura ambiente per minimizzare i cicli brevi su puffer 200L e massimizzare il COP sincronizzando Vitocal e Grundfos.
 
 ### B. Decimazione Dati Adattiva nei Grafici Web (LTTB - Largest Triangle Three Buckets)
 - Inserimento di un algoritmo di decimazione client-side leggero per visualizzare grafici plurimensili (fino a 6 mesi / 50.000 campioni) a 60 fps fluidi su qualsiasi smartphone senza rallentamenti grafici.

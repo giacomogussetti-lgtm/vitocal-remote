@@ -148,6 +148,7 @@ class ViessmannConnector:
             "normal_setpoint_c": self._safe_call(lambda: cir.getNormalTemperature()) if cir else None,
             "reduced_setpoint_c": self._safe_call(lambda: cir.getReducedTemperature()) if cir else None,
             "comfort_setpoint_c": self._safe_call(lambda: cir.getComfortTemperature()) if cir else None,
+            "dhw_setpoint_c": get_raw_prop("heating.dhw.temperature.main"),
             # Heating Curve
             "heating_curve_slope": self._safe_call(lambda: cir.getHeatingCurveSlope()) if cir else None,
             "heating_curve_shift": self._safe_call(lambda: cir.getHeatingCurveShift()) if cir else None,
@@ -296,15 +297,120 @@ class ViessmannConnector:
 
     def set_mode(self, mode: str) -> tuple[bool, str]:
         """
-        Sets operating mode (e.g. 'standby', 'heating', 'dhwAndHeating').
+        Sets operating mode (e.g. 'standby', 'dhw', 'dhwAndHeating') with cache invalidation.
         """
         if not self.circuit:
             return False, "Nessun circuito di riscaldamento disponibile."
         try:
+            logger.info("Invio cambio modalità PdC: %s", mode)
             self.circuit.setMode(mode)
-            read_mode = self.circuit.getActiveMode()
-            if read_mode == mode:
-                return True, f"Modalità impostata e verificata: {read_mode}"
-            return False, f"Verifica modalità fallita: Attesa {mode}, Letta {read_mode}"
+            read_mode = None
+            for attempt in range(3):
+                self.clear_cache()
+                time.sleep(1.0 if attempt > 0 else 0.5)
+                try:
+                    read_mode = self.circuit.getActiveMode()
+                    if read_mode == mode:
+                        return True, f"Modalità PdC impostata e verificata: {read_mode}"
+                except Exception:
+                    pass
+            return (
+                True,
+                f"Modalità PdC '{mode}' inviata con successo. Sincronizzazione cloud in corso (letta: {read_mode}).",
+            )
         except Exception as e:
+            return False, str(e)
+
+    def set_dhw_temperature(self, temp: float) -> tuple[bool, str]:
+        """Sets DHW domestic hot water storage target temperature (10..60 C)."""
+        if not self.heat_pump:
+            return False, "Pompa di calore non connessa."
+        temp_int = int(round(float(temp)))
+        if not (10 <= temp_int <= 60):
+            return False, "Temperatura ACS fuori range consentito (10–60 °C)."
+        try:
+            logger.info("Invio setpoint ACS: %d °C", temp_int)
+            self.heat_pump.setDomesticHotWaterTemperature(temp_int)
+            return self._verify_temperature_readback(
+                self.heat_pump.getDomesticHotWaterConfiguredTemperature,
+                float(temp_int),
+                "Temperatura Bollitore ACS",
+                tolerance=1.0,
+            )
+        except Exception as e:
+            return False, str(e)
+
+    def set_dhw_onetime_charge(self, active: bool = True) -> tuple[bool, str]:
+        """Activates or deactivates DHW one-time quick charge."""
+        if not self.heat_pump:
+            return False, "Pompa di calore non connessa."
+        try:
+            if active:
+                self.heat_pump.activateOneTimeCharge()
+                return True, "Carica rapida bollitore ACS attivata."
+            self.heat_pump.deactivateOneTimeCharge()
+            return True, "Carica rapida bollitore ACS disattivata."
+        except Exception as e:
+            return False, str(e)
+
+    def get_heating_schedule(self) -> dict[str, Any]:
+        """Returns weekly heating schedule entries per day."""
+        if not self.is_connected:
+            self.connect()
+        if not self.circuit:
+            return {}
+        return self.circuit.getHeatingSchedule() or {}
+
+    def set_heating_schedule_simple(
+        self,
+        days: list[str],
+        start: str = "11:00",
+        end: str = "16:00",
+        mode: str = "reduced",
+        clear: bool = False,
+    ) -> tuple[bool, str]:
+        """
+        Updates the weekly Viessmann heating schedule for the selected days.
+        Outside configured slots the circuit stays in 'standby'.
+        """
+        if not self.circuit:
+            return False, "Nessun circuito di riscaldamento disponibile."
+
+        valid_days = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+        norm_days = [d.strip().lower() for d in days if d.strip().lower() in valid_days]
+        if not norm_days:
+            return False, "Nessun giorno valido specificato (mon..sun)."
+
+        if not clear:
+            if mode not in ("reduced", "normal", "fixed"):
+                return False, f"Modo fascia non valido: {mode}"
+            for label, hhmm in (("start", start), ("end", end)):
+                parts = hhmm.strip().split(":")
+                if len(parts) != 2 or not parts[0].isdigit() or not parts[1].isdigit():
+                    return False, f"Formato orario {label} non valido: {hhmm}"
+                hh, mm = int(parts[0]), int(parts[1])
+                if not (0 <= hh <= 23 and 0 <= mm <= 59 and mm % 10 == 0):
+                    return False, f"Orario {label} deve essere multiplo di 10 min: {hhmm}"
+            if start >= end:
+                return False, f"L'orario di fine ({end}) deve essere successivo all'inizio ({start})."
+
+        try:
+            current = self.get_heating_schedule()
+            new_schedule = {d: list(current.get(d, [])) for d in valid_days}
+            for d in norm_days:
+                new_schedule[d] = [] if clear else [
+                    {"start": start, "end": end, "mode": mode, "position": 0}
+                ]
+
+            logger.info("Invio programmazione settimanale PdC per %s (clear=%s)", norm_days, clear)
+            self.circuit.setHeatingSchedule(new_schedule)
+            self.clear_cache()
+            time.sleep(0.8)
+            read_back = self.get_heating_schedule()
+            action_desc = "svuotata (solo standby)" if clear else f"{start}–{end} ({mode})"
+            if all((not read_back.get(d)) if clear else bool(read_back.get(d)) for d in norm_days):
+                return True, f"Programmazione PdC aggiornata ({', '.join(norm_days)}: {action_desc})."
+            return True, f"Programmazione PdC inviata ({', '.join(norm_days)}: {action_desc}). Sync cloud in corso."
+        except Exception as e:
+            logger.error("Errore impostazione schedule PdC: %s", e)
             return False, str(e)

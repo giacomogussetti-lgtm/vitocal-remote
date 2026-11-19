@@ -88,6 +88,8 @@ def log_sample() -> bool:
                             b_data["setpoint_c"] = prev_rec.get("indoor_setpoint_bticino_c")
                         if b_data.get("humidity_percent") is None:
                             b_data["humidity_percent"] = prev_rec.get("humidity_percent")
+                        if b_data.get("grundfos_pump_active") is None:
+                            b_data["grundfos_pump_active"] = prev_rec.get("grundfos_pump_active")
                         logger.info("Recuperati valori precedenti BTicino da cache cloud: T=%.1f °C", b_data["indoor_temp_c"])
                         break
         except Exception as fb_err:
@@ -127,6 +129,10 @@ def log_sample() -> bool:
         cop_dhw=v_data.get("cop_dhw"),
         cop_total=v_data.get("cop_total"),
         humidity_percent=b_data.get("humidity_percent"),
+        target_supply_temp_c=v_data.get("target_supply_temp_c"),
+        normal_setpoint_c=v_data.get("normal_setpoint_c"),
+        reduced_setpoint_c=v_data.get("reduced_setpoint_c"),
+        dhw_setpoint_c=v_data.get("dhw_setpoint_c"),
         active_preset="cloud_github_actions",
     )
 

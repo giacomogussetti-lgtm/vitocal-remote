@@ -31,10 +31,14 @@ document.addEventListener("DOMContentLoaded", () => {
   if (typeof initChartControls === "function") {
     initChartControls();
   }
+  if (typeof initCommandsUI === "function") {
+    initCommandsUI();
+  }
 
   // Initial Sync
   loadCachedSamples();
   checkBackendConnection().then(() => {
+    if (typeof updateCommandsTransportUI === "function") updateCommandsTransportUI();
     syncWithGitHub();
   });
 
@@ -70,6 +74,9 @@ function initNavigation() {
           setTimeout(() => updateChartData(state.samples), 50);
         } else if (tabId === "tab-analytics") {
           updateAnalyticsUI(state.analyticsHours);
+        } else if (tabId === "tab-commands") {
+          if (typeof updateCommandsTransportUI === "function") updateCommandsTransportUI();
+          if (typeof refreshLastCommandReceipt === "function") refreshLastCommandReceipt();
         } else if (tabId === "tab-synoptic" && state.latestSample) {
           renderSynoptic(state.latestSample);
         }
@@ -248,6 +255,7 @@ function initSettingsForm() {
       state.githubToken = tokenInput.value.trim();
       localStorage.setItem("vitocal_repo", state.repo);
       localStorage.setItem("vitocal_token", state.githubToken);
+      if (typeof updateCommandsTransportUI === "function") updateCommandsTransportUI();
       showToast("Impostazioni salvate con successo!");
       syncWithGitHub(true);
     });
@@ -517,6 +525,11 @@ function updateUI() {
 
   // 7. Update Analytics (X-Hours Period)
   updateAnalyticsUI(state.analyticsHours || 24);
+
+  // 8. Sync Bidirectional Commands Controls
+  if (typeof syncCommandsFromTelemetry === "function") {
+    syncCommandsFromTelemetry(s);
+  }
 }
 
 function renderDetailedSondeList(s) {

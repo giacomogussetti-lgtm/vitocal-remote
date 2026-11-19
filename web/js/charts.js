@@ -2,8 +2,8 @@
  * Telemetry Charts for Vitocal Remote Mobile App.
  * Uses Chart.js v4 with continuous TimeScale (date-fns adapter),
  * X-only 2-finger pinch + pan (keeping 1-finger value scrubbing intact),
- * minimal Read/Pan mode toggle, locked/tappable Y-axes, and 3-color
- * PdC / Grundfos background activity bands.
+ * minimal Read/Pan mode toggle, locked/tappable Y-axes, seamless toggleable
+ * 3-color PdC / Grundfos activity bands, and WO1C Target LWT curve overlay.
  */
 
 let telemetryChart = null;
@@ -14,19 +14,65 @@ let chartInteractionMode = "read"; // "read" (1-finger tooltip) | "pan" (1-finge
 let xZoomRange = null; // { min, max } when zoomed/panned in X, null when showing full timeframe
 let yAutoFrozen = { yTemp: null, yOther: null }; // Snapshot of auto Y bounds during X zoom/pan
 let activeModalAxis = null;
+let visibleActivityBands = { 1: true, 2: true, 3: true };
 
 const MIN_X_SPAN_MS = 15 * 60 * 1000; // Minimum 15 min X window when zooming in
 const Y_SCALE_STORAGE_KEY = "vitocal_y_scales";
 
 let yAxisCustom = loadYAxisCustom();
 
+/**
+ * Calculates the Viessmann Vitotronic WO1C target supply temperature (LWT)
+ * using PyViCare's heat_curve_formular_variant2 (single-circuit heatpump).
+ * Returns null in standby unless allowStandby is true.
+ */
+function computeVitocalTargetLwt(sample, allowStandby = false) {
+  if (!sample) return null;
+  const prog = (sample.active_program || "").toLowerCase();
+  if (!allowStandby && prog === "standby") return null;
+
+  if (!allowStandby && sample.target_supply_temp_c != null && !isNaN(Number(sample.target_supply_temp_c))) {
+    return Math.round(Number(sample.target_supply_temp_c) * 10) / 10;
+  }
+
+  if (sample.external_temp_c == null || isNaN(Number(sample.external_temp_c))) return null;
+  const oat = Number(sample.external_temp_c);
+  const slope = sample.heating_curve_slope != null ? Number(sample.heating_curve_slope) : 0.6;
+  const shift = sample.heating_curve_shift != null ? Number(sample.heating_curve_shift) : 0.0;
+
+  let tRef = 12.0;
+  if (prog === "reduced" && sample.reduced_setpoint_c != null) {
+    tRef = Number(sample.reduced_setpoint_c);
+  } else if (sample.normal_setpoint_c != null) {
+    tRef = Number(sample.normal_setpoint_c);
+  }
+
+  const delta = oat - tRef;
+  const raw = tRef + shift - slope * delta * (1.148987 + 0.021 * delta + 247.9e-6 * delta * delta) + 5.0;
+  const clamped = Math.max(10.0, Math.min(40.0, raw));
+  return Math.round(clamped * 10) / 10;
+}
+
+window.computeVitocalTargetLwt = computeVitocalTargetLwt;
+
 const CHANNEL_DEFS = [
   { key: "external_temp_c", label: "T Esterna Sonda PdC", unit: "°C", color: "#38bdf8", yAxis: "yTemp", active: true },
   { key: "buffer_temp_c", label: "T Accumulo Puffer 200L", unit: "°C", color: "#f59e0b", yAxis: "yTemp", active: true },
   { key: "pdc_supply_temp_c", label: "T Mandata PdC", unit: "°C", color: "#ef4444", yAxis: "yTemp", active: true },
+  {
+    key: "_target_lwt_c",
+    label: "Target LWT Curva (PdC)",
+    unit: "°C",
+    color: "#d946ef",
+    yAxis: "yTemp",
+    borderDash: [6, 4],
+    active: true,
+    spanGaps: false,
+    computed: (s) => computeVitocalTargetLwt(s, false),
+  },
   { key: "pdc_return_temp_c", label: "T Ritorno PdC", unit: "°C", color: "#f43f5e", yAxis: "yTemp", active: false },
   { key: "indoor_temp_bticino_c", label: "T Interna Corridoio", unit: "°C", color: "#10b981", yAxis: "yTemp", active: true },
-  { key: "indoor_setpoint_bticino_c", label: "Setpoint BTicino", unit: "°C", color: "#eab308", yAxis: "yTemp", borderDash: [5, 5], active: true },
+  { key: "indoor_setpoint_bticino_c", label: "Setpoint BTicino", unit: "°C", color: "#eab308", yAxis: "yTemp", borderDash: [5, 5], active: false },
   { key: "dhw_storage_temp_c", label: "T Bollitore ACS", unit: "°C", color: "#a855f7", yAxis: "yTemp", active: false },
   { key: "compressor_modulation_percent", label: "Modulazione Inverter (%)", unit: "%", color: "#facc15", yAxis: "yOther", active: true },
   { key: "hot_gas_pressure_bar", label: "Pressione Gas Caldo (bar)", unit: "bar", color: "#ec4899", yAxis: "yOther", active: false },
@@ -139,6 +185,11 @@ function classifyActivityStates(chronoFiltered) {
   });
 }
 
+/**
+ * Groups consecutive active states and snaps directly-adjacent state transitions
+ * (e.g., Solo GF -> PdC + GF -> Solo PdC) at their midpoint so bands sit flush
+ * without visual gaps between transitions, while never bleeding into OFF samples.
+ */
 function buildActivityRuns(states) {
   const runs = [];
   let cur = null;
@@ -154,13 +205,40 @@ function buildActivityRuns(states) {
       }
     } else if (cur && cur.state === state && prevTs !== null && (ts - prevTs) <= maxGapMs) {
       cur.endTs = ts;
+      cur.endIdx = i;
     } else {
       if (cur) runs.push(cur);
-      cur = { state, startTs: ts, endTs: ts };
+      cur = { state, startTs: ts, endTs: ts, startIdx: i, endIdx: i, segStart: ts, segEnd: ts };
     }
     prevTs = ts;
   }
   if (cur) runs.push(cur);
+
+  // Join directly-adjacent runs seamlessly at midpoint; pad isolated 1-sample runs
+  for (let i = 0; i < runs.length; i++) {
+    const r = runs[i];
+    const hasAdjacentPrev = i > 0 && r.startIdx === runs[i - 1].endIdx + 1 && (r.startTs - runs[i - 1].endTs) <= maxGapMs;
+    const hasAdjacentNext = i < runs.length - 1 && runs[i + 1].startIdx === r.endIdx + 1 && (runs[i + 1].startTs - r.endTs) <= maxGapMs;
+
+    if (hasAdjacentPrev) {
+      const mid = (runs[i - 1].endTs + r.startTs) / 2;
+      runs[i - 1].segEnd = mid;
+      r.segStart = mid;
+    } else if (r.startTs === r.endTs && !hasAdjacentNext) {
+      r.segStart = r.startTs - 150000;
+    } else {
+      r.segStart = r.startTs;
+    }
+
+    if (!hasAdjacentNext) {
+      if (r.startTs === r.endTs && !hasAdjacentPrev) {
+        r.segEnd = r.endTs + 150000;
+      } else {
+        r.segEnd = r.endTs;
+      }
+    }
+  }
+
   return runs;
 }
 
@@ -183,12 +261,12 @@ const activityBandsPlugin = {
 
     for (let i = 0; i < runs.length; i++) {
       const r = runs[i];
+      if (!visibleActivityBands[r.state]) continue;
       const style = ACTIVITY_STYLES[r.state];
       if (!style) continue;
 
-      // Single isolated sample gets a 5-min centered highlight; multi-sample run ends cleanly at endTs
-      const t1 = (r.startTs === r.endTs) ? (r.startTs - 150000) : r.startTs;
-      const t2 = (r.startTs === r.endTs) ? (r.endTs + 150000) : r.endTs;
+      const t1 = r.segStart;
+      const t2 = r.segEnd;
       if (t2 < viewMin || t1 > viewMax) continue;
 
       let x1 = xScale.getPixelForValue(t1);
@@ -257,6 +335,18 @@ function initChartControls() {
     pillOther.dataset.bound = "1";
     pillOther.addEventListener("click", () => openYAxisModal("yOther"));
   }
+
+  document.querySelectorAll(".activity-legend-btn").forEach(btn => {
+    if (btn.dataset.bound === "1") return;
+    btn.dataset.bound = "1";
+    btn.addEventListener("click", () => {
+      const band = parseInt(btn.dataset.band, 10);
+      if (![1, 2, 3].includes(band)) return;
+      visibleActivityBands[band] = !visibleActivityBands[band];
+      btn.classList.toggle("active", visibleActivityBands[band]);
+      if (telemetryChart) telemetryChart.update("none");
+    });
+  });
 
   bindYAxisModalEvents();
   updateModeButtonUI();
@@ -361,6 +451,7 @@ function updateChartData(samples) {
   const chronoFiltered = filterChronoByBounds(chronoAll, fullBounds);
 
   const states = classifyActivityStates(chronoFiltered);
+  telemetryChart._activityChrono = chronoFiltered;
   telemetryChart._activityStates = states;
   telemetryChart._activityRuns = buildActivityRuns(states);
   telemetryChart.data.datasets = getDatasets(chronoFiltered);
@@ -425,7 +516,7 @@ function filterChronoByBounds(chronoAll, bounds) {
 function getDatasets(chronoFiltered) {
   return CHANNEL_DEFS.filter(ch => ch.active).map(ch => {
     const points = chronoFiltered.map(({ sample, ts }) => {
-      const val = sample[ch.key];
+      const val = ch.computed ? ch.computed(sample) : sample[ch.key];
       const num = (val !== null && val !== undefined && val !== "") ? Number(val) : null;
       return {
         x: ts,
@@ -441,27 +532,27 @@ function getDatasets(chronoFiltered) {
       borderWidth: 2,
       pointRadius: points.length > 60 ? 0 : 2.5,
       pointHoverRadius: 6,
-      tension: 0.2,
+      tension: ch.spanGaps === false ? 0 : 0.2,
       borderDash: ch.borderDash || [],
       yAxisID: ch.yAxis,
-      spanGaps: true,
+      spanGaps: ch.spanGaps !== undefined ? ch.spanGaps : true,
     };
   });
 }
 
-function findClosestState(states, targetTs) {
-  if (!states || !states.length) return null;
+function findClosestByTs(list, targetTs) {
+  if (!list || !list.length) return null;
   let lo = 0;
-  let hi = states.length - 1;
+  let hi = list.length - 1;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
-    if (states[mid].ts < targetTs) lo = mid + 1;
+    if (list[mid].ts < targetTs) lo = mid + 1;
     else hi = mid;
   }
-  if (lo > 0 && Math.abs(states[lo - 1].ts - targetTs) < Math.abs(states[lo].ts - targetTs)) {
-    return states[lo - 1];
+  if (lo > 0 && Math.abs(list[lo - 1].ts - targetTs) < Math.abs(list[lo].ts - targetTs)) {
+    return list[lo - 1];
   }
-  return states[lo];
+  return list[lo];
 }
 
 function buildChart() {
@@ -530,10 +621,28 @@ function buildChart() {
             },
             afterBody: function(items) {
               if (!items || !items.length || !telemetryChart) return [];
-              const st = findClosestState(telemetryChart._activityStates, items[0].parsed.x);
-              if (!st) return [];
-              const info = ACTIVITY_STYLES[st.state];
-              return [info ? info.text : "⏸ Stato: Standby"];
+              const targetTs = items[0].parsed.x;
+              const lines = [];
+              const st = findClosestByTs(telemetryChart._activityStates, targetTs);
+              if (st) {
+                const info = ACTIVITY_STYLES[st.state];
+                lines.push(info ? info.text : "⏸ Stato: Standby");
+              }
+              const rawEntry = findClosestByTs(telemetryChart._activityChrono, targetTs);
+              if (rawEntry && rawEntry.sample) {
+                const s = rawEntry.sample;
+                const tin = s.indoor_temp_bticino_c != null ? `${Number(s.indoor_temp_bticino_c).toFixed(1)}°C` : "--";
+                const sp = s.indoor_setpoint_bticino_c != null ? `${Number(s.indoor_setpoint_bticino_c).toFixed(1)}°C` : "--";
+                const gfTxt = s.grundfos_pump_active === 1 ? "GF ON" : (s.grundfos_pump_active === 0 ? "GF OFF" : "GF --");
+                lines.push(`🏠 Casa: ${tin} / SP ${sp} → ${gfTxt}`);
+                if ((s.active_program || "").toLowerCase() === "standby") {
+                  const potentialLwt = computeVitocalTargetLwt(s, true);
+                  if (potentialLwt !== null) {
+                    lines.push(`🎯 Curva PdC (in Standby): ${potentialLwt.toFixed(1)} °C`);
+                  }
+                }
+              }
+              return lines;
             },
           },
         },
@@ -585,6 +694,7 @@ function buildChart() {
     },
   });
 
+  telemetryChart._activityChrono = chronoFiltered;
   telemetryChart._activityStates = states;
   telemetryChart._activityRuns = runs;
   applyYScaleOptions(telemetryChart);

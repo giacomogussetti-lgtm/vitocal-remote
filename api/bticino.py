@@ -19,6 +19,7 @@ class BTicinoConnector:
     HOMES_DATA_URL = "https://api.netatmo.com/api/homesdata"
     HOME_STATUS_URL = "https://api.netatmo.com/api/homestatus"
     SET_STATE_URL = "https://api.netatmo.com/api/setstate"
+    SWITCH_SCHEDULE_URL = "https://api.netatmo.com/api/switchhomeschedule"
     # Legacy Netatmo thermostat endpoint (kept for reference, forbidden for BNS Smarther)
     SET_ROOM_THERM_POINT_URL = "https://api.netatmo.com/api/setroomthermpoint"
 
@@ -236,11 +237,12 @@ class BTicinoConnector:
         )
         is_demanding_heat = (heating_power_request and heating_power_request > 0) or boiler_status
 
-        # Thermodynamic sanity check: in heating mode, if setpoint <= measured temp,
-        # heating demand is satisfied and the relay is opened.
-        # This prevents transient Netatmo cloud keep-alive latency (~60-120s) from falsely
-        # logging Grundfos as active after lowering setpoint below room temperature.
-        if temp is not None and setpoint is not None and setpoint <= temp:
+        # Thermodynamic sanity check: in heating mode, if setpoint is clearly below measured temp
+        # (> 0.3 C gap), heating demand is definitely satisfied and relay is opened.
+        # Allow a 0.3 C hysteresis band around setpoint == measured_temp so Smarther PID/hysteresis
+        # pulses right at the threshold (e.g. 8.5 == 8.5 C) are not masked, while stale cloud lag
+        # after dropping setpoint well below room temperature (e.g. 7.0 vs 7.8 C) is still filtered.
+        if temp is not None and setpoint is not None and setpoint < (temp - 0.3):
             pump_active = 0
         else:
             pump_active = 1 if is_demanding_heat else 0
@@ -337,3 +339,70 @@ class BTicinoConnector:
         if self.last_status:
             self.last_status["mode"] = mode
         return True, f"Modalità BTicino aggiornata su '{mode}'"
+
+    def get_schedules(self) -> list[dict[str, Any]]:
+        """Fetches all heating schedules configured on BTicino / Netatmo Home + Control."""
+        headers = self._get_headers()
+        resp = requests.get(self.HOMES_DATA_URL, headers=headers, timeout=15)
+        if resp.status_code in (401, 403):
+            headers = self._get_headers(force_refresh=True)
+            resp = requests.get(self.HOMES_DATA_URL, headers=headers, timeout=15)
+        if resp.status_code != 200:
+            raise RuntimeError(f"Errore lettura schedules homesdata ({resp.status_code}): {resp.text}")
+
+        homes = resp.json().get("body", {}).get("homes", [])
+        if not homes:
+            return []
+
+        home = homes[0]
+        if not self.home_id:
+            self.home_id = home.get("id")
+        if not self.room_id and home.get("rooms"):
+            self.room_id = home["rooms"][0].get("id")
+            self.room_name = home["rooms"][0].get("name", "Stanza")
+
+        result = []
+        for sc in home.get("schedules", []):
+            if sc.get("type", "therm") != "therm":
+                continue
+            result.append({
+                "id": sc.get("id"),
+                "name": sc.get("name", "Programmazione"),
+                "selected": bool(sc.get("selected")),
+            })
+        return result
+
+    def switch_schedule(
+        self, schedule_id: Optional[str] = None, schedule_name: Optional[str] = None
+    ) -> tuple[bool, str]:
+        """Switches the active BTicino Smarther heating schedule by ID or name."""
+        schedules = self.get_schedules()
+        if not self.home_id:
+            return False, "Home ID BTicino non trovato."
+
+        target = None
+        if schedule_id:
+            target = next((s for s in schedules if s["id"] == schedule_id), None)
+        if not target and schedule_name:
+            needle = schedule_name.strip().lower()
+            target = next((s for s in schedules if s["name"].strip().lower() == needle), None)
+            if not target:
+                target = next((s for s in schedules if needle in s["name"].strip().lower()), None)
+
+        if not target or not target.get("id"):
+            available = ", ".join(s["name"] for s in schedules) or "nessuno"
+            return False, f"Programmazione BTicino non trovata. Disponibili: {available}"
+
+        headers = self._get_headers()
+        payload = {"home_id": self.home_id, "schedule_id": target["id"]}
+        resp = requests.post(self.SWITCH_SCHEDULE_URL, headers=headers, json=payload, timeout=15)
+        if resp.status_code in (401, 403):
+            headers = self._get_headers(force_refresh=True)
+            resp = requests.post(self.SWITCH_SCHEDULE_URL, headers=headers, json=payload, timeout=15)
+
+        if resp.status_code != 200:
+            logger.error("Errore switchhomeschedule (%s): %s", resp.status_code, resp.text)
+            return False, f"Errore cambio programmazione BTicino ({resp.status_code}): {resp.text}"
+
+        logger.info("Programmazione BTicino attivata: %s (%s)", target["name"], target["id"])
+        return True, f"Programmazione BTicino attivata: '{target['name']}'"

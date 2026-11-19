@@ -122,10 +122,10 @@
         </div>
 
         <div class="chart-meta-strip">
-          <div class="activity-legend">
-            <span class="activity-legend-item"><i class="band-swatch swatch-pdc"></i>Solo PdC</span>
-            <span class="activity-legend-item"><i class="band-swatch swatch-gf"></i>Solo GF</span>
-            <span class="activity-legend-item"><i class="band-swatch swatch-both"></i>PdC + GF</span>
+          <div class="activity-legend" id="activityLegendButtons">
+            <button type="button" class="activity-legend-btn active" data-band="1"><i class="band-swatch swatch-pdc"></i>Solo PdC</button>
+            <button type="button" class="activity-legend-btn active" data-band="2"><i class="band-swatch swatch-gf"></i>Solo GF</button>
+            <button type="button" class="activity-legend-btn active" data-band="3"><i class="band-swatch swatch-both"></i>PdC + GF</button>
           </div>
           <div class="axis-pills">
             <button type="button" class="axis-pill" id="btnScaleYTemp" title="Tocca per fissare scala °C">°C: Auto</button>
@@ -139,6 +139,238 @@
 
         <div class="chart-channels" id="channelPillsContainer">
           <!-- Populated dynamically by charts.js -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: COMANDI BIDIREZIONALI (PDC + BTICINO) -->
+    <section id="tab-commands" class="tab-content">
+      <!-- Transport & Last Receipt Banner -->
+      <div class="sync-card" style="padding: 12px 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <h4 style="margin-bottom: 0; color: var(--accent-cyan);">🎛️ Controllo Remoto Impianto</h4>
+          <span class="brand-badge" id="cmdTransportBadge">Cloud Actions (4G/5G)</span>
+        </div>
+        <p id="cmdTokenWarning" style="display: none; color: #fbbf24; margin-top: 8px; margin-bottom: 4px; font-size: 0.74rem;">
+          ⚠️ Inserisci il GitHub PAT nella scheda <strong>Sync</strong> per inviare comandi da remoto (4G/5G).
+        </p>
+        <div id="lastCommandReceiptBox" class="cmd-receipt-box">
+          Nessun comando recente registrato.
+        </div>
+      </div>
+
+      <!-- Quick Synchronized Presets -->
+      <div class="sync-card">
+        <div class="cmd-card-header">
+          <h4>⚡ Azioni Rapide Sincronizzate (PdC + Grundfos)</h4>
+          <span class="cmd-live-tag" id="cmdPresetLiveState">--</span>
+        </div>
+        <p>Evita cicli brevi ON/OFF sincronizzando accensione/spegnimento di Vitocal e pompa pavimento.</p>
+        <div class="cmd-sync-row">
+          <div class="cmd-inline-field">
+            <label for="cmdSyncTemp">Target Casa (°C)</label>
+            <div class="stepper-group">
+              <button type="button" class="btn-step" data-target="cmdSyncTemp" data-step="-0.5">−</button>
+              <input type="number" id="cmdSyncTemp" class="form-input step-input" min="7" max="25" step="0.5" value="15.0">
+              <button type="button" class="btn-step" data-target="cmdSyncTemp" data-step="0.5">+</button>
+            </div>
+          </div>
+          <div class="cmd-inline-field">
+            <label for="cmdSyncDuration">Durata (min)</label>
+            <select id="cmdSyncDuration" class="form-input">
+              <option value="60">1 ora</option>
+              <option value="120">2 ore</option>
+              <option value="180" selected>3 ore</option>
+              <option value="240">4 ore</option>
+              <option value="360">6 ore</option>
+            </select>
+          </div>
+        </div>
+        <div class="cmd-btn-pair" style="margin-top: 10px;">
+          <button type="button" class="btn-action btn-primary" id="btnPresetSyncPulse">🔥 Avvia Ciclo Sincronizzato</button>
+          <button type="button" class="btn-action btn-danger" id="btnPresetStopAll">🛑 Tutto Standby / Antigelo</button>
+        </div>
+      </div>
+
+      <!-- Viessmann Vitocal 111-S Controls -->
+      <div class="sync-card">
+        <div class="cmd-card-header">
+          <h4>🔥 Pompa di Calore Vitocal 111-S</h4>
+          <span class="led-badge" id="ledPdcMode">🟢 --</span>
+        </div>
+
+        <div class="form-group">
+          <label for="cmdPdcModeSelect">Modalità Operativa Circuito</label>
+          <div class="cmd-inline-submit">
+            <select id="cmdPdcModeSelect" class="form-input">
+              <option value="standby">⏸ Standby (Solo Antigelo)</option>
+              <option value="dhw">🚿 Solo ACS Sanitario</option>
+              <option value="dhwAndHeating">🔥 Riscaldamento + ACS</option>
+            </select>
+            <button type="button" class="btn-action btn-primary btn-compact" id="btnSendPdcMode">Invia</button>
+          </div>
+        </div>
+
+        <!-- Heating Curve -->
+        <div class="cmd-subbox">
+          <div class="cmd-card-header">
+            <span class="cmd-sub-title">📈 Curva Climatica LWT</span>
+            <span class="led-badge" id="ledPdcCurve">🟢 --</span>
+          </div>
+          <div class="cmd-sync-row">
+            <div class="cmd-inline-field">
+              <label for="cmdSlopeInput">Inclinazione (Slope)</label>
+              <div class="stepper-group">
+                <button type="button" class="btn-step" data-target="cmdSlopeInput" data-step="-0.1">−</button>
+                <input type="number" id="cmdSlopeInput" class="form-input step-input" min="0.0" max="3.5" step="0.1" value="0.6">
+                <button type="button" class="btn-step" data-target="cmdSlopeInput" data-step="0.1">+</button>
+              </div>
+            </div>
+            <div class="cmd-inline-field">
+              <label for="cmdShiftInput">Livello (Shift)</label>
+              <div class="stepper-group">
+                <button type="button" class="btn-step" data-target="cmdShiftInput" data-step="-1">−</button>
+                <input type="number" id="cmdShiftInput" class="form-input step-input" min="-15" max="40" step="1" value="0">
+                <button type="button" class="btn-step" data-target="cmdShiftInput" data-step="1">+</button>
+              </div>
+            </div>
+          </div>
+          <div class="cmd-preview-line" id="cmdCurveLwtPreview">Target LWT stimato: -- °C</div>
+          <div class="cmd-btn-pair" style="margin-top: 8px;">
+            <button type="button" class="btn-action btn-secondary btn-compact" id="btnResetPdcCurve" style="margin-top: 0; flex: 0 0 auto; width: auto; padding: 8px 12px;">↺</button>
+            <button type="button" class="btn-action btn-primary" id="btnSendPdcCurve">Invia Curva Climatica</button>
+          </div>
+        </div>
+
+        <!-- Setpoint Temperatures -->
+        <div class="cmd-subbox">
+          <div class="cmd-card-header">
+            <span class="cmd-sub-title">🌡️ Setpoint & Bollitore ACS</span>
+            <span class="led-badge" id="ledPdcTemps">🟢 --</span>
+          </div>
+          <div class="cmd-temps-grid">
+            <div class="cmd-inline-field">
+              <label for="cmdTempNormal">T Normale (°C)</label>
+              <div class="stepper-group">
+                <button type="button" class="btn-step" data-target="cmdTempNormal" data-step="-1">−</button>
+                <input type="number" id="cmdTempNormal" class="form-input step-input" min="10" max="30" step="1" value="12">
+                <button type="button" class="btn-step" data-target="cmdTempNormal" data-step="1">+</button>
+              </div>
+            </div>
+            <div class="cmd-inline-field">
+              <label for="cmdTempReduced">T Ridotta (°C)</label>
+              <div class="stepper-group">
+                <button type="button" class="btn-step" data-target="cmdTempReduced" data-step="-1">−</button>
+                <input type="number" id="cmdTempReduced" class="form-input step-input" min="10" max="30" step="1" value="12">
+                <button type="button" class="btn-step" data-target="cmdTempReduced" data-step="1">+</button>
+              </div>
+            </div>
+            <div class="cmd-inline-field">
+              <label for="cmdTempDhw">T ACS (°C)</label>
+              <div class="stepper-group">
+                <button type="button" class="btn-step" data-target="cmdTempDhw" data-step="-1">−</button>
+                <input type="number" id="cmdTempDhw" class="form-input step-input" min="10" max="60" step="1" value="10">
+                <button type="button" class="btn-step" data-target="cmdTempDhw" data-step="1">+</button>
+              </div>
+            </div>
+          </div>
+          <div class="cmd-btn-pair" style="margin-top: 8px;">
+            <button type="button" class="btn-action btn-primary" id="btnSendPdcTemps">Invia Temperature</button>
+            <button type="button" class="btn-action btn-secondary" id="btnSendDhwBoost" style="margin-top: 0;">🚿 Boost ACS</button>
+          </div>
+        </div>
+
+        <!-- Viessmann Schedule -->
+        <div class="cmd-subbox">
+          <div class="cmd-card-header">
+            <span class="cmd-sub-title">🗓️ Fascia Oraria PdC</span>
+            <span class="cmd-live-tag" id="cmdPdcActiveProg">PROG: --</span>
+          </div>
+          <div class="cmd-sync-row">
+            <div class="cmd-inline-field">
+              <label for="cmdSchedDays">Giorni</label>
+              <select id="cmdSchedDays" class="form-input">
+                <option value="all">Tutti (Lun–Dom)</option>
+                <option value="weekdays">Feriali (Lun–Ven)</option>
+                <option value="weekend">Weekend (Sab–Dom)</option>
+              </select>
+            </div>
+            <div class="cmd-inline-field">
+              <label for="cmdSchedMode">Livello Fascia</label>
+              <select id="cmdSchedMode" class="form-input">
+                <option value="reduced">Ridotta</option>
+                <option value="normal">Normale</option>
+              </select>
+            </div>
+          </div>
+          <div class="cmd-sync-row" style="margin-top: 6px;">
+            <div class="cmd-inline-field">
+              <label for="cmdSchedStart">Inizio</label>
+              <select id="cmdSchedStart" class="form-input"></select>
+            </div>
+            <div class="cmd-inline-field">
+              <label for="cmdSchedEnd">Fine</label>
+              <select id="cmdSchedEnd" class="form-input"></select>
+            </div>
+          </div>
+          <div class="cmd-btn-pair" style="margin-top: 8px;">
+            <button type="button" class="btn-action btn-primary" id="btnSendPdcSchedule">Imposta Fascia</button>
+            <button type="button" class="btn-action btn-danger" id="btnClearPdcSchedule">Svuota (Standby)</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- BTicino Smarther Controls -->
+      <div class="sync-card">
+        <div class="cmd-card-header">
+          <h4>🏠 Termostato BTicino Smarther (Grundfos)</h4>
+          <span class="led-badge" id="ledBticinoSp">🟢 --</span>
+        </div>
+
+        <div class="cmd-sync-row">
+          <div class="cmd-inline-field">
+            <label for="cmdBticinoTemp">Setpoint Manuale (°C)</label>
+            <div class="stepper-group">
+              <button type="button" class="btn-step" data-target="cmdBticinoTemp" data-step="-0.5">−</button>
+              <input type="number" id="cmdBticinoTemp" class="form-input step-input" min="5.0" max="30.0" step="0.5" value="7.0">
+              <button type="button" class="btn-step" data-target="cmdBticinoTemp" data-step="0.5">+</button>
+            </div>
+          </div>
+          <div class="cmd-inline-field">
+            <label for="cmdBticinoDuration">Durata Manuale</label>
+            <select id="cmdBticinoDuration" class="form-input">
+              <option value="60">1 ora</option>
+              <option value="120">2 ore</option>
+              <option value="180" selected>3 ore</option>
+              <option value="360">6 ore</option>
+              <option value="720">12 ore</option>
+            </select>
+          </div>
+        </div>
+        <div class="cmd-btn-pair" style="margin-top: 8px;">
+          <button type="button" class="btn-action btn-secondary btn-compact" id="btnResetBticinoSp" style="margin-top: 0; flex: 0 0 auto; width: auto; padding: 8px 12px;">↺</button>
+          <button type="button" class="btn-action btn-primary" id="btnSendBticinoManual">Invia Setpoint Manuale</button>
+        </div>
+
+        <div class="cmd-mode-pills" style="margin-top: 10px;">
+          <button type="button" class="btn-action btn-secondary btn-compact cmd-bt-mode" data-mode="home" style="margin-top: 0;">📅 Programma</button>
+          <button type="button" class="btn-action btn-secondary btn-compact cmd-bt-mode" data-mode="hg" style="margin-top: 0;">❄️ Antigelo</button>
+          <button type="button" class="btn-action btn-secondary btn-compact cmd-bt-mode" data-mode="away" style="margin-top: 0;">✈️ Assente</button>
+        </div>
+
+        <div class="cmd-subbox" style="margin-top: 10px;">
+          <div class="cmd-card-header">
+            <span class="cmd-sub-title">📋 Cambia Programmazione Oraria</span>
+            <button type="button" class="btn-mini-tool" id="btnRefreshSchedules">🔄 Rileggi</button>
+          </div>
+          <div class="cmd-inline-submit">
+            <select id="cmdBticinoScheduleSelect" class="form-input">
+              <option value="Modalità antigelo o assenza prolungata">Modalità antigelo o assenza prolungata</option>
+              <option value="Modalità riscaldamento attiva">Modalità riscaldamento attiva</option>
+              <option value="Modalità riscaldamento ECO attiva">Modalità riscaldamento ECO attiva</option>
+            </select>
+            <button type="button" class="btn-action btn-primary btn-compact" id="btnSendBticinoSchedule">Attiva</button>
+          </div>
         </div>
       </div>
     </section>
@@ -327,6 +559,10 @@
       <svg viewBox="0 0 24 24"><path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/></svg>
       <span>Grafici</span>
     </button>
+    <button class="nav-item" data-tab="tab-commands">
+      <svg viewBox="0 0 24 24"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
+      <span>Comandi</span>
+    </button>
     <button class="nav-item" data-tab="tab-analytics">
       <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
       <span>Analisi</span>
@@ -337,7 +573,7 @@
     </button>
     <button class="nav-item" data-tab="tab-settings">
       <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
-      <span>Sync & Info</span>
+      <span>Sync</span>
     </button>
   </nav>
 
@@ -368,6 +604,22 @@
     </div>
   </div>
 
+  <!-- Command Confirmation Modal -->
+  <div id="commandConfirmModal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="cmdConfirmTitle">
+      <div class="modal-header">
+        <h4 id="cmdConfirmTitle">⚠️ Conferma Invio Comando</h4>
+        <button type="button" class="modal-close-btn" id="btnCloseCmdConfirm" aria-label="Chiudi">✕</button>
+      </div>
+      <p id="cmdConfirmSummary" class="modal-hint" style="color: var(--text-main); font-size: 0.82rem; line-height: 1.45; margin-bottom: 10px;"></p>
+      <p id="cmdConfirmRouteHint" class="modal-hint" style="margin-bottom: 14px;"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn-action btn-secondary" id="btnCancelCmdConfirm" style="margin-top: 0;">Annulla</button>
+        <button type="button" class="btn-action btn-primary" id="btnConfirmSendCmd">✅ Conferma e Invia</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification element -->
   <div id="toast"></div>
 
@@ -375,6 +627,7 @@
   <script src="js/synoptic.js"></script>
   <script src="js/charts.js"></script>
   <script src="js/analytics.js"></script>
+  <script src="js/commands.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

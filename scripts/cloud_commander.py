@@ -1,0 +1,357 @@
+"""
+Cloud Command Executor for Vitocal 111-S & BTicino Smarther.
+Executes validated bidirectional write commands (from GitHub Actions workflow_dispatch
+or local Flask web_server), logs an updated telemetry snapshot, and writes a receipt
+to data/last_command.json for PWA confirmation.
+"""
+import argparse
+import json
+import logging
+import os
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE_DIR))
+
+from config import Config
+from api.viessmann import ViessmannConnector
+from api.bticino import BTicinoConnector
+from scripts.cloud_logger import log_sample
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger("cloud_commander")
+
+VALID_DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+
+
+def _validate_hhmm(val: str, label: str) -> str:
+    if not isinstance(val, str):
+        raise ValueError(f"Orario {label} non valido.")
+    parts = val.strip().split(":")
+    if len(parts) != 2 or not parts[0].isdigit() or not parts[1].isdigit():
+        raise ValueError(f"Formato orario {label} non valido: {val}")
+    hh, mm = int(parts[0]), int(parts[1])
+    if not (0 <= hh <= 23 and 0 <= mm <= 59 and mm % 10 == 0):
+        raise ValueError(f"Orario {label} deve essere multiplo di 10 min (es. 11:30): {val}")
+    return f"{hh:02d}:{mm:02d}"
+
+
+def _validate_command(command: str, params: dict[str, Any]) -> dict[str, Any]:
+    """Validates command name and strictly clamps/checks parameter ranges."""
+    if not isinstance(params, dict):
+        raise ValueError("I parametri devono essere un oggetto JSON.")
+
+    if command == "viessmann_curve":
+        slope = round(float(params["slope"]), 1)
+        shift = int(round(float(params["shift"])))
+        if not (0.0 <= slope <= 3.5):
+            raise ValueError("Slope fuori range (0.0 – 3.5).")
+        if not (-15 <= shift <= 40):
+            raise ValueError("Shift fuori range (-15 – +40).")
+        return {"slope": slope, "shift": shift}
+
+    if command == "viessmann_temps":
+        clean: dict[str, Any] = {}
+        if params.get("normal") is not None:
+            t_norm = int(round(float(params["normal"])))
+            if not (10 <= t_norm <= 30):
+                raise ValueError("Temperatura Normale fuori range (10 – 30 °C).")
+            clean["normal"] = t_norm
+        if params.get("reduced") is not None:
+            t_red = int(round(float(params["reduced"])))
+            if not (10 <= t_red <= 30):
+                raise ValueError("Temperatura Ridotta fuori range (10 – 30 °C).")
+            clean["reduced"] = t_red
+        if params.get("dhw") is not None:
+            t_dhw = int(round(float(params["dhw"])))
+            if not (10 <= t_dhw <= 60):
+                raise ValueError("Temperatura ACS fuori range (10 – 60 °C).")
+            clean["dhw"] = t_dhw
+        if not clean:
+            raise ValueError("Specificare almeno una temperatura (normal, reduced o dhw).")
+        return clean
+
+    if command == "viessmann_mode":
+        mode = str(params.get("mode", "")).strip()
+        if mode not in ("standby", "dhw", "dhwAndHeating"):
+            raise ValueError(f"Modalità PdC non valida: '{mode}'.")
+        return {"mode": mode}
+
+    if command == "viessmann_schedule":
+        raw_days = params.get("days", list(VALID_DAYS))
+        if not isinstance(raw_days, list):
+            raise ValueError("days deve essere una lista.")
+        days = [str(d).strip().lower() for d in raw_days if str(d).strip().lower() in VALID_DAYS]
+        if not days:
+            raise ValueError("Selezionare almeno un giorno valido (mon..sun).")
+        clear = bool(params.get("clear", False))
+        if clear:
+            return {"days": days, "clear": True}
+        start = _validate_hhmm(str(params.get("start", "11:00")), "inizio")
+        end = _validate_hhmm(str(params.get("end", "16:00")), "fine")
+        if start >= end:
+            raise ValueError(f"L'ora di fine ({end}) deve seguire l'inizio ({start}).")
+        mode = str(params.get("mode", "reduced")).strip()
+        if mode not in ("reduced", "normal", "fixed"):
+            raise ValueError(f"Modo fascia non valido: {mode}")
+        return {"days": days, "start": start, "end": end, "mode": mode, "clear": False}
+
+    if command == "viessmann_dhw_boost":
+        return {"active": bool(params.get("active", True))}
+
+    if command == "bticino_setpoint":
+        mode = str(params.get("mode", "manual")).strip().lower()
+        if mode not in ("manual", "home", "away", "hg"):
+            raise ValueError(f"Modalità BTicino non valida: '{mode}'.")
+        if mode == "manual":
+            temp = round(float(params.get("temp", 12.0)) * 2) / 2.0
+            if not (5.0 <= temp <= 30.0):
+                raise ValueError("Setpoint BTicino fuori range (5.0 – 30.0 °C).")
+            dur = int(params.get("duration_minutes", 180))
+            if not (0 <= dur <= 1440):
+                raise ValueError("Durata manuale fuori range (0 – 1440 min).")
+            return {"mode": "manual", "temp": temp, "duration_minutes": dur}
+        return {"mode": mode}
+
+    if command == "bticino_switch_schedule":
+        sid = str(params.get("schedule_id", "") or "").strip() or None
+        sname = str(params.get("schedule_name", "") or "").strip() or None
+        if not sid and not sname:
+            raise ValueError("Specificare schedule_id o schedule_name per BTicino.")
+        return {"schedule_id": sid, "schedule_name": sname}
+
+    if command == "preset_stop_all":
+        return {}
+
+    if command == "preset_sync_pulse":
+        temp = round(float(params.get("temp", 15.0)) * 2) / 2.0
+        if not (7.0 <= temp <= 26.0):
+            raise ValueError("Setpoint casa per ciclo sincronizzato fuori range (7.0 – 26.0 °C).")
+        dur = int(params.get("duration_minutes", 180))
+        if not (15 <= dur <= 720):
+            raise ValueError("Durata ciclo sincronizzato fuori range (15 – 720 min).")
+        clean: dict[str, Any] = {"temp": temp, "duration_minutes": dur}
+        if params.get("pdc_reduced") is not None:
+            pr = int(round(float(params["pdc_reduced"])))
+            if not (10 <= pr <= 30):
+                raise ValueError("Temperatura Ridotta PdC fuori range (10 – 30 °C).")
+            clean["pdc_reduced"] = pr
+        if params.get("pdc_normal") is not None:
+            pn = int(round(float(params["pdc_normal"])))
+            if not (10 <= pn <= 30):
+                raise ValueError("Temperatura Normale PdC fuori range (10 – 30 °C).")
+            clean["pdc_normal"] = pn
+        return clean
+
+    raise ValueError(f"Comando sconosciuto: '{command}'")
+
+
+def _write_receipt(receipt: dict[str, Any]) -> None:
+    receipt_file = Config.DATA_DIR / "last_command.json"
+    receipt_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(receipt_file, "w", encoding="utf-8") as f:
+        json.dump(receipt, f, indent=2, ensure_ascii=False)
+
+
+def execute_command(
+    command: str,
+    params: dict[str, Any] | None = None,
+    dry_run: bool = False,
+    write_receipt_file: bool = True,
+) -> dict[str, Any]:
+    """Validates and executes a hardware write command, returning structured receipt."""
+    ts = datetime.now(timezone.utc).isoformat()
+    raw_params = params or {}
+
+    try:
+        clean_params = _validate_command(command, raw_params)
+    except Exception as ve:
+        receipt = {
+            "timestamp_utc": ts,
+            "command": command,
+            "params": raw_params,
+            "success": False,
+            "message": f"Validazione fallita: {ve}",
+            "sample_logged": False,
+        }
+        if write_receipt_file and not dry_run:
+            _write_receipt(receipt)
+        return receipt
+
+    if dry_run:
+        return {
+            "timestamp_utc": ts,
+            "command": command,
+            "params": clean_params,
+            "success": True,
+            "message": f"[DRY-RUN] Comando '{command}' validato correttamente.",
+            "sample_logged": False,
+        }
+
+    success = False
+    messages: list[str] = []
+
+    try:
+        if command.startswith("viessmann_") or command.startswith("preset_"):
+            v_conn = ViessmannConnector()
+            v_conn.connect()
+
+        if command.startswith("bticino_") or command.startswith("preset_"):
+            b_conn = BTicinoConnector()
+
+        if command == "viessmann_curve":
+            ok, msg = v_conn.set_heating_curve(clean_params["slope"], clean_params["shift"])
+            success = ok
+            messages.append(msg)
+
+        elif command == "viessmann_temps":
+            all_ok = True
+            if "normal" in clean_params:
+                ok, msg = v_conn.set_normal_temperature(clean_params["normal"])
+                all_ok = all_ok and ok
+                messages.append(msg)
+            if "reduced" in clean_params:
+                ok, msg = v_conn.set_reduced_temperature(clean_params["reduced"])
+                all_ok = all_ok and ok
+                messages.append(msg)
+            if "dhw" in clean_params:
+                ok, msg = v_conn.set_dhw_temperature(clean_params["dhw"])
+                all_ok = all_ok and ok
+                messages.append(msg)
+            success = all_ok
+
+        elif command == "viessmann_mode":
+            ok, msg = v_conn.set_mode(clean_params["mode"])
+            success = ok
+            messages.append(msg)
+
+        elif command == "viessmann_schedule":
+            ok, msg = v_conn.set_heating_schedule_simple(
+                days=clean_params["days"],
+                start=clean_params.get("start", "11:00"),
+                end=clean_params.get("end", "16:00"),
+                mode=clean_params.get("mode", "reduced"),
+                clear=clean_params["clear"],
+            )
+            success = ok
+            messages.append(msg)
+
+        elif command == "viessmann_dhw_boost":
+            ok, msg = v_conn.set_dhw_onetime_charge(clean_params["active"])
+            success = ok
+            messages.append(msg)
+
+        elif command == "bticino_setpoint":
+            if clean_params["mode"] == "manual":
+                ok, msg = b_conn.set_thermostat_setpoint(
+                    temp=clean_params["temp"],
+                    mode="manual",
+                    duration_minutes=clean_params["duration_minutes"],
+                )
+            else:
+                ok, msg = b_conn.set_thermostat_mode(clean_params["mode"])
+            success = ok
+            messages.append(msg)
+
+        elif command == "bticino_switch_schedule":
+            ok, msg = b_conn.switch_schedule(
+                schedule_id=clean_params.get("schedule_id"),
+                schedule_name=clean_params.get("schedule_name"),
+            )
+            success = ok
+            messages.append(msg)
+
+        elif command == "preset_stop_all":
+            ok_v, msg_v = v_conn.set_mode("standby")
+            ok_b, msg_b = b_conn.set_thermostat_mode("hg")
+            success = ok_v and ok_b
+            messages.extend([msg_v, msg_b])
+
+        elif command == "preset_sync_pulse":
+            all_ok = True
+            if "pdc_normal" in clean_params:
+                ok_n, msg_n = v_conn.set_normal_temperature(clean_params["pdc_normal"])
+                all_ok = all_ok and ok_n
+                messages.append(msg_n)
+            if "pdc_reduced" in clean_params:
+                ok_r, msg_r = v_conn.set_reduced_temperature(clean_params["pdc_reduced"])
+                all_ok = all_ok and ok_r
+                messages.append(msg_r)
+            ok_v, msg_v = v_conn.set_mode("dhwAndHeating")
+            ok_b, msg_b = b_conn.set_thermostat_setpoint(
+                temp=clean_params["temp"],
+                mode="manual",
+                duration_minutes=clean_params["duration_minutes"],
+            )
+            success = all_ok and ok_v and ok_b
+            messages.extend([msg_v, msg_b])
+
+    except Exception as exc:
+        logger.error("Errore esecuzione comando '%s': %s", command, exc)
+        success = False
+        messages.append(str(exc))
+
+    # Wait briefly for cloud state propagation, then refresh telemetry log
+    sample_logged = False
+    if success:
+        try:
+            time.sleep(2.0)
+            sample_logged = bool(log_sample())
+        except Exception as log_exc:
+            logger.warning("Log post-comando fallito: %s", log_exc)
+
+    receipt = {
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "command": command,
+        "params": clean_params,
+        "success": bool(success),
+        "message": " | ".join(m for m in messages if m) or ("Comando eseguito" if success else "Errore comando"),
+        "sample_logged": sample_logged,
+    }
+    if write_receipt_file:
+        _write_receipt(receipt)
+    return receipt
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Vitocal Remote Cloud Command Executor")
+    parser.add_argument("--command", default=os.environ.get("CMD_ACTION", ""), help="Command name")
+    parser.add_argument("--params", default=os.environ.get("CMD_PAYLOAD_JSON", "{}"), help="JSON params string")
+    parser.add_argument("--dry-run", action="store_true", help="Validate only without calling cloud APIs")
+    args = parser.parse_args()
+
+    if not args.command:
+        logger.error("Nessun comando specificato (--command o CMD_ACTION).")
+        return 1
+
+    try:
+        params = json.loads(args.params or "{}")
+    except json.JSONDecodeError as je:
+        receipt = {
+            "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+            "command": args.command,
+            "params": {},
+            "success": False,
+            "message": f"Payload JSON non valido: {je}",
+            "sample_logged": False,
+        }
+        if not args.dry_run:
+            _write_receipt(receipt)
+        print(json.dumps(receipt, ensure_ascii=False, indent=2))
+        return 1
+
+    receipt = execute_command(args.command, params, dry_run=args.dry_run)
+    print(json.dumps(receipt, ensure_ascii=False, indent=2))
+    return 0 if receipt["success"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

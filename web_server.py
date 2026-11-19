@@ -129,6 +129,25 @@ def api_sync_github():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+def _read_latest_cloud_sample_and_store() -> dict | None:
+    """Reads last record from cloud_telemetry.jsonl and stores it in SQLite if present."""
+    cloud_file = Config.DATA_DIR / "cloud_telemetry.jsonl"
+    latest_record = None
+    if cloud_file.exists():
+        with open(cloud_file, "r", encoding="utf-8") as f:
+            lines = [l.strip() for l in f if l.strip()]
+            if lines:
+                latest_record = json.loads(lines[-1])
+
+    if latest_record:
+        from models.telemetry import TelemetrySample
+        try:
+            db.insert_sample(TelemetrySample(**latest_record))
+        except Exception as dbe:
+            logger.debug("Insert SQLite: %s", dbe)
+    return latest_record
+
+
 @app.route("/api/refresh-direct", methods=["POST"])
 def api_refresh_direct():
     """Triggers an immediate live reading from Viessmann and BTicino APIs."""
@@ -138,23 +157,7 @@ def api_refresh_direct():
         if not success:
             return jsonify({"success": False, "error": "Errore lettura connettori API"}), 500
 
-        # Read the newly appended sample from cloud_telemetry.jsonl
-        cloud_file = Config.DATA_DIR / "cloud_telemetry.jsonl"
-        latest_record = None
-        if cloud_file.exists():
-            with open(cloud_file, "r", encoding="utf-8") as f:
-                lines = [l.strip() for l in f if l.strip()]
-                if lines:
-                    latest_record = json.loads(lines[-1])
-
-        # Also store into local SQLite DB if not already present
-        if latest_record:
-            from models.telemetry import TelemetrySample
-            try:
-                db.insert_sample(TelemetrySample(**latest_record))
-            except Exception as dbe:
-                logger.debug("Insert SQLite: %s", dbe)
-
+        latest_record = _read_latest_cloud_sample_and_store()
         return jsonify({
             "success": True,
             "message": "Campionamento diretto completato con successo",
@@ -162,6 +165,45 @@ def api_refresh_direct():
         })
     except Exception as e:
         logger.error("Errore campionamento diretto: %s", e)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/command", methods=["POST"])
+def api_command():
+    """Executes a validated bidirectional write command directly via local connectors."""
+    body = request.get_json(silent=True) or {}
+    command = str(body.get("command", "")).strip()
+    params = body.get("params") or {}
+    if not command:
+        return jsonify({"success": False, "message": "Parametro 'command' mancante."}), 400
+
+    logger.info("Comando bidirezionale ricevuto da PWA locale: %s %s", command, params)
+    try:
+        from scripts.cloud_commander import execute_command
+        receipt = execute_command(command, params)
+        latest_record = _read_latest_cloud_sample_and_store() if receipt.get("sample_logged") else None
+        status_code = 200 if receipt.get("success") else 400
+        return jsonify({**receipt, "sample": latest_record}), status_code
+    except Exception as e:
+        logger.error("Errore esecuzione /api/command: %s", e)
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/schedules", methods=["GET"])
+def api_schedules():
+    """Returns configured BTicino and Viessmann weekly schedules."""
+    try:
+        from api.bticino import BTicinoConnector
+        from api.viessmann import ViessmannConnector
+        bticino_schedules = BTicinoConnector().get_schedules()
+        viessmann_schedule = ViessmannConnector().get_heating_schedule()
+        return jsonify({
+            "success": True,
+            "bticino_schedules": bticino_schedules,
+            "viessmann_schedule": viessmann_schedule,
+        })
+    except Exception as e:
+        logger.error("Errore lettura programmazioni: %s", e)
         return jsonify({"success": False, "error": str(e)}), 500
 
 
