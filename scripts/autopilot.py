@@ -37,12 +37,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "t_emergency_c": 6.8,
     "rapid_drop_slope_c_per_h": -0.18,
     "debounce_minutes": 20,
-    "cop_window_start": "11:30",
-    "cop_window_end": "15:30",
+    "cop_window_start": "11:00",
+    "cop_window_end": "16:00",
     "target_lwt_delta_k": 18.0,
     "min_target_lwt_c": 25.0,
     "max_target_lwt_c": 28.5,
-    "max_cycle_minutes": 210,
+    "max_cycle_minutes": 300,
     "puffer_drain_minutes": 25,
     "puffer_drain_stop_temp_c": 13.8,
     "bticino_force_on_temp_c": 18.0,
@@ -51,7 +51,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "dynamic_cron_enabled": True,
     "cron_idle_minutes": 15,
     "cron_armed_minutes": 5,
-    "cron_active_minutes": 3,
+    "cron_active_minutes": 2,
 }
 
 DEFAULT_STATE: dict[str, Any] = {
@@ -387,21 +387,31 @@ def run_autopilot_tick(latest_sample: dict[str, Any] | Any, dry_run: bool = Fals
     comp_active = sample.get("compressor_active")
     frost_status = str(sample.get("frost_protection_status") or "").lower()
 
-    ref_tin = float(t_in) if t_in is not None else float(cfg["t_min_c"])
-    target_lwt = _clamp_target_lwt(ref_tin, cfg)
-    pdc_setpoint = compute_inverse_setpoint_for_target_lwt(
-        target_lwt_c=target_lwt,
-        oat_c=float(oat),
-        slope=float(curve_slope),
-        shift=float(curve_shift),
-    )
-
     st["last_eval_utc"] = now_iso
     st["indoor_slope_c_per_h"] = slope_c_h
-    st["calculated_target_lwt_c"] = target_lwt
-    st["calculated_pdc_setpoint_c"] = pdc_setpoint
     st["defrost_detected_today"] = defrost_cnt
     st["heating_rod_delta_s"] = rod_delta_s
+
+    ref_tin = float(t_in) if t_in is not None else float(cfg["t_min_c"])
+    if (
+        cfg.get("enabled")
+        and st.get("state") in ("HEATING_SYNC", "PUFFER_DRAIN")
+        and st.get("calculated_target_lwt_c") is not None
+        and st.get("calculated_pdc_setpoint_c") is not None
+    ):
+        # Lock Target LWT & Setpoint PdC once the cycle starts so Viessmann WO1C modulates undisturbed
+        target_lwt = float(st["calculated_target_lwt_c"])
+        pdc_setpoint = int(st["calculated_pdc_setpoint_c"])
+    else:
+        target_lwt = _clamp_target_lwt(ref_tin, cfg)
+        pdc_setpoint = compute_inverse_setpoint_for_target_lwt(
+            target_lwt_c=target_lwt,
+            oat_c=float(oat),
+            slope=float(curve_slope),
+            shift=float(curve_shift),
+        )
+        st["calculated_target_lwt_c"] = target_lwt
+        st["calculated_pdc_setpoint_c"] = pdc_setpoint
 
     if not cfg.get("enabled"):
         st["state"] = "DISABLED"
