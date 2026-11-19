@@ -1,0 +1,12 @@
+{
+  "timestamp_utc": "2026-11-19T21:08:40.432898+00:00",
+  "command": "viessmann_temps",
+  "params": {
+    "normal": 11,
+    "reduced": 11,
+    "dhw": 10
+  },
+  "success": true,
+  "message": "Temperatura Normale impostata e verificata con successo: 11 °C | Temperatura Ridotta impostata e verificata con successo: 11 °C | Temperatura Bollitore ACS impostata e verificata con successo: 10 °C",
+  "sample_logged": true
+}
