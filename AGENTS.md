@@ -159,13 +159,12 @@ L'impianto è idraulicamente disaccoppiato in due sottosistemi tramite un **Puff
    - I punti nei dataset devono avere coordinate `{ x: timestamp_ms, y: value }`. In questo modo la coordinata orizzontale riflette i minuti effettivi, le tacche orarie vengono calcolate ad intervalli uniformi (es. 01:00, 01:30, 02:00) e l'interazione touch (`mode: 'nearest', axis: 'x'`) aggancia la fetta temporale corretta con tooltip completo.
    - Le librerie (`chart.min.js` e `chartjs-adapter-date-fns.bundle.min.js`) sono salvate in `web/js/` e gestite dal Service Worker (`sw.js`) in modalità offline-first, funzionando senza necessità di connessione a CDN esterne.
 
-### L. Procedura di Deploy su GitHub Web & Gestione File Nascosti:
-1. **Blocco File Nascosti su GitHub Web ("This file is hidden")**:
-   - L'uploader drag-and-drop web di GitHub rifiuta cartelle e file che iniziano con un punto (`.github`, `.gitignore`, `.env.example`).
-   - **Regola di Upload in 2 Fasi**:
-     * **Fase 1 (Codice e UI)**: Dalla cartella `github_ready/`, trascinare nella root del repo GitHub tutti i file e cartelle standard (`api/`, `models/`, `scripts/`, `storage/`, `ui/`, `web/`, file di root). Escludere `data/cloud_telemetry.jsonl` se il logger GitHub è già in marcia.
-     * **Fase 2 (Workflow CI/CD)**: Entrare su GitHub nel percorso `.github/workflows/` e trascinare direttamente i singoli file `.yml` (`telemetry_logger.yml`, `deploy_pwa.yml`, `build_apk.yml`) da dentro `github_ready/.github/workflows/`. Non avendo il punto iniziale nel nome file, vengono accettati istantaneamente senza errori.
-   - Skill dedicata attiva: `.agents/skills/vitocal-build-deploy/SKILL.md`.
+### L. Procedura di Deploy su GitHub (Automatizzata al 100% via Git CLI):
+1. **Automazione Git Completa (Nessun Upload Manuale nel Browser)**:
+   - È configurato Git per Windows con eccezione TinyWall su `C:\Program Files\Git\ucrt64\libexec\git-core\git-remote-https.exe`.
+   - Il repository locale è collegato a `origin/main` (`giacomogussetti-lgtm/vitocal-remote`).
+   - L'agente AI gestisce modifiche, commit e push direttamente via riga di comando (`git push origin main`).
+   - Il caricamento manuale drag-and-drop su browser è superato: l'agente esegue lo scanner di sicurezza (`python scripts/security_check.py`), verifica `.gitignore` e invia le modifiche in autonomia senza rischi di esporre file nascosti o token.
 
 ---
 

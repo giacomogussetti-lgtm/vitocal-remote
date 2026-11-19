@@ -7,6 +7,11 @@
 
 ## 1. OBIETTIVI RAGGIUNTI (FASE 1 — BANOMETRO & DESKTOP GUI)
 
+- [x] **Integrazione Git CLI & Automazione Deploy GitHub al 100% (Addio Drag-and-Drop)**:
+  - Installato e configurato Git per Windows con eccezione TinyWall su `C:\Program Files\Git\ucrt64\libexec\git-core\git-remote-https.exe`.
+  - Inizializzato repository Git locale collegato a `origin/main` (`giacomogussetti-lgtm/vitocal-remote`).
+  - Eseguito primo push e allineamento con successo: rimossi i vecchi file di cache `__pycache__` remoti, protetti tutti i dati sensibili locali (`.env`, `token.save`, database) via `.gitignore`.
+  - L'assistente AI ora opera in piena autonomia con commit e push diretti da terminale senza richiedere nessun intervento manuale dell'utente su GitHub Web.
 - [x] **Gestione Ritenzione Dati Cloud & Rotazione Automatica (Campionamento 5 Minuti)**:
   - Progettata e implementata l'architettura **"Hot Buffer + Cold Storage"** in `scripts/cloud_logger.py`:
     - **Hot Window**: `data/cloud_telemetry.jsonl` mantiene una finestra scorrevole degli **ultimi 30 giorni** di campionamento continuo a 5 minuti (`MAX_HOT_SAMPLES = 8640`, soglia `ROTATION_THRESHOLD = 9000`). Pesa circa 5.8 MB uncompress / solo ~600 KB trasferiti via rete con compressione gzip.
