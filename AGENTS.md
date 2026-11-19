@@ -109,11 +109,11 @@ L'impianto è idraulicamente disaccoppiato in due sottosistemi tramite un **Puff
 2. **Sincronizzazione Cloud -> SQLite**:
    * L'applicazione desktop dispone del pulsante `☁️ Sync Cloud (GitHub)` nella barra superiore, che importa i campioni da `cloud_telemetry.jsonl` nel database SQLite locale scartando i duplicati basandosi sull'indice `timestamp_utc`.
    * **Bypass Cache CDN Fastly GitHub (300s)**: `raw.githubusercontent.com` applica una cache CDN di 5 minuti. L'URL include `?t={int(time.time())}` con intestazioni `Cache-Control: no-cache` e `Pragma: no-cache` per garantire che ogni clic scarichi sempre l'ultimo commit in tempo reale senza attendere il refresh della CDN.
-3. **Politica di Ritenzione Dati & Rotazione Hot/Cold (Campionamento 5 Minuti)**:
-   * Con campionamento ogni 5 minuti (288 campioni/giorno = 8.640 campioni/mese), un log continuo non segmentato raggiungerebbe 72 MB/anno, rallentando l'app mobile ed eccedendo i limiti di commit Git.
-   * `scripts/cloud_logger.py` adotta una **sliding window di 30 giorni** (`MAX_HOT_SAMPLES = 8640`, soglia isteresi `ROTATION_THRESHOLD = 9000`).
-   * `cloud_telemetry.jsonl` conserva sempre gli ultimi 30 giorni completi (~5.8 MB raw, solo ~600 KB trasferiti su 4G grazie a gzip HTTP), garantendo boot istantaneo e grafici fino a 30gg su smartphone.
-   * I campioni eccedenti vengono automaticamente compressi e archiviati per mese in `data/archive/telemetry_YYYY-MM.jsonl.gz`.
+3. **Politica di Ritenzione Dati & Rotazione Hot/Cold (Campionamento 5 Minuti - Finestra 6 Mesi)**:
+   * Con campionamento ogni 5 minuti (288 campioni/giorno = 8.640 campioni/mese), un log continuo non segmentato raggiungerebbe 72 MB/anno, eccedendo i limiti di commit Git e saturando la memoria.
+   * `scripts/cloud_logger.py` adotta una **sliding window estesa di 6 mesi / 180 giorni** (`MAX_HOT_SAMPLES = 51840`, soglia isteresi `ROTATION_THRESHOLD = 52500`, `MIN_BYTES_BEFORE_CHECK = 32_000_000`).
+   * `cloud_telemetry.jsonl` conserva sempre gli ultimi 6 mesi completi (~34.7 MB raw, ma solo ~3.8 MB scaricati effettivamente via 4G/Wi-Fi grazie alla compressione automatica gzip di GitHub).
+   * I campioni che superano i 6 mesi vengono automaticamente compressi e archiviati per mese in `data/archive/telemetry_YYYY-MM.jsonl.gz`.
    * `DatabaseManager.import_file()` su desktop supporta in modo trasparente sia `.jsonl` che `.jsonl.gz`, archiviando a lungo termine tutto lo storico su SQLite (`vitocal_telemetry.db`).
 
 ### E. Regole Mandatorie di Sicurezza, Privacy e Controllo Pre-Commit:
@@ -158,6 +158,10 @@ L'impianto è idraulicamente disaccoppiato in due sottosistemi tramite un **Puff
    - Per una telemetria termodinamica coerente, si DEVE usare una scala temporale continua: `type: 'time'` con date adapter (`chartjs-adapter-date-fns`).
    - I punti nei dataset devono avere coordinate `{ x: timestamp_ms, y: value }`. In questo modo la coordinata orizzontale riflette i minuti effettivi, le tacche orarie vengono calcolate ad intervalli uniformi (es. 01:00, 01:30, 02:00) e l'interazione touch (`mode: 'nearest', axis: 'x'`) aggancia la fetta temporale corretta con tooltip completo.
    - Le librerie (`chart.min.js` e `chartjs-adapter-date-fns.bundle.min.js`) sono salvate in `web/js/` e gestite dal Service Worker (`sw.js`) in modalità offline-first, funzionando senza necessità di connessione a CDN esterne.
+2. **Prevenzione Campioni Equidistanti (`distribution: 'linear'`, `bounds: 'ticks'`)**:
+   - Per impedire che i campioni vengano disegnati a distanze orizzontali identiche nonostante intervalli temporali diversi (es. un buco di 1 ora o campioni a 5 min), la scala temporale adotta esplicitamente `distribution: 'linear'` e `bounds: 'ticks'`.
+   - In `web/js/charts.js`, le funzioni `buildChart` e `updateChartData` calcolano dinamicamente `min = latestMs - hours` e `max = latestMs` ancorando l'asse X all'esatto intervallo temporale selezionato.
+   - La cache PWA in `web/sw.js` è versionata (`vitocal-remote-v3`) per forzare il refresh immediato su tutti i dispositivi mobili.
 
 ### L. Procedura di Deploy su GitHub (Automatizzata al 100% via Git CLI):
 1. **Automazione Git Completa (Nessun Upload Manuale nel Browser)**:

@@ -109,7 +109,9 @@
             <button class="btn-filter active" data-hours="24">24h</button>
             <button class="btn-filter" data-hours="72">3gg</button>
             <button class="btn-filter" data-hours="168">7gg</button>
-            <button class="btn-filter" data-hours="0">30gg (Tutti)</button>
+            <button class="btn-filter" data-hours="720">30gg</button>
+            <button class="btn-filter" data-hours="2160">3 Mesi</button>
+            <button class="btn-filter" data-hours="0">6 Mesi (Tutti)</button>
           </div>
         </div>
 
@@ -135,11 +137,12 @@
             <button class="btn-filter active" data-hours="24">24h</button>
             <button class="btn-filter" data-hours="48">48h</button>
             <button class="btn-filter" data-hours="168">7gg</button>
+            <button class="btn-filter" data-hours="720">30gg</button>
           </div>
         </div>
         <div style="display: flex; gap: 8px; align-items: center; margin-top: 8px;">
           <label style="font-size: 0.75rem; color: var(--text-muted);">Ore personalizzate:</label>
-          <input type="number" id="customAnalyticsHours" class="form-input" style="width: 70px; padding: 4px 8px;" min="1" max="720" value="24">
+          <input type="number" id="customAnalyticsHours" class="form-input" style="width: 70px; padding: 4px 8px;" min="1" max="4320" value="24">
           <button class="btn-filter" id="btnApplyCustomHours" style="padding: 6px 12px; font-weight: 700;">Calcola</button>
           <span style="font-size: 0.75rem; color: var(--text-dim); margin-left: auto;" id="analyticsEffectiveSpan">Analisi su 24.0h</span>
         </div>

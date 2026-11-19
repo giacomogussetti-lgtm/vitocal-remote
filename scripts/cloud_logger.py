@@ -145,12 +145,12 @@ def log_sample() -> bool:
     return True
 
 
-# Retention policy for 5-minute sampling:
+# Retention policy for 5-minute telemetry:
 # 12 samples/hour * 24 hours = 288 samples/day.
-# 30 days = 8,640 samples (~5.8 MB uncompressed JSONL, ~600 KB gzipped).
-MAX_HOT_SAMPLES = 8640  # Rolling window: last 30 days of 5-minute telemetry
-ROTATION_THRESHOLD = 9000  # Hysteresis buffer (~1.25 extra days before triggering rotation batch)
-MIN_BYTES_BEFORE_CHECK = 5_500_000  # Quick O(1) file size check to avoid line counting when small
+# 6 months (180 days) = 51,840 samples (~34.7 MB uncompressed JSONL, ~3.8 MB gzipped).
+MAX_HOT_SAMPLES = 51840  # Rolling window: last 6 months (180 days) of 5-minute telemetry
+ROTATION_THRESHOLD = 52500  # Hysteresis buffer (~2.3 extra days before triggering rotation batch)
+MIN_BYTES_BEFORE_CHECK = 32_000_000  # Quick O(1) file size check to avoid line counting when small
 
 
 def rotate_hot_buffer_if_needed(cloud_file: Path):
@@ -215,7 +215,7 @@ def rotate_hot_buffer_if_needed(cloud_file: Path):
         temp_file.replace(cloud_file)
 
         logger.info(
-            "Rotazione completata: archiviati %d campioni, mantenuti %d campioni (~30 giorni a 5 min) nel file live %s",
+            "Rotazione completata: archiviati %d campioni, mantenuti %d campioni (~6 mesi a 5 min) nel file live %s",
             num_to_archive,
             len(hot_lines),
             cloud_file.name,

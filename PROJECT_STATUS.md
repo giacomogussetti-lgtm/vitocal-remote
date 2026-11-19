@@ -12,12 +12,17 @@
   - Inizializzato repository Git locale collegato a `origin/main` (`giacomogussetti-lgtm/vitocal-remote`).
   - Eseguito primo push e allineamento con successo: rimossi i vecchi file di cache `__pycache__` remoti, protetti tutti i dati sensibili locali (`.env`, `token.save`, database) via `.gitignore`.
   - L'assistente AI ora opera in piena autonomia con commit e push diretti da terminale senza richiedere nessun intervento manuale dell'utente su GitHub Web.
-- [x] **Gestione Ritenzione Dati Cloud & Rotazione Automatica (Campionamento 5 Minuti)**:
+- [x] **Gestione Ritenzione Dati Cloud & Rotazione Automatica (Campionamento 5 Minuti - Finestra 6 Mesi)**:
   - Progettata e implementata l'architettura **"Hot Buffer + Cold Storage"** in `scripts/cloud_logger.py`:
-    - **Hot Window**: `data/cloud_telemetry.jsonl` mantiene una finestra scorrevole degli **ultimi 30 giorni** di campionamento continuo a 5 minuti (`MAX_HOT_SAMPLES = 8640`, soglia `ROTATION_THRESHOLD = 9000`). Pesa circa 5.8 MB uncompress / solo ~600 KB trasferiti via rete con compressione gzip.
-    - **Cold Archive**: al superamento della soglia, i campioni più vecchi di 30 giorni vengono automaticamente raggruppati per mese e archiviati in formato compresso `data/archive/telemetry_YYYY-MM.jsonl.gz`.
-    - **Protezione Git & Smartphone**: il file live non supererà mai i ~6 MB (evitando warning/blocchi Git su GitHub oltre 50/100 MB) e garantisce che lo smartphone scarichi sempre un dataset snello e fulmineo in <0.5s su 4G.
+    - **Hot Window**: `data/cloud_telemetry.jsonl` mantiene una finestra scorrevole degli **ultimi 6 mesi (180 giorni)** di campionamento continuo a 5 minuti (`MAX_HOT_SAMPLES = 51840`, soglia `ROTATION_THRESHOLD = 52500`, `MIN_BYTES_BEFORE_CHECK = 32_000_000`). Pesa circa 34.7 MB uncompressed / solo ~3.8 MB trasferiti su 4G grazie alla compressione gzip nativa di GitHub.
+    - **Cold Archive**: al superamento della soglia dei 6 mesi, i campioni più vecchi vengono archiviati mensilmente in formato compresso `data/archive/telemetry_YYYY-MM.jsonl.gz`.
+    - **Filtri Web Aggiornati**: aggiunti selettori a 30gg, 3 Mesi e 6 Mesi (Tutti) nell'interfaccia PWA.
     - **Compatibilità Desktop & SQLite**: `DatabaseManager.import_file()` supporta nativamente sia file `.jsonl` sia archivi `.jsonl.gz`, permettendo all'applicazione desktop di conservare a vita l'intero storico su SQLite locale (`vitocal_telemetry.db`).
+- [x] **Correzione Asse Temporale Continuo nei Grafici Mobile PWA**:
+  - Risolto il problema dei campioni visualizzati a intervalli orizzontali equidistanti:
+    * Impositata esplicitamente la modalità `distribution: 'linear'` e `bounds: 'ticks'` sulla scala X (`type: 'time'`).
+    * Implementato l'ancoraggio proporzionale esatto calcolando dinamicamente `min` e `max` sulle ore attive (`latestMs - hours`), garantendo che intervalli di durata diversa (es. 5 min vs 2 ore) mostrino distanze grafiche rigorosamente proporzionali alla fisica temporale.
+    * Aggiornata la versione cache Service Worker (`vitocal-remote-v3`) per forzare l'aggiornamento automatico e istantaneo su tutti gli smartphone senza residui di vecchie cache.
 - [x] **Disaccoppiamento Cron GitHub Actions & Integrazione cron-job.org**:
   - Risolto il ritardo tipico dei cron GitHub su runner gratuiti integrando trigger esterno HTTPS via `cron-job.org` (`POST .../dispatches`).
   - Ottenuto campionamento puntuale al secondo esatto, funzionante 24/7 a computer spento.

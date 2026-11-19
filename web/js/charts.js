@@ -37,6 +37,17 @@ function updateChartData(samples) {
   
   const filtered = filterSamplesByTime(currentSamples, activeTimeframeHours);
   telemetryChart.data.datasets = getDatasets(filtered);
+
+  // Apply continuous proportional time bounds
+  const bounds = getScaleBounds(currentSamples, activeTimeframeHours);
+  if (bounds.min !== undefined && bounds.max !== undefined) {
+    telemetryChart.options.scales.x.min = bounds.min;
+    telemetryChart.options.scales.x.max = bounds.max;
+  } else {
+    delete telemetryChart.options.scales.x.min;
+    delete telemetryChart.options.scales.x.max;
+  }
+
   telemetryChart.update();
 }
 
@@ -48,11 +59,29 @@ function setChartTimeframe(hours) {
   updateChartData(currentSamples);
 }
 
+function getScaleBounds(samples, hours) {
+  if (!samples || samples.length === 0 || hours <= 0) {
+    return { min: undefined, max: undefined };
+  }
+
+  let latestMs = Date.now();
+  for (let i = samples.length - 1; i >= 0; i--) {
+    if (samples[i] && samples[i].timestamp_utc) {
+      const parsed = new Date(samples[i].timestamp_utc).getTime();
+      if (!isNaN(parsed) && parsed > 0) {
+        latestMs = Math.max(latestMs, parsed);
+        break;
+      }
+    }
+  }
+  const cutoff = latestMs - hours * 60 * 60 * 1000;
+  return { min: cutoff, max: latestMs };
+}
+
 function filterSamplesByTime(samples, hours) {
   if (!samples || samples.length === 0) return [];
   if (hours <= 0) return samples; // All data
 
-  // Determine latest valid timestamp from samples to prevent empty views on historic replays
   let latestMs = Date.now();
   for (let i = samples.length - 1; i >= 0; i--) {
     if (samples[i] && samples[i].timestamp_utc) {
@@ -110,6 +139,7 @@ function buildChart() {
   if (!canvas) return;
 
   const filtered = filterSamplesByTime(currentSamples, activeTimeframeHours);
+  const bounds = getScaleBounds(currentSamples, activeTimeframeHours);
 
   if (telemetryChart) {
     telemetryChart.destroy();
@@ -169,6 +199,10 @@ function buildChart() {
       scales: {
         x: {
           type: "time",
+          distribution: "linear",
+          bounds: "ticks",
+          min: bounds.min,
+          max: bounds.max,
           time: {
             displayFormats: {
               millisecond: "HH:mm:ss",
@@ -187,6 +221,7 @@ function buildChart() {
             maxRotation: 0,
             autoSkip: true,
             maxTicksLimit: 7,
+            source: "auto",
             font: { size: 10 }
           }
         },
