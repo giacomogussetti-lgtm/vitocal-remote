@@ -1,10 +1,7 @@
 name: Telemetry Cloud Logger (Vitocal & BTicino)
 
 on:
-  schedule:
-    # Esegue ogni 5 minuti (288 volte al giorno)
-    - cron: '*/5 * * * *'
-  workflow_dispatch: # Consente l'avvio manuale con pulsante
+  workflow_dispatch: # Attivato con precisione al secondo da cron-job.org o dall'app mobile
 
 concurrency:
   group: telemetry-logger
