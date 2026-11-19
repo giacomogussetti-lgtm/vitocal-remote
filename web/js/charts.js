@@ -641,6 +641,13 @@ function buildChart() {
                     lines.push(`🎯 Curva PdC (in Standby): ${potentialLwt.toFixed(1)} °C`);
                   }
                 }
+                const phase = String(s.compressor_phase || "").toLowerCase();
+                if (phase.includes("defrost")) {
+                  lines.push(`❄️ SBRINAMENTO ATTIVO (${s.compressor_phase})`);
+                }
+                if (String(s.frost_protection_status || "").toLowerCase() === "on") {
+                  lines.push("🛡️ Antigelo Hardware PdC ON");
+                }
               }
               return lines;
             },

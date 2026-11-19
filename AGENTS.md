@@ -6,21 +6,24 @@
 ---
 
 ## 1. CONTESTO DELL'IMPIANTO FISICO (Abitazione di Montagna - Zona Climatica E)
-L'abitazione è una seconda casa di montagna non presidiata nei giorni feriali, soggetta a rigide temperature invernali e rischio gelo per radiante e tubazioni nei muri perimetrali.
+L'abitazione è una seconda casa di montagna non presidiata nei giorni feriali (abitata tipicamente nelle festività principali), soggetta a rigide temperature invernali e rischio gelo per radiante e tubazioni.
+- **Disposizione edificio & involucro**: IDU e Puffer 200 L si trovano nel box al piano terra; sopra il box insistono due appartamenti intermedi e al 3° livello (ultimo piano mansardato) si trova l'appartamento gestito (~120 m², privo di cappotto termico, pareti perimetrali e tetto esposti all'esterno).
+- **Unità Esterna (ODU)**: posizionata su terrapieno dietro al box, rialzata rispetto all'IDU di circa $\Delta H \approx 7\text{ m} \pm 2.5\text{ m}$.
 L'impianto è idraulicamente disaccoppiato in due sottosistemi tramite un **Puffer parallelo da 200 litri**:
 
 1. **Circuito Primario (PdC <-> Puffer)**:
-   * **Pompa di Calore**: Viessmann Vitocal 111-S split (AWBT-E-AC 111.A16, 11 kW nominali, refrigerante R410A) con bollitore ACS integrato.
+   * **Pompa di Calore**: Viessmann Vitocal 111-S split (AWBT-E-AC 111.A16, 11 kW nominali, refrigerante R410A) con bollitore ACS integrato e resistenza elettrica di backup integrata (`heatingRod` a 2 stadi).
    * **Centralina**: Vitotronic 200 tipo WO1C collegata a Vitoconnect Optolink ViCare.
    * **Dispositivo reale nel cloud Viessmann**: `CU401B_S_64` (Device tipo `heating`, 193 features hardware).
    * **Regolazione**: Curva climatica con Inclinazione (Slope) = 0.6, Livello (Shift) = 0, mandata max 40 °C. Setpoint Normale/Ridotta = 12 °C (o 10 °C baseline).
 2. **Circuito Secondario (Puffer <-> Pavimento)**:
-   * **Rilancio**: Circolatore Grundfos a velocità fissa che pesca dal puffer 200 L e alimenta i collettori del riscaldamento a pavimento.
+   * **Rilancio**: Circolatore Grundfos (modello esatto da confermare a vista, tipo UPM3/ALPHA1 L, attualmente su curva Radiante) che pesca dal puffer 200 L e alimenta direttamente l'intero pavimento radiante (~120 m², **unica zona aperta senza testine né valvole di zona**).
    * **Termostato Ambiente**: BTicino Smarther (modello `BNS`, firmware 40) installato in "Corridoio".
-   * **Comando**: Il consenso ON/OFF del termostato comanda direttamente la pompa Grundfos.
-3. **Criticità Termodinamica Risolta dal Software**:
+   * **Comando**: Il consenso ON/OFF del termostato comanda direttamente il circolatore di rilancio.
+3. **Criticità Termodinamica & Regola di Rigore**:
    * Se la Grundfos è spenta, la PdC da 11 kW satura rapidamente i soli 200 L di puffer e lavora a cicli brevi ad alto consumo.
-   * Il sistema software orchestra preset multi-dispositivo per sincronizzare la PdC nelle ore più calde ad alto COP con l'accensione forzata della Grundfos per accumulare calore nel massetto radiante.
+   * Il sistema software orchestra cicli sincronizzati lunghi nelle ore calde ad alto COP + scarico finale del puffer.
+   * **Regola ferrea (Zero Supposizioni)**: non trattare come certezze grandezze idrauliche non misurate (es. rapporto esatto di portata secondario/primario o curva esatta pompa non ancora letta da etichetta). Prima di ogni tuning strategico eseguire `python scripts/audit_strategy.py`.
 
 ---
 
@@ -161,7 +164,7 @@ L'impianto è idraulicamente disaccoppiato in due sottosistemi tramite un **Puff
 2. **Prevenzione Campioni Equidistanti (`distribution: 'linear'`, `bounds: 'ticks'`)**:
    - Per impedire che i campioni vengano disegnati a distanze orizzontali identiche nonostante intervalli temporali diversi (es. un buco di 1 ora o campioni a 5 min), la scala temporale adotta esplicitamente `distribution: 'linear'` e `bounds: 'ticks'`.
    - In `web/js/charts.js`, le funzioni `buildChart` e `updateChartData` calcolano dinamicamente `min = latestMs - hours` e `max = latestMs` ancorando l'asse X all'esatto intervallo temporale selezionato.
-   - La cache PWA in `web/sw.js` è versionata (`vitocal-remote-v5`) per forzare il refresh immediato su tutti i dispositivi mobili.
+   - La cache PWA in `web/sw.js` è versionata (`vitocal-remote-v6`) per forzare il refresh immediato su tutti i dispositivi mobili.
 3. **Zoom/Pan Solo X, Blocco Asse Y & Bande Attività Adiacenti (`web/js/charts.js`)**:
    - **Gesti Touch Separati**: con 1 dito in modalità `👆 Leggi` resta attivo lo scrubbing dei valori; con 2 dita si esegue **pinch zoom + drag solo su asse X** ancorato al punto medio (senza librerie esterne). Toggle minimale `👆 Leggi / ✋ Sposta` in alto a destra per eventuale pan in X ad una mano + `↺ Reset`.
    - **Asse Y Bloccato & Modale Tappabile**: durante zoom/pan in X gli assi Y vengono congelati (`yAutoFrozen`) così da non "saltare" verticalmente; tappando direttamente su asse Y sinistro/destro o sulle pillole `°C` / `%` si apre il modale `#yAxisModal` con preset e campi `Y Min` / `Y Max` persistenti in `localStorage` (`vitocal_y_scales`).
@@ -173,6 +176,17 @@ L'impianto è idraulicamente disaccoppiato in due sottosistemi tramite un **Puff
 5. **PWA Bidirezionale & Fix Isteresi BTicino (`api/bticino.py`, `scripts/cloud_commander.py`, `web/js/commands.js`, `.github/workflows/apply_command.yml`)**:
    - **Fix Soglia `setpoint == indoor_temp` in `api/bticino.py`**: il sanity check anti-lag cloud usa `setpoint < (temp - 0.3)` anziché `setpoint <= temp`, evitando di mascherare a `0` le reali attivazioni PID/isteresi di Smarther quando il setpoint coincide con la temperatura stanza (es. `8.5 °C == 8.5 °C`).
    - **Comandi Remoti Sicuri 4G/5G + LAN**: scheda `🎛️ Comandi` con conferma modale obbligatoria, LED di sincronizzazione, stepper, preview curva LWT, controllo modalità/curva/temperature/fasce orarie Vitocal e setpoint/modalità/switch-schedule BTicino via `POST /api/command` (LAN) o `apply_command.yml` (GitHub Actions + ricevuta `data/last_command.json`).
+
+### M. Autopilota Custodia Montagna Full-Auto, Diagnostica & Frequenza Dinamica (`scripts/autopilot.py`, `scripts/audit_strategy.py`):
+1. **Sensori Diagnostici Esposti (`api/viessmann.py`)**:
+   - `compressor_phase` (`heating.compressors.0.phase`: rileva `"defrost"`, `"preparing-defrost"`, `"heating"`, `"off"`), `frost_protection_status` (`heating.circuits.0.frostprotection`), `heating_rod_level1_s` e `heating_rod_level2_s` (`heating.heatingRod.runtime`, secondi cumulati della resistenza elettrica di backup).
+2. **Macchina a Stati Autopilota (`scripts/autopilot.py`)**:
+   - Configurazione in `data/autopilot_config.json` (disattivato di default; attivabile con 1 tap da `🛡️ ATTIVA ASSENZA MONTAGNA` nella PWA) e stato persistito in `data/autopilot_state.json`.
+   - Stati: `DISABLED` / `IDLE` (tutto fermo in Standby + BTicino Antigelo 7 °C; assist scarico se antigelo hardware porta puffer >= 22 °C) → `ARMED` (conferma T_in <= `t_min_c` per `debounce_minutes`) → `HEATING_SYNC` (avvio sincronizzato in finestra COP `11:30–15:30` oppure emergenza notturna se `T_in <= t_emergency_c` o derivata ripida; Target LWT calcolato e convertito con formula inversa WO1C `compute_inverse_setpoint_for_target_lwt`) → `PUFFER_DRAIN` (PdC in `standby`, Grundfos attiva altri 25 min per svuotare il puffer) → `IDLE`.
+   - **Doppio Fail-Safe Hardware**: manuale BTicino sempre con `duration_minutes` auto-scadente + fascia hardware `heating.schedule` Vitocal limitata alla finestra COP diurna.
+   - **Polling Dinamico `cron-job.org`**: tramite `CRONJOB_API_KEY` e `CRONJOB_ID` nei GitHub Secrets, adatta automaticamente la frequenza (`15 min` IDLE / `5 min` ARMED / `3 min` HEATING_SYNC o PUFFER_DRAIN).
+3. **Audit Strategia Obbligatorio (`scripts/audit_strategy.py`, regola `.agents/rules/thermodynamic-rigor-and-telemetry-audit.md`)**:
+   - Prima di qualsiasi tuning su ON/OFF, defrost o soglie, eseguire `python scripts/audit_strategy.py` per verificare dati reali, modalità applicate, durata cicli, pendenze termiche e contatori resistenza elettrica.
 
 ### L. Procedura di Deploy su GitHub (Automatizzata al 100% via Git CLI):
 1. **Automazione Git Completa (Nessun Upload Manuale nel Browser)**:

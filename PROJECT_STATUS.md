@@ -220,11 +220,12 @@
     - **Area Grafico Verticale Amplificata**: barra filtri compatta su riga singola scorrevole e altezza dinamica `clamp(320px, 50dvh, 560px)`.
     - **Bande Verticali Stato Impianto Adiacenti & Disattivabili**: plugin Chart.js `beforeDatasetsDraw` con fasce traslucide e nastro superiore da 6px per `Solo PdC` (Ambra), `Solo Grundfos` (Ciano) e `PdC + Grundfos` (Verde), attivabili/disattivabili singolarmente da legenda e saldate senza buchi tra cambi di stato adiacenti.
     - **Traccia Target LWT Curva (PdC) & Fix Isteresi BTicino**: traccia calcolata `Target LWT Curva (PdC)` basata sulla formula ufficiale Viessmann WO1C `variant2` (attiva fuori da `standby`); `Setpoint BTicino` disattivato di default per evitare compressioni verticali da picchi anti-grippaggio (30 °C), con riepilogo casa/setpoint sempre nel tooltip. Risolto inoltre il bug `setpoint <= temp` in `api/bticino.py` (`setpoint < temp - 0.3`) che mascherava i cicli PID della Grundfos a soglia `8.5 == 8.5 °C`.
-  - **App Mobile PWA Bidirezionale (`tab-commands`, `web/js/commands.js`, `scripts/cloud_commander.py`, `.github/workflows/apply_command.yml`, `web_server.py`)**:
+  - **App Mobile PWA Bidirezionale & Custodia Full-Auto (`tab-commands`, `scripts/autopilot.py`, `scripts/cloud_commander.py`, `.github/workflows/apply_command.yml`, Service Worker `vitocal-remote-v6`)**:
     - **Controllo Remoto Completo (4G/5G + LAN)**: nuova scheda `🎛️ Comandi` con conferma modale obbligatoria, LED `🟢 Sincronizzato / 🟠 Da inviare`, stepper e preview Target LWT dal vivo.
-    - **Comandi Viessmann Vitocal**: cambio modalità (`standby`/`dhw`/`dhwAndHeating`), curva climatica (`slope`/`shift`), temperature (`Normale`/`Ridotta`/`ACS`), carica rapida ACS e programmazione fasce orarie settimanali (`setHeatingSchedule`).
-    - **Comandi BTicino Smarther & Preset Sincronizzati**: setpoint manuale con durata, cambio modalità (`home`/`hg`/`away`), cambio programmazione oraria (`POST /api/switchhomeschedule`), e pulsanti rapidi sincronizzati PdC + Grundfos (`Avvia Ciclo Sincronizzato` / `Tutto Standby`).
-    - **Sicurezza & Ricevuta Cloud**: in LAN invio diretto tramite `POST /api/command`; da remoto in 4G/5G `workflow_dispatch` su `apply_command.yml` usando i GitHub Secrets, verifica read-back, aggiornamento telemetria e ricevuta in `data/last_command.json`.
+    - **Pannello One-Click "Custodia Automatica Montagna" ("A Prova di Nonni")**: tasto singolo `🛡️ ATTIVA ASSENZA MONTAGNA (Full-Auto 7.5 °C)` con cassetto parametri regolabili (`T_min`, `T_max`, `Emergenza`, `Salto LWT`, durata max, scarico puffer, finestra COP, frequenza dinamica) e banner di stato rapido sul Sinottico.
+    - **Motore Autopilota a Macchina a Stati (`scripts/autopilot.py`)**: gestisce `IDLE` → `ARMED` (anti-rimbalzo 20 min) → `HEATING_SYNC` (finestra COP `11:30–15:30` o emergenza gelo/derivata notturna, con Target LWT adattivo e formula inversa WO1C) → `PUFFER_DRAIN` (25 min di scarico puffer a PdC spenta) con doppio fail-safe hardware e adattamento automatico della frequenza `cron-job.org` (15m / 5m / 3m).
+    - **Diagnostica Avanzata Defrost, Antigelo & Resistenza Elettrica (`api/viessmann.py`)**: mappati e storicizzati `compressor_phase`, `frost_protection_status`, `heating_rod_level1_s` e `heating_rod_level2_s` (secondi reali resistenza backup BPHE) + script di audit `scripts/audit_strategy.py` e regola/skill di rigore termodinamico.
+    - **Comandi Viessmann Vitocal & BTicino Smarther**: cambio modalità, curva climatica, temperature, boost ACS, fasce orarie settimanali (`setHeatingSchedule`), setpoint manuale con durata, switch programmazione BTicino (`/api/switchhomeschedule`) e preset sincronizzati via `POST /api/command` (LAN) o `apply_command.yml` (4G/5G).
   - **Grafici Touch Mobile Interattivi (`web/js/charts.js`)**:
     - **Risolto Bug di Spaziatura Temporale (Scala Continua su Asse X)**:
       * Sostituita la precedente scala a categorie (che posizionava i campioni in modo rigidamente equidistante, distorcendo i buchi temporali o le letture ravvicinate) con una scala temporale continua reale (`type: 'time'`).
@@ -245,13 +246,15 @@
   - **Skill Dedicate per l'Assistente AI (`.agents/skills/`)**:
     - `vitocal-remote-expert`: manuale operativo di bordo, mappatura sensori, runbook e protezione termodinamica.
     - `vitocal-build-deploy`: guida per esportazione, audit di sicurezza pre-commit, gestione dei file nascosti (`.github/workflows/`) su GitHub Web e controllo della finestra di ritenzione.
+    - `vitocal-thermodynamic-tuning`: workflow obbligatorio di audit telemetria (`scripts/audit_strategy.py`) prima di qualsiasi modifica a strategie o soglie, unito alla regola di rigore fisico (zero supposizioni non misurate).
 
 ---
 
 ## 3. WORK IN PROGRESS & ROADMAP (FASE 2)
 
-### A. Strategia Adattiva Anti-ON/OFF & Regolazione Dinamica (Prossimo Step)
-- Analisi approfondita dei primi log 24/7 e definizione strategia basata su feedback reale della temperatura ambiente per minimizzare i cicli brevi su puffer 200L e massimizzare il COP sincronizzando Vitocal e Grundfos.
+### A. Tasto "Arrivo in Montagna (Pre-Riscaldamento Comfort)" & Verifica Portata Circolatore
+- Implementazione del secondo tasto rapido one-click per pre-riscaldare gradualmente massetto, ambiente e bollitore ACS prima del soggiorno.
+- Verifica a vista del modello esatto del circolatore secondario in centrale termica (UPM3 / ALPHA1 L) e test di portata/durata cicli con curva III costante vs Radiante.
 
 ### B. Decimazione Dati Adattiva nei Grafici Web (LTTB - Largest Triangle Three Buckets)
 - Inserimento di un algoritmo di decimazione client-side leggero per visualizzare grafici plurimensili (fino a 6 mesi / 50.000 campioni) a 60 fps fluidi su qualsiasi smartphone senza rallentamenti grafici.

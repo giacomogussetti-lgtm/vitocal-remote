@@ -41,4 +41,8 @@ class TelemetrySample(BaseModel):
     normal_setpoint_c: Optional[float] = None
     reduced_setpoint_c: Optional[float] = None
     dhw_setpoint_c: Optional[float] = None
+    compressor_phase: Optional[str] = None
+    frost_protection_status: Optional[str] = None
+    heating_rod_level1_s: Optional[int] = None
+    heating_rod_level2_s: Optional[int] = None
     active_preset: Optional[str] = "manual"

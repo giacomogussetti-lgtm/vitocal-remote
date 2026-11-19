@@ -48,6 +48,8 @@ jobs:
           NETATMO_CLIENT_ID: ${{ secrets.NETATMO_CLIENT_ID }}
           NETATMO_CLIENT_SECRET: ${{ secrets.NETATMO_CLIENT_SECRET }}
           NETATMO_REFRESH_TOKEN: ${{ secrets.NETATMO_REFRESH_TOKEN }}
+          CRONJOB_API_KEY: ${{ secrets.CRONJOB_API_KEY }}
+          CRONJOB_ID: ${{ secrets.CRONJOB_ID }}
           CMD_ACTION: ${{ inputs.command }}
           CMD_PAYLOAD_JSON: ${{ inputs.payload_json }}
         run: |
@@ -62,6 +64,8 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           if [ -f "data/last_command.json" ]; then git add data/last_command.json; fi
+          if [ -f "data/autopilot_config.json" ]; then git add data/autopilot_config.json; fi
+          if [ -f "data/autopilot_state.json" ]; then git add data/autopilot_state.json; fi
           if [ -f "data/cloud_telemetry.jsonl" ]; then git add data/cloud_telemetry.jsonl; fi
           if [ -d "data/archive" ]; then git add data/archive/; fi
           if git diff --staged --quiet; then

@@ -69,6 +69,10 @@ class DatabaseManager:
                 ("normal_setpoint_c", "REAL"),
                 ("reduced_setpoint_c", "REAL"),
                 ("dhw_setpoint_c", "REAL"),
+                ("compressor_phase", "TEXT"),
+                ("frost_protection_status", "TEXT"),
+                ("heating_rod_level1_s", "INTEGER"),
+                ("heating_rod_level2_s", "INTEGER"),
             ]
             cursor.execute("PRAGMA table_info(telemetry_samples);")
             existing_cols = {row["name"] for row in cursor.fetchall()}

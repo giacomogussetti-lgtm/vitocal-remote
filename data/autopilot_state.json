@@ -1,0 +1,17 @@
+{
+  "state": "DISABLED",
+  "state_since_utc": null,
+  "below_threshold_since_utc": null,
+  "cycle_started_utc": null,
+  "cycle_is_emergency": false,
+  "drain_started_utc": null,
+  "last_eval_utc": null,
+  "last_action_utc": null,
+  "last_action_reason": "In attesa di attivazione dalla PWA",
+  "indoor_slope_c_per_h": 0.0,
+  "calculated_target_lwt_c": 25.5,
+  "calculated_pdc_setpoint_c": 15,
+  "current_cron_interval_min": 5,
+  "defrost_detected_today": 0,
+  "heating_rod_delta_s": 0
+}

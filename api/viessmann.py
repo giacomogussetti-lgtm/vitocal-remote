@@ -21,6 +21,33 @@ from config import Config
 logger = logging.getLogger(__name__)
 
 
+def compute_wo1c_lwt(oat_c: float, t_ref: float, slope: float = 0.6, shift: float = 0.0) -> float:
+    """Calculates Viessmann WO1C target LWT using heat_curve_formular_variant2."""
+    delta = float(oat_c) - float(t_ref)
+    val = float(t_ref) + float(shift) - float(slope) * delta * (
+        1.148987 + 0.021 * delta + 247.9e-6 * (delta ** 2)
+    ) + 5.0
+    return round(max(10.0, min(40.0, val)), 1)
+
+
+def compute_inverse_setpoint_for_target_lwt(
+    target_lwt_c: float, oat_c: float, slope: float = 0.6, shift: float = 0.0
+) -> int:
+    """
+    Finds integer room setpoint (10..30 C) whose WO1C variant2 curve produces
+    an LWT closest to target_lwt_c at the given OAT, slope, and shift.
+    """
+    best_t = 12
+    best_err = float("inf")
+    for t_ref in range(10, 31):
+        lwt = compute_wo1c_lwt(oat_c, float(t_ref), slope, shift)
+        err = abs(lwt - float(target_lwt_c))
+        if err < best_err:
+            best_err = err
+            best_t = t_ref
+    return best_t
+
+
 class ViessmannConnector:
     def __init__(
         self,
@@ -159,10 +186,16 @@ class ViessmannConnector:
             "dhw_active": self._safe_call(lambda: hp.getDomesticHotWaterActive()),
             # Compressor Status & Modulation
             "compressor_active": self._safe_call(lambda: comp.getActive()) if comp else None,
+            "compressor_phase": get_raw_prop("heating.compressors.0", "phase"),
             "compressor_modulation_percent": get_raw_prop("heating.compressors.0.sensors.power"),
             "primary_pump_rotation_percent": get_raw_prop("heating.primaryCircuit.sensors.rotation"),
             "compressor_hours": self._safe_call(lambda: comp.getHours()) if comp else None,
             "compressor_starts": self._safe_call(lambda: comp.getStarts()) if comp else None,
+            # Frost protection, backup electric heater & diagnostics
+            "frost_protection_status": get_raw_prop("heating.circuits.0.frostprotection", "status"),
+            "heating_rod_level1_s": get_raw_prop("heating.heatingRod.runtime", "levelOne"),
+            "heating_rod_level2_s": get_raw_prop("heating.heatingRod.runtime", "levelTwo"),
+            "error_counter_d6": get_raw_prop("device.messages.errors.counter.d6", "value"),
             # Machine COPs
             "cop_heating": get_raw_prop("heating.cop.heating"),
             "cop_dhw": get_raw_prop("heating.cop.dhw"),

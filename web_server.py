@@ -207,6 +207,21 @@ def api_schedules():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route("/api/autopilot", methods=["GET"])
+def api_autopilot():
+    """Returns current Full-Auto Autopilot config and live state machine snapshot."""
+    try:
+        from scripts.autopilot import load_config, load_state
+        return jsonify({
+            "success": True,
+            "config": load_config(),
+            "state": load_state(),
+        })
+    except Exception as e:
+        logger.error("Errore lettura stato autopilota: %s", e)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 def main():
     port = 8080
     ips = get_local_ips()

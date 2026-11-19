@@ -151,7 +151,47 @@ def _validate_command(command: str, params: dict[str, Any]) -> dict[str, Any]:
             clean["pdc_normal"] = pn
         return clean
 
+    if command in ("autopilot_configure", "autopilot_activate_away"):
+        return _validate_autopilot_params(params, force_enable=(command == "autopilot_activate_away"))
+
     raise ValueError(f"Comando sconosciuto: '{command}'")
+
+
+def _validate_autopilot_params(params: dict[str, Any], force_enable: bool = False) -> dict[str, Any]:
+    """Validates tunable Full-Auto Mountain Custody parameters."""
+    clean: dict[str, Any] = {}
+    if force_enable:
+        clean["enabled"] = True
+        clean["mode"] = "away_antifrost"
+    elif "enabled" in params:
+        clean["enabled"] = bool(params["enabled"])
+
+    bounds = {
+        "t_min_c": (5.0, 15.0, float),
+        "t_max_c": (6.0, 18.0, float),
+        "t_emergency_c": (4.5, 12.0, float),
+        "target_lwt_delta_k": (10.0, 25.0, float),
+        "min_target_lwt_c": (20.0, 32.0, float),
+        "max_target_lwt_c": (24.0, 36.0, float),
+        "max_cycle_minutes": (30, 360, int),
+        "puffer_drain_minutes": (0, 60, int),
+        "puffer_drain_stop_temp_c": (10.0, 20.0, float),
+    }
+    for key, (lo, hi, caster) in bounds.items():
+        if params.get(key) is not None:
+            val = caster(params[key])
+            if not (lo <= val <= hi):
+                raise ValueError(f"{key} fuori range ({lo} – {hi}).")
+            clean[key] = round(val, 1) if caster is float else val
+
+    if "dynamic_cron_enabled" in params:
+        clean["dynamic_cron_enabled"] = bool(params["dynamic_cron_enabled"])
+
+    for tkey in ("cop_window_start", "cop_window_end"):
+        if params.get(tkey) is not None:
+            clean[tkey] = _validate_hhmm(str(params[tkey]), tkey)
+
+    return clean
 
 
 def _write_receipt(receipt: dict[str, Any]) -> None:
@@ -200,11 +240,11 @@ def execute_command(
     messages: list[str] = []
 
     try:
-        if command.startswith("viessmann_") or command.startswith("preset_"):
+        if command.startswith("viessmann_") or command.startswith("preset_") or command == "autopilot_activate_away":
             v_conn = ViessmannConnector()
             v_conn.connect()
 
-        if command.startswith("bticino_") or command.startswith("preset_"):
+        if command.startswith("bticino_") or command.startswith("preset_") or command == "autopilot_activate_away":
             b_conn = BTicinoConnector()
 
         if command == "viessmann_curve":
@@ -294,6 +334,70 @@ def execute_command(
             success = all_ok and ok_v and ok_b
             messages.extend([msg_v, msg_b])
 
+        elif command == "autopilot_configure":
+            from scripts.autopilot import load_config, save_config, load_state, save_state, update_cronjob_frequency
+            cfg = load_config()
+            cfg.update(clean_params)
+            if float(cfg["t_max_c"]) <= float(cfg["t_min_c"]):
+                raise ValueError("t_max_c deve essere maggiore di t_min_c.")
+            saved_cfg = save_config(cfg)
+            st = load_state()
+            if not saved_cfg.get("enabled"):
+                st["state"] = "DISABLED"
+                st["below_threshold_since_utc"] = None
+                st["last_action_utc"] = datetime.now(timezone.utc).isoformat()
+                st["last_action_reason"] = "Autopilota disattivato manualmente dalla PWA."
+                if saved_cfg.get("dynamic_cron_enabled"):
+                    update_cronjob_frequency(5)
+                    st["current_cron_interval_min"] = 5
+            else:
+                if st.get("state") == "DISABLED":
+                    st["state"] = "IDLE"
+                    st["state_since_utc"] = datetime.now(timezone.utc).isoformat()
+                st["last_action_utc"] = datetime.now(timezone.utc).isoformat()
+                st["last_action_reason"] = f"Parametri autopilota aggiornati (T_min={saved_cfg['t_min_c']}°C, T_max={saved_cfg['t_max_c']}°C)."
+            save_state(st)
+            success = True
+            messages.append(st["last_action_reason"])
+
+        elif command == "autopilot_activate_away":
+            from scripts.autopilot import load_config, save_config, load_state, save_state, update_cronjob_frequency
+            cfg = load_config()
+            cfg.update(clean_params)
+            if float(cfg["t_max_c"]) <= float(cfg["t_min_c"]):
+                raise ValueError("t_max_c deve essere maggiore di t_min_c.")
+            saved_cfg = save_config(cfg)
+
+            # Configure hardware fail-safes immediately on both devices
+            ok_s, msg_s = v_conn.set_heating_schedule_simple(
+                days=["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+                start=str(saved_cfg["cop_window_start"]),
+                end=str(saved_cfg["cop_window_end"]),
+                mode="reduced",
+                clear=False,
+            )
+            ok_d, msg_d = v_conn.set_dhw_temperature(10)
+            ok_v, msg_v = v_conn.set_mode("standby")
+            ok_b, msg_b = b_conn.set_thermostat_mode("hg")
+
+            now_iso = datetime.now(timezone.utc).isoformat()
+            st = load_state()
+            st["state"] = "IDLE"
+            st["state_since_utc"] = now_iso
+            st["below_threshold_since_utc"] = None
+            st["cycle_started_utc"] = None
+            st["drain_started_utc"] = None
+            st["cycle_is_emergency"] = False
+            st["last_action_utc"] = now_iso
+            st["last_action_reason"] = f"Assenza Montagna Full-Auto ATTIVATA (T_min={saved_cfg['t_min_c']}°C, Standby+Antigelo)."
+            if saved_cfg.get("dynamic_cron_enabled"):
+                ok_c, _ = update_cronjob_frequency(int(saved_cfg["cron_idle_minutes"]))
+                if ok_c:
+                    st["current_cron_interval_min"] = int(saved_cfg["cron_idle_minutes"])
+            save_state(st)
+            success = ok_s and ok_d and ok_v and ok_b
+            messages.extend([msg_s, msg_d, msg_v, msg_b, st["last_action_reason"]])
+
     except Exception as exc:
         logger.error("Errore esecuzione comando '%s': %s", command, exc)
         success = False
@@ -304,7 +408,7 @@ def execute_command(
     if success:
         try:
             time.sleep(2.0)
-            sample_logged = bool(log_sample())
+            sample_logged = bool(log_sample(run_autopilot=(command == "autopilot_activate_away")))
         except Exception as log_exc:
             logger.warning("Log post-comando fallito: %s", log_exc)
 

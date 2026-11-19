@@ -29,7 +29,7 @@ logging.basicConfig(
 logger = logging.getLogger("cloud_logger")
 
 
-def log_sample() -> bool:
+def log_sample(run_autopilot: bool = True) -> bool:
     logger.info("Avvio campionamento telemetria cloud (Vitocal 111-S & BTicino)...")
 
     # Validate configurations
@@ -133,6 +133,10 @@ def log_sample() -> bool:
         normal_setpoint_c=v_data.get("normal_setpoint_c"),
         reduced_setpoint_c=v_data.get("reduced_setpoint_c"),
         dhw_setpoint_c=v_data.get("dhw_setpoint_c"),
+        compressor_phase=v_data.get("compressor_phase"),
+        frost_protection_status=v_data.get("frost_protection_status"),
+        heating_rod_level1_s=v_data.get("heating_rod_level1_s"),
+        heating_rod_level2_s=v_data.get("heating_rod_level2_s"),
         active_preset="cloud_github_actions",
     )
 
@@ -146,8 +150,17 @@ def log_sample() -> bool:
 
     logger.info("Campione registrato con successo in: %s", cloud_file)
 
-    # 5. Rotate buffer if threshold exceeded (30-day sliding window for fast mobile loading)
+    # 5. Rotate buffer if threshold exceeded (6-month sliding window)
     rotate_hot_buffer_if_needed(cloud_file)
+
+    # 6. Evaluate Full-Auto Mountain Custody Autopilot tick (fail-safe wrapped)
+    if run_autopilot:
+        try:
+            from scripts.autopilot import run_autopilot_tick
+            run_autopilot_tick(sample.model_dump())
+        except Exception as ap_err:
+            logger.error("Errore valutazione autopilota (telemetria comunque salvata): %s", ap_err)
+
     return True
 
 

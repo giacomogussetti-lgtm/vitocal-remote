@@ -36,6 +36,7 @@ function initCommandsUI() {
   bindSteppers();
   bindDirtyWatchers();
   bindCommandButtons();
+  bindAutopilotButtons();
   bindConfirmModal();
   updateCommandsTransportUI();
 }
@@ -559,6 +560,7 @@ async function executeCommandAction({ command, params, dirtyKey }) {
           state.latestSample = data.sample;
           updateUI();
         }
+        await refreshAutopilotStatus();
       } else {
         setReceiptBanner("err", `❌ ${data.message || "Errore esecuzione comando"}`);
         showToast(`❌ ${data.message || "Errore comando"}`);
@@ -612,6 +614,7 @@ async function executeCommandAction({ command, params, dirtyKey }) {
         showToast(`⚠️ Comando non riuscito: ${receipt.message}`);
       }
       await syncWithGitHub(false);
+      await refreshAutopilotStatus();
     } else {
       setReceiptBanner("pending", "ℹ️ Il runner sta ancora completando l'operazione. Premi 🔄 tra qualche secondo.");
     }
@@ -623,13 +626,13 @@ async function executeCommandAction({ command, params, dirtyKey }) {
   }
 }
 
-async function fetchLastCommandReceipt() {
+async function fetchDataJson(filename) {
   try {
     if (state.backendConnected) {
-      const res = await fetch(`./data/last_command.json?t=${Date.now()}`);
+      const res = await fetch(`./data/${filename}?t=${Date.now()}`);
       if (res.ok) return await res.json();
     } else if (state.githubToken) {
-      const apiUrl = `https://api.github.com/repos/${state.repo}/contents/data/last_command.json?ref=main&t=${Date.now()}`;
+      const apiUrl = `https://api.github.com/repos/${state.repo}/contents/data/${filename}?ref=main&t=${Date.now()}`;
       const res = await fetch(apiUrl, {
         headers: {
           "Authorization": `token ${state.githubToken}`,
@@ -638,14 +641,178 @@ async function fetchLastCommandReceipt() {
       });
       if (res.ok) return await res.json();
     } else {
-      const rawUrl = `https://raw.githubusercontent.com/${state.repo}/main/data/last_command.json?t=${Date.now()}`;
+      const rawUrl = `https://raw.githubusercontent.com/${state.repo}/main/data/${filename}?t=${Date.now()}`;
       const res = await fetch(rawUrl);
       if (res.ok) return await res.json();
     }
   } catch (e) {
-    // Receipt may not exist yet before first remote command
+    // File may not exist yet
   }
   return null;
+}
+
+async function fetchLastCommandReceipt() {
+  return fetchDataJson("last_command.json");
+}
+
+function readAutopilotFormValues() {
+  return {
+    t_min_c: parseFloat(document.getElementById("apTMin").value),
+    t_max_c: parseFloat(document.getElementById("apTMax").value),
+    t_emergency_c: parseFloat(document.getElementById("apTEmergency").value),
+    target_lwt_delta_k: parseFloat(document.getElementById("apDeltaLwt").value),
+    max_cycle_minutes: parseInt(document.getElementById("apMaxCycle").value, 10),
+    puffer_drain_minutes: parseInt(document.getElementById("apDrainMin").value, 10),
+    cop_window_start: document.getElementById("apWinStart").value || "11:30",
+    cop_window_end: document.getElementById("apWinEnd").value || "15:30",
+    dynamic_cron_enabled: Boolean(document.getElementById("apDynamicCron").checked),
+  };
+}
+
+function bindAutopilotButtons() {
+  const synBanner = document.getElementById("autopilotSynopticBanner");
+  if (synBanner) {
+    synBanner.addEventListener("click", () => {
+      const cmdTabBtn = document.querySelector('.nav-item[data-tab="tab-commands"]');
+      if (cmdTabBtn) cmdTabBtn.click();
+    });
+  }
+
+  const btnAway = document.getElementById("btnActivateFullAutoAway");
+  if (btnAway) {
+    btnAway.addEventListener("click", () => {
+      const vals = readAutopilotFormValues();
+      if (isNaN(vals.t_min_c) || isNaN(vals.t_max_c) || vals.t_max_c <= vals.t_min_c) {
+        showToast("⚠️ T_max deve essere maggiore di T_min.");
+        return;
+      }
+      requestCommandConfirm(
+        "autopilot_activate_away",
+        vals,
+        `Attivare CUSTODIA AUTOMATICA MONTAGNA (Full-Auto)?\nMetterà subito la PdC in Standby (fascia sicurezza ${vals.cop_window_start}–${vals.cop_window_end}), BTicino in Antigelo (7.0 °C) e gestirà automaticamente cicli lunghi se T casa scende sotto ${vals.t_min_c.toFixed(1)} °C.`,
+        null
+      );
+    });
+  }
+
+  const btnDisable = document.getElementById("btnDisableAutopilot");
+  if (btnDisable) {
+    btnDisable.addEventListener("click", () => {
+      requestCommandConfirm(
+        "autopilot_configure",
+        { enabled: false },
+        "Disattivare l'Autopilota Full-Auto e tornare al controllo manuale?",
+        null
+      );
+    });
+  }
+
+  const btnSave = document.getElementById("btnSaveAutopilotConfig");
+  if (btnSave) {
+    btnSave.addEventListener("click", () => {
+      const vals = readAutopilotFormValues();
+      if (isNaN(vals.t_min_c) || isNaN(vals.t_max_c) || vals.t_max_c <= vals.t_min_c) {
+        showToast("⚠️ T_max deve essere maggiore di T_min.");
+        return;
+      }
+      requestCommandConfirm(
+        "autopilot_configure",
+        vals,
+        `Salvare i nuovi parametri dell'Autopilota (Avvio ${vals.t_min_c}°C → Stacco ${vals.t_max_c}°C, Emergenza ${vals.t_emergency_c}°C, ΔT LWT +${vals.target_lwt_delta_k}K)?`,
+        null
+      );
+    });
+  }
+}
+
+async function refreshAutopilotStatus() {
+  let cfg = null;
+  let st = null;
+  if (state.backendConnected) {
+    try {
+      const res = await fetch("./api/autopilot");
+      const data = await res.json();
+      if (data && data.success) {
+        cfg = data.config;
+        st = data.state;
+      }
+    } catch (e) {}
+  }
+  if (!cfg) cfg = await fetchDataJson("autopilot_config.json");
+  if (!st) st = await fetchDataJson("autopilot_state.json");
+  if (cfg || st) {
+    renderAutopilotUI(cfg || {}, st || {});
+  }
+}
+
+function renderAutopilotUI(cfg, st) {
+  const enabled = Boolean(cfg.enabled);
+  const stateCode = enabled ? (st.state || "IDLE") : "DISABLED";
+
+  const badge = document.getElementById("autopilotStatusBadge");
+  if (badge) {
+    badge.textContent = stateCode;
+    badge.classList.toggle("synced", enabled);
+    badge.classList.toggle("pending", stateCode === "HEATING_SYNC" || stateCode === "ARMED" || stateCode === "PUFFER_DRAIN");
+  }
+
+  const reasonEl = document.getElementById("autopilotStateReason");
+  if (reasonEl && st.last_action_reason) {
+    reasonEl.textContent = st.last_action_reason;
+  }
+
+  const slopeEl = document.getElementById("apMetricSlope");
+  const lwtEl = document.getElementById("apMetricLwt");
+  const cronEl = document.getElementById("apMetricCron");
+  if (slopeEl) {
+    const slp = st.indoor_slope_c_per_h != null ? Number(st.indoor_slope_c_per_h).toFixed(2) : "--";
+    slopeEl.textContent = `Pendenza: ${Number(slp) >= 0 ? "+" : ""}${slp} °C/h`;
+  }
+  if (lwtEl) {
+    lwtEl.textContent = st.calculated_target_lwt_c != null
+      ? `Target LWT Auto: ${Number(st.calculated_target_lwt_c).toFixed(1)} °C`
+      : "Target LWT Auto: -- °C";
+  }
+  if (cronEl) {
+    cronEl.textContent = st.current_cron_interval_min != null
+      ? `Polling: ${st.current_cron_interval_min} min`
+      : "Polling: -- min";
+  }
+
+  const synBanner = document.getElementById("autopilotSynopticBanner");
+  const synText = document.getElementById("autopilotSynopticText");
+  if (synBanner && synText) {
+    synBanner.classList.toggle("active", enabled);
+    synBanner.classList.toggle("inactive", !enabled);
+    if (enabled) {
+      const tMin = cfg.t_min_c != null ? Number(cfg.t_min_c).toFixed(1) : "7.5";
+      synText.textContent = `🛡️ AUTOPILOTA FULL-AUTO: ATTIVO (${stateCode} • Avvio ≤ ${tMin} °C)`;
+    } else {
+      synText.textContent = "🤖 AUTOPILOTA: DISATTIVATO (Tocca per attivare Custodia Montagna)";
+    }
+  }
+
+  // Hydrate tuning drawer unless user is currently focused inside it
+  const activeEl = document.activeElement;
+  const isEditingAp = activeEl && activeEl.id && activeEl.id.startsWith("ap");
+  if (!isEditingAp) {
+    const mapVals = {
+      apTMin: cfg.t_min_c,
+      apTMax: cfg.t_max_c,
+      apTEmergency: cfg.t_emergency_c,
+      apDeltaLwt: cfg.target_lwt_delta_k,
+      apMaxCycle: cfg.max_cycle_minutes,
+      apDrainMin: cfg.puffer_drain_minutes,
+      apWinStart: cfg.cop_window_start,
+      apWinEnd: cfg.cop_window_end,
+    };
+    for (const [elId, val] of Object.entries(mapVals)) {
+      const el = document.getElementById(elId);
+      if (el && val != null) el.value = val;
+    }
+    const chk = document.getElementById("apDynamicCron");
+    if (chk && cfg.dynamic_cron_enabled != null) chk.checked = Boolean(cfg.dynamic_cron_enabled);
+  }
 }
 
 async function pollCommandReceipt(sinceMs) {

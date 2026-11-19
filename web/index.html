@@ -81,6 +81,12 @@
         </div>
       </div>
 
+      <!-- Autopilot Quick Status Banner (Click to open Commands) -->
+      <div id="autopilotSynopticBanner" class="pump-banner inactive" style="cursor: pointer; margin-top: 6px; padding: 8px 12px; font-size: 0.76rem;" title="Tocca per gestire Autopilota">
+        <span id="autopilotSynopticText">🤖 AUTOPILOTA: DISATTIVATO (Tocca per attivare)</span>
+        <span style="font-size: 0.85rem;">›</span>
+      </div>
+
       <!-- Live Grundfos Secondary Pump Status Banner -->
       <div id="grundfosBanner" class="pump-banner inactive">
         <span id="grundfosBannerText">POMPA GRUNDFOS: SPENTA (Standby)</span>
@@ -157,6 +163,73 @@
         <div id="lastCommandReceiptBox" class="cmd-receipt-box">
           Nessun comando recente registrato.
         </div>
+      </div>
+
+      <!-- HERO FULL-AUTO MOUNTAIN CUSTODY CARD (Elderly-Friendly One-Click) -->
+      <div class="sync-card autopilot-hero-card">
+        <div class="cmd-card-header">
+          <h4>🤖 Custodia Automatica Montagna</h4>
+          <span class="led-badge" id="autopilotStatusBadge">DISABLED</span>
+        </div>
+        <p id="autopilotStateReason" style="margin-bottom: 8px;">
+          Un tocco per lasciare la casa al sicuro: tutto spento finché l'aria interna resta sopra la soglia, cicli lunghi sincronizzati ad alto COP quando serve.
+        </p>
+        <div class="autopilot-metrics-row">
+          <span id="apMetricSlope">Pendenza: -- °C/h</span>
+          <span id="apMetricLwt">Target LWT Auto: -- °C</span>
+          <span id="apMetricCron">Polling: -- min</span>
+        </div>
+
+        <button type="button" class="btn-action btn-hero-away" id="btnActivateFullAutoAway">
+          🛡️ ATTIVA ASSENZA MONTAGNA (Full-Auto 7.5 °C)
+        </button>
+        <div class="cmd-btn-pair" style="margin-top: 8px;">
+          <button type="button" class="btn-action btn-secondary" id="btnDisableAutopilot" style="margin-top: 0;">✋ Disattiva (Manuale)</button>
+          <button type="button" class="btn-action btn-secondary" disabled style="margin-top: 0; opacity: 0.55;" title="Prossimo step">🏡 Arrivo (In arrivo)</button>
+        </div>
+
+        <details class="autopilot-tuning-drawer">
+          <summary>⚙️ Parametri Strategia (Tuning Avanzato)</summary>
+          <div class="cmd-sync-row" style="margin-top: 10px;">
+            <div class="cmd-inline-field">
+              <label for="apTMin">Soglia Avvio T_min (°C)</label>
+              <input type="number" id="apTMin" class="form-input" min="5.0" max="15.0" step="0.5" value="7.5">
+            </div>
+            <div class="cmd-inline-field">
+              <label for="apTMax">Soglia Stacco T_max (°C)</label>
+              <input type="number" id="apTMax" class="form-input" min="6.0" max="18.0" step="0.5" value="8.8">
+            </div>
+            <div class="cmd-inline-field">
+              <label for="apTEmergency">Emergenza Notte (°C)</label>
+              <input type="number" id="apTEmergency" class="form-input" min="4.5" max="12.0" step="0.2" value="6.8">
+            </div>
+            <div class="cmd-inline-field">
+              <label for="apDeltaLwt">Salto LWT ΔT (K)</label>
+              <input type="number" id="apDeltaLwt" class="form-input" min="10.0" max="25.0" step="0.5" value="18.0">
+            </div>
+            <div class="cmd-inline-field">
+              <label for="apMaxCycle">Durata Max Ciclo (min)</label>
+              <input type="number" id="apMaxCycle" class="form-input" min="30" max="360" step="10" value="210">
+            </div>
+            <div class="cmd-inline-field">
+              <label for="apDrainMin">Scarico Puffer (min)</label>
+              <input type="number" id="apDrainMin" class="form-input" min="0" max="60" step="5" value="25">
+            </div>
+            <div class="cmd-inline-field">
+              <label for="apWinStart">Finestra COP Inizio</label>
+              <input type="time" id="apWinStart" class="form-input" value="11:30">
+            </div>
+            <div class="cmd-inline-field">
+              <label for="apWinEnd">Finestra COP Fine</label>
+              <input type="time" id="apWinEnd" class="form-input" value="15:30">
+            </div>
+          </div>
+          <label class="ap-checkbox-row">
+            <input type="checkbox" id="apDynamicCron" checked>
+            <span>Frequenza dinamica cron-job.org (15m idle / 5m armato / 3m attivo)</span>
+          </label>
+          <button type="button" class="btn-action btn-primary" id="btnSaveAutopilotConfig" style="margin-top: 8px;">💾 Salva Parametri Strategia</button>
+        </details>
       </div>
 
       <!-- Quick Synchronized Presets -->

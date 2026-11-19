@@ -39,6 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadCachedSamples();
   checkBackendConnection().then(() => {
     if (typeof updateCommandsTransportUI === "function") updateCommandsTransportUI();
+    if (typeof refreshAutopilotStatus === "function") refreshAutopilotStatus();
     syncWithGitHub();
   });
 
@@ -77,6 +78,7 @@ function initNavigation() {
         } else if (tabId === "tab-commands") {
           if (typeof updateCommandsTransportUI === "function") updateCommandsTransportUI();
           if (typeof refreshLastCommandReceipt === "function") refreshLastCommandReceipt();
+          if (typeof refreshAutopilotStatus === "function") refreshAutopilotStatus();
         } else if (tabId === "tab-synoptic" && state.latestSample) {
           renderSynoptic(state.latestSample);
         }
@@ -299,6 +301,7 @@ async function syncWithGitHub(showNotification = false) {
         localStorage.setItem("cached_telemetry", JSON.stringify(state.samples.slice(-100)));
         state.lastSyncTime = new Date();
         updateUI();
+        if (typeof refreshAutopilotStatus === "function") refreshAutopilotStatus();
         if (showNotification) {
           showToast(`✅ Sincronizzati ${data.total_lines} campioni da GitHub (${data.imported} nuovi)!`);
         }
@@ -341,6 +344,7 @@ async function syncWithGitHub(showNotification = false) {
       state.lastSyncTime = new Date();
 
       updateUI();
+      if (typeof refreshAutopilotStatus === "function") refreshAutopilotStatus();
       if (showNotification) {
         showToast(`✅ Sincronizzati ${parsedSamples.length} campioni da GitHub!`);
       }
@@ -557,6 +561,9 @@ function renderDetailedSondeList(s) {
     { label: "Circolatore Primario PdC", val: s.primary_pump_rotation_percent, unit: "%", color: "#34d399" },
     { label: "Curva Climatica (Inclinazione / Livello)", val: `${s.heating_curve_slope || 0.6} / ${s.heating_curve_shift || 0}`, unit: "", color: "#60a5fa" },
     { label: "Programma Operativo PdC", val: (s.active_program || "standby").toUpperCase(), unit: "", color: "#a78bfa" },
+    { label: "Fase Compressore / Defrost", val: (s.compressor_phase || "off").toUpperCase(), unit: "", color: String(s.compressor_phase || "").includes("defrost") ? "#38bdf8" : "#cbd5e1" },
+    { label: "Antigelo Hardware WO1C", val: (s.frost_protection_status || "off").toUpperCase(), unit: "", color: s.frost_protection_status === "on" ? "#f59e0b" : "#94a3b8" },
+    { label: "Resistenza Elettrica (S1 / S2)", val: (s.heating_rod_level1_s != null || s.heating_rod_level2_s != null) ? `${(Number(s.heating_rod_level1_s || 0) / 3600).toFixed(1)}h / ${(Number(s.heating_rod_level2_s || 0) / 3600).toFixed(1)}h` : "--", unit: "", color: "#fb7185" },
   ];
 
   container.innerHTML = items.map(item => `
