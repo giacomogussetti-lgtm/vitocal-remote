@@ -1,0 +1,78 @@
+name: Build Android APK (Capacitor Native)
+
+on:
+  push:
+    paths:
+      - 'web/**'
+      - '.github/workflows/build_apk.yml'
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Capacitor & Dependencies
+        run: |
+          npm init -y
+          npm install @capacitor/core@6.0.0 @capacitor/cli@6.0.0 @capacitor/android@6.0.0
+
+      - name: Initialize Capacitor Config
+        run: |
+          cat << 'EOF' > capacitor.config.json
+          {
+            "appId": "com.vitocal.remote",
+            "appName": "Vitocal Remote",
+            "webDir": "web",
+            "server": {
+              "androidScheme": "https",
+              "cleartext": true
+            }
+          }
+          EOF
+
+      - name: Add Android Platform & Sync Web Assets
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: Enable Network Permissions
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if ! grep -q "android.permission.INTERNET" "$MANIFEST"; then
+            sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />' "$MANIFEST"
+          fi
+
+      - name: Build Debug APK with Gradle
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Rename APK
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk VitocalRemote.apk
+
+      - name: Upload APK Artifact (Downloadable on Phone)
+        uses: actions/upload-artifact@v4
+        with:
+          name: VitocalRemote-Android-APK
+          path: VitocalRemote.apk
+          retention-days: 30
