@@ -1,5 +1,5 @@
 {
-  "enabled": false,
+  "enabled": true,
   "mode": "away_antifrost",
   "t_min_c": 7.5,
   "t_max_c": 8.8,
