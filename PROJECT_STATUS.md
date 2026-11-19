@@ -219,3 +219,26 @@
     - Server Flask leggero su porta 8080 con rilevamento automatico dell'IP locale per connessione immediata da smartphone nella stessa rete Wi-Fi.
   - **Workflow Deploy Automatico su GitHub Pages (`.github/workflows/deploy_pwa.yml`)**:
     - Pubblicazione automatica dell'app web PWA su GitHub Pages per l'accesso 24/7 da smartphone in 4G/5G da qualsiasi parte del mondo a costo zero.
+  - **Compilatore Automatico APK Android Nativo (`.github/workflows/build_apk.yml`)**:
+    - Workflow cloud che ad ogni aggiornamento della cartella `web/` compila automaticamente l'app in pacchetto nativo `.apk` (via Capacitor), scaricabile direttamente da GitHub Actions Artifacts.
+  - **Skill Dedicate per l'Assistente AI (`.agents/skills/`)**:
+    - `vitocal-remote-expert`: manuale operativo di bordo, mappatura sensori, runbook e protezione termodinamica.
+    - `vitocal-build-deploy`: guida per esportazione, audit di sicurezza pre-commit, gestione dei file nascosti (`.github/workflows/`) su GitHub Web e controllo della finestra di ritenzione.
+
+---
+
+## 3. WORK IN PROGRESS & ROADMAP (FASE 2)
+
+### A. App Mobile PWA Bidirezionale (Comandi Remoti di Scrittura)
+- **Obiettivo**: Permettere all'utente di comandare l'impianto dallo smartphone ovunque si trovi in 4G/5G, non solo in lettura ma anche in scrittura.
+- **Funzionalità in Sviluppo**:
+  1. *Regolazione Setpoint Corridoio (BTicino Smarther)*: cambiare setpoint da 7.0 °C (antigelo infrasettimanale) a 12.0 °C / 18.0 °C prima dell'arrivo nel weekend.
+  2. *Regolazione Curva Climatica (Viessmann Vitocal)*: modifica da remoto di Inclinazione (Slope) e Livello (Shift) con stepper numerici touch.
+  3. *Regolazione Temperature Mandata PdC*: impostazione T Normale (12 °C) e Ridotta (10 °C).
+  4. *Preset Sincronizzati Weekend*: pulsante unico *"Attiva Pre-Riscaldamento Weekend"* che alza contemporaneamente la mandata PdC e accende la pompa Grundfos per caricare termicamente il massetto radiante prima del soggiorno.
+- **Architettura di Sicurezza (Cloud Command Dispatcher)**:
+  - Per evitare di esporre le password Viessmann o i client secret Netatmo nel browser del telefono, l'app mobile invia un ordine parametrico via `workflow_dispatch` a un workflow isolato GitHub Actions (`apply_command.yml`).
+  - Il runner GitHub esegue lo script con i GitHub Secrets protetti, effettua la verifica di read-back con PyViCare/Netatmo e aggiorna subito lo stato.
+
+### B. Decimazione Dati Adattiva nei Grafici Web (LTTB - Largest Triangle Three Buckets)
+- Inserimento di un algoritmo di decimazione client-side leggero per visualizzare grafici plurimensili (fino a 6 mesi / 50.000 campioni) a 60 fps fluidi su qualsiasi smartphone senza rallentamenti grafici.

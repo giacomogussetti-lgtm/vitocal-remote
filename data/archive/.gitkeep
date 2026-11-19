@@ -1,0 +1,2 @@
+# Questo file mantiene tracciata la cartella data/archive in Git.
+# Qui vengono archiviati i campioni storici mensili compressi (telemetry_YYYY-MM.jsonl.gz).

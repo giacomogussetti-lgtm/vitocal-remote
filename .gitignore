@@ -1,0 +1,31 @@
+# Environment and secrets
+.env
+token.save
+token_*.json
+netatmo_token.json
+data/netatmo_token.json
+*.token
+
+# Agent and IDE configs
+.agents/
+*.docx
+
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+env/
+
+# Database & logs
+*.db
+*.sqlite3
+*.log
+dumps/
+data/dumps/
+
+# Temporary export folders
+github_ready/
+

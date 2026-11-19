@@ -159,6 +159,14 @@ L'impianto è idraulicamente disaccoppiato in due sottosistemi tramite un **Puff
    - I punti nei dataset devono avere coordinate `{ x: timestamp_ms, y: value }`. In questo modo la coordinata orizzontale riflette i minuti effettivi, le tacche orarie vengono calcolate ad intervalli uniformi (es. 01:00, 01:30, 02:00) e l'interazione touch (`mode: 'nearest', axis: 'x'`) aggancia la fetta temporale corretta con tooltip completo.
    - Le librerie (`chart.min.js` e `chartjs-adapter-date-fns.bundle.min.js`) sono salvate in `web/js/` e gestite dal Service Worker (`sw.js`) in modalità offline-first, funzionando senza necessità di connessione a CDN esterne.
 
+### L. Procedura di Deploy su GitHub Web & Gestione File Nascosti:
+1. **Blocco File Nascosti su GitHub Web ("This file is hidden")**:
+   - L'uploader drag-and-drop web di GitHub rifiuta cartelle e file che iniziano con un punto (`.github`, `.gitignore`, `.env.example`).
+   - **Regola di Upload in 2 Fasi**:
+     * **Fase 1 (Codice e UI)**: Dalla cartella `github_ready/`, trascinare nella root del repo GitHub tutti i file e cartelle standard (`api/`, `models/`, `scripts/`, `storage/`, `ui/`, `web/`, file di root). Escludere `data/cloud_telemetry.jsonl` se il logger GitHub è già in marcia.
+     * **Fase 2 (Workflow CI/CD)**: Entrare su GitHub nel percorso `.github/workflows/` e trascinare direttamente i singoli file `.yml` (`telemetry_logger.yml`, `deploy_pwa.yml`, `build_apk.yml`) da dentro `github_ready/.github/workflows/`. Non avendo il punto iniziale nel nome file, vengono accettati istantaneamente senza errori.
+   - Skill dedicata attiva: `.agents/skills/vitocal-build-deploy/SKILL.md`.
+
 ---
 
 ## 3. STRUTTURA DEL REPOSITORY
@@ -168,11 +176,13 @@ vitocal remote/
 │   ├── rules/
 │   │   └── security-and-privacy.md # Regola permanente di audit pre-commit
 │   └── skills/
-│       └── vitocal-remote-expert/  # Skill runbook, architettura e troubleshooting
+│       ├── vitocal-remote-expert/  # Skill runbook, architettura e troubleshooting
+│       └── vitocal-build-deploy/   # Skill checklist e release su GitHub (gestione hidden files)
 ├── .github/
 │   └── workflows/
 │       ├── telemetry_logger.yml    # Workflow GitHub Actions 24/7 (cron ogni 5 min)
-│       └── deploy_pwa.yml          # Deploy automatico dell'app web PWA su GitHub Pages
+│       ├── deploy_pwa.yml          # Deploy automatico dell'app web PWA su GitHub Pages
+│       └── build_apk.yml           # Compilatore cloud APK nativo Android Capacitor
 ├── .env                            # Credenziali e token (NON versionare)
 ├── .env.example                    # Template credenziali anonimizzato
 ├── .gitignore                      # Esclusioni git (token, cache, db, dumps)
