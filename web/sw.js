@@ -1,5 +1,5 @@
 // Vitocal Remote - Service Worker for PWA Offline Caching
-const CACHE_NAME = 'vitocal-remote-v7';
+const CACHE_NAME = 'vitocal-remote-v8';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

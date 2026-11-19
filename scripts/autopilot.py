@@ -263,6 +263,45 @@ def update_cronjob_frequency(interval_min: int) -> tuple[bool, str]:
         return False, str(exc)
 
 
+def test_cronjob_secrets() -> tuple[bool, str]:
+    """Read-only check of CRONJOB_API_KEY and CRONJOB_ID against cron-job.org REST API."""
+    api_key = os.environ.get("CRONJOB_API_KEY", "").strip()
+    job_id = os.environ.get("CRONJOB_ID", "").strip()
+    if not api_key and not job_id:
+        return False, "Mancano entrambi i GitHub Secrets: CRONJOB_API_KEY e CRONJOB_ID."
+    if not api_key:
+        return False, "Manca il GitHub Secret CRONJOB_API_KEY (o è vuoto)."
+    if not job_id:
+        return False, "Manca il GitHub Secret CRONJOB_ID (o è vuoto)."
+    if not job_id.isdigit():
+        return False, f"CRONJOB_ID non è numerico (lunghezza {len(job_id)}): inserire solo le cifre dell'ID job."
+
+    url = f"https://api.cron-job.org/jobs/{job_id}"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    try:
+        resp = requests.get(url, headers=headers, timeout=15)
+        if resp.status_code == 200:
+            data = resp.json() if resp.text else {}
+            details = data.get("jobDetails", {})
+            if isinstance(details, list):
+                details = details[0] if details else {}
+            enabled = details.get("enabled")
+            mins = (details.get("schedule") or {}).get("minutes", [])
+            mins_txt = ",".join(str(m) for m in mins[:6]) + ("..." if len(mins) > 6 else "")
+            status_txt = "ATTIVO" if enabled else "DISABILITATO"
+            return True, f"Secrets cron-job.org OK! Job #{job_id} ({status_txt}), minuti=[{mins_txt}]"
+        if resp.status_code == 401:
+            return False, "CRONJOB_API_KEY non valida (HTTP 401 Unauthorized)."
+        if resp.status_code == 404:
+            return False, f"CRONJOB_ID #{job_id} non trovato su questo account (HTTP 404)."
+        return False, f"Errore cron-job.org HTTP {resp.status_code}: {resp.text[:180]}"
+    except Exception as exc:
+        return False, f"Errore connessione cron-job.org: {exc}"
+
+
 def _weekday_code(local_dt: datetime) -> str:
     return ("mon", "tue", "wed", "thu", "fri", "sat", "sun")[local_dt.weekday()]
 

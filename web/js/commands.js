@@ -464,12 +464,14 @@ function requestCommandConfirm(command, params, summaryText, dirtyKey) {
     return;
   }
   updateCommandsTransportUI();
-  if (!state.backendConnected && !state.githubToken) {
-    showToast("⚠️ Inserisci il GitHub Personal Access Token nella scheda Sync per comandare da remoto!");
+  const forceCloud = command === "cronjob_test";
+  const useLocal = state.backendConnected && !forceCloud;
+  if (!useLocal && !state.githubToken) {
+    showToast("⚠️ Inserisci il GitHub Personal Access Token nella scheda Sync per testare/comandare via GitHub Actions!");
     return;
   }
 
-  cmdState.pendingAction = { command, params, dirtyKey };
+  cmdState.pendingAction = { command, params, dirtyKey, forceCloud };
   const modal = document.getElementById("commandConfirmModal");
   const sumEl = document.getElementById("cmdConfirmSummary");
   const routeEl = document.getElementById("cmdConfirmRouteHint");
@@ -477,7 +479,7 @@ function requestCommandConfirm(command, params, summaryText, dirtyKey) {
 
   if (sumEl) sumEl.textContent = summaryText;
   if (routeEl) {
-    routeEl.textContent = state.backendConnected
+    routeEl.textContent = useLocal
       ? "🔌 Canale: Server Locale Wi-Fi (esecuzione diretta ~2–4 s)."
       : "☁️ Canale: GitHub Actions (apply_command.yml, esecuzione ~25–35 s).";
   }
@@ -539,10 +541,10 @@ function clearDirtyFlag(dirtyKey) {
   updateCommandLeds();
 }
 
-async function executeCommandAction({ command, params, dirtyKey }) {
+async function executeCommandAction({ command, params, dirtyKey, forceCloud }) {
   cmdState.isSending = true;
 
-  if (state.backendConnected) {
+  if (state.backendConnected && !forceCloud) {
     setReceiptBanner("pending", `⏳ Invio comando '${command}' tramite server locale...`);
     try {
       const res = await fetch("./api/command", {
@@ -663,8 +665,8 @@ function readAutopilotFormValues() {
     target_lwt_delta_k: parseFloat(document.getElementById("apDeltaLwt").value),
     max_cycle_minutes: parseInt(document.getElementById("apMaxCycle").value, 10),
     puffer_drain_minutes: parseInt(document.getElementById("apDrainMin").value, 10),
-    cop_window_start: document.getElementById("apWinStart").value || "11:30",
-    cop_window_end: document.getElementById("apWinEnd").value || "15:30",
+    cop_window_start: document.getElementById("apWinStart").value || "11:00",
+    cop_window_end: document.getElementById("apWinEnd").value || "16:00",
     dynamic_cron_enabled: Boolean(document.getElementById("apDynamicCron").checked),
   };
 }
@@ -719,6 +721,18 @@ function bindAutopilotButtons() {
         "autopilot_configure",
         vals,
         `Salvare i nuovi parametri dell'Autopilota (Avvio ${vals.t_min_c}°C → Stacco ${vals.t_max_c}°C, Emergenza ${vals.t_emergency_c}°C, ΔT LWT +${vals.target_lwt_delta_k}K)?`,
+        null
+      );
+    });
+  }
+
+  const btnTestCron = document.getElementById("btnTestCronjob");
+  if (btnTestCron) {
+    btnTestCron.addEventListener("click", () => {
+      requestCommandConfirm(
+        "cronjob_test",
+        {},
+        "Verificare in sola lettura su GitHub Actions che i secrets CRONJOB_API_KEY e CRONJOB_ID funzionino su cron-job.org? (Nessuna modifica a PdC, BTicino o orari.)",
         null
       );
     });

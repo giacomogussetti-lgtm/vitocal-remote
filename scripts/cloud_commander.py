@@ -154,6 +154,9 @@ def _validate_command(command: str, params: dict[str, Any]) -> dict[str, Any]:
     if command in ("autopilot_configure", "autopilot_activate_away"):
         return _validate_autopilot_params(params, force_enable=(command == "autopilot_activate_away"))
 
+    if command == "cronjob_test":
+        return {}
+
     raise ValueError(f"Comando sconosciuto: '{command}'")
 
 
@@ -348,8 +351,10 @@ def execute_command(
                 st["last_action_utc"] = datetime.now(timezone.utc).isoformat()
                 st["last_action_reason"] = "Autopilota disattivato manualmente dalla PWA."
                 if saved_cfg.get("dynamic_cron_enabled"):
-                    update_cronjob_frequency(5)
-                    st["current_cron_interval_min"] = 5
+                    ok_c, msg_c = update_cronjob_frequency(5)
+                    if ok_c:
+                        st["current_cron_interval_min"] = 5
+                    messages.append(msg_c)
             else:
                 if st.get("state") == "DISABLED":
                     st["state"] = "IDLE"
@@ -359,6 +364,12 @@ def execute_command(
             save_state(st)
             success = True
             messages.append(st["last_action_reason"])
+
+        elif command == "cronjob_test":
+            from scripts.autopilot import test_cronjob_secrets
+            ok_c, msg_c = test_cronjob_secrets()
+            success = ok_c
+            messages.append(msg_c)
 
         elif command == "autopilot_activate_away":
             from scripts.autopilot import load_config, save_config, load_state, save_state, update_cronjob_frequency
@@ -405,7 +416,7 @@ def execute_command(
 
     # Wait briefly for cloud state propagation, then refresh telemetry log
     sample_logged = False
-    if success:
+    if success and command != "cronjob_test":
         try:
             time.sleep(2.0)
             sample_logged = bool(log_sample(run_autopilot=(command == "autopilot_activate_away")))
