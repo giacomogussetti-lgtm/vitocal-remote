@@ -164,7 +164,7 @@ L'impianto è idraulicamente disaccoppiato in due sottosistemi tramite un **Puff
 2. **Prevenzione Campioni Equidistanti (`distribution: 'linear'`, `bounds: 'ticks'`)**:
    - Per impedire che i campioni vengano disegnati a distanze orizzontali identiche nonostante intervalli temporali diversi (es. un buco di 1 ora o campioni a 5 min), la scala temporale adotta esplicitamente `distribution: 'linear'` e `bounds: 'ticks'`.
    - In `web/js/charts.js`, le funzioni `buildChart` e `updateChartData` calcolano dinamicamente `min = latestMs - hours` e `max = latestMs` ancorando l'asse X all'esatto intervallo temporale selezionato.
-   - La cache PWA in `web/sw.js` è versionata (`vitocal-remote-v6`) per forzare il refresh immediato su tutti i dispositivi mobili.
+   - La cache PWA in `web/sw.js` è versionata (`vitocal-remote-v8`) per forzare il refresh immediato su tutti i dispositivi mobili.
 3. **Zoom/Pan Solo X, Blocco Asse Y & Bande Attività Adiacenti (`web/js/charts.js`)**:
    - **Gesti Touch Separati**: con 1 dito in modalità `👆 Leggi` resta attivo lo scrubbing dei valori; con 2 dita si esegue **pinch zoom + drag solo su asse X** ancorato al punto medio (senza librerie esterne). Toggle minimale `👆 Leggi / ✋ Sposta` in alto a destra per eventuale pan in X ad una mano + `↺ Reset`.
    - **Asse Y Bloccato & Modale Tappabile**: durante zoom/pan in X gli assi Y vengono congelati (`yAutoFrozen`) così da non "saltare" verticalmente; tappando direttamente su asse Y sinistro/destro o sulle pillole `°C` / `%` si apre il modale `#yAxisModal` con preset e campi `Y Min` / `Y Max` persistenti in `localStorage` (`vitocal_y_scales`).
@@ -184,7 +184,7 @@ L'impianto è idraulicamente disaccoppiato in due sottosistemi tramite un **Puff
    - Configurazione in `data/autopilot_config.json` (disattivato di default; attivabile con 1 tap da `🛡️ ATTIVA ASSENZA MONTAGNA` nella PWA) e stato persistito in `data/autopilot_state.json`.
    - Stati: `DISABLED` / `IDLE` (tutto fermo in Standby + BTicino Antigelo 7 °C; assist scarico se antigelo hardware porta puffer >= 22 °C) → `ARMED` (conferma T_in <= `t_min_c` per `debounce_minutes`) → `HEATING_SYNC` (avvio sincronizzato in finestra COP `11:00–16:00` con cap `300 min` oppure emergenza notturna se `T_in <= t_emergency_c` o derivata ripida; Target LWT calcolato su `T_in` + `OAT` e bloccato all'avvio ciclo fino a fine scarico, convertito con formula inversa WO1C `compute_inverse_setpoint_for_target_lwt`) → `PUFFER_DRAIN` (PdC in `standby`, Grundfos attiva altri 25 min per svuotare il puffer) → `IDLE`.
    - **Doppio Fail-Safe Hardware**: manuale BTicino sempre con `duration_minutes` auto-scadente + fascia hardware `heating.schedule` Vitocal limitata alla finestra COP diurna.
-   - **Polling Dinamico `cron-job.org`**: tramite `CRONJOB_API_KEY` e `CRONJOB_ID` nei GitHub Secrets, adatta automaticamente la frequenza (`15 min` IDLE / `5 min` ARMED / `2 min` HEATING_SYNC o PUFFER_DRAIN).
+   - **Polling Dinamico `cron-job.org` & Test Sola Lettura**: tramite `CRONJOB_API_KEY` e `CRONJOB_ID` nei GitHub Secrets (verificati end-to-end con `cronjob_test` su Job `#8895676` / pulsante PWA `🧪 Testa Secrets cron-job.org`), adatta automaticamente la frequenza (`15 min` IDLE / `5 min` ARMED / `2 min` HEATING_SYNC o PUFFER_DRAIN).
 3. **Audit Strategia Obbligatorio (`scripts/audit_strategy.py`, regola `.agents/rules/thermodynamic-rigor-and-telemetry-audit.md`)**:
    - Prima di qualsiasi tuning su ON/OFF, defrost o soglie, eseguire `python scripts/audit_strategy.py` per verificare dati reali, modalità applicate, durata cicli, pendenze termiche e contatori resistenza elettrica.
 
@@ -202,60 +202,70 @@ L'impianto è idraulicamente disaccoppiato in due sottosistemi tramite un **Puff
 vitocal remote/
 ├── .agents/
 │   ├── rules/
-│   │   └── security-and-privacy.md # Regola permanente di audit pre-commit
+│   │   ├── security-and-privacy.md               # Regola permanente di audit pre-commit
+│   │   └── thermodynamic-rigor-and-telemetry-audit.md # Rigore fisico & audit obbligatorio
 │   └── skills/
-│       ├── vitocal-remote-expert/  # Skill runbook, architettura e troubleshooting
-│       └── vitocal-build-deploy/   # Skill checklist e release su GitHub (gestione hidden files)
+│       ├── vitocal-remote-expert/                # Skill runbook, architettura e troubleshooting
+│       ├── vitocal-build-deploy/                 # Skill checklist e release su GitHub
+│       └── vitocal-thermodynamic-tuning/         # Procedura periodica di audit log & calibrazione
 ├── .github/
 │   └── workflows/
-│       ├── telemetry_logger.yml    # Workflow GitHub Actions 24/7 (cron ogni 5 min)
-│       ├── deploy_pwa.yml          # Deploy automatico dell'app web PWA su GitHub Pages
-│       └── build_apk.yml           # Compilatore cloud APK nativo Android Capacitor
-├── .env                            # Credenziali e token (NON versionare)
-├── .env.example                    # Template credenziali anonimizzato
-├── .gitignore                      # Esclusioni git (token, cache, db, dumps)
-├── requirements_cloud.txt          # Dipendenze headless minime per GitHub Actions
-├── config.py                       # Validazione e caricamento impostazioni
-├── app.py                          # ENTRY POINT APPLICAZIONE DESKTOP PYQT6
-├── web_server.py                   # SERVER FLASK PER APP MOBILE ANDROID (PWA)
-├── avvia_gestionale.bat            # Launcher desktop Windows doppio-clic
-├── avvia_app_mobile.bat            # Launcher server mobile Android doppio-clic
-├── test_bench.py                   # Banchetto prova interattivo CLI
-├── web/                            # Frontend Web & PWA per Smartphone Android
-│   ├── index.html                  # Layout mobile SCADA con 4 Tab (Sinottico, Grafici, Sonde, Sync)
-│   ├── manifest.json               # Manifest per installazione nativa Android
-│   ├── sw.js                       # Service Worker per caching e offline
-│   ├── css/styles.css              # Tema SCADA scuro industriale per schermi touch
-│   ├── icons/                      # Icone 192px e 512px per Android
+│       ├── telemetry_logger.yml                  # Workflow GitHub Actions 24/7 (cron + autopilot)
+│       ├── apply_command.yml                     # Executor comandi remoti PWA -> Vitocal/BTicino/Autopilota
+│       ├── deploy_pwa.yml                        # Deploy automatico dell'app web PWA su GitHub Pages
+│       └── build_apk.yml                         # Compilatore cloud APK nativo Android Capacitor
+├── .env                                          # Credenziali e token (NON versionare)
+├── .env.example                                  # Template credenziali anonimizzato
+├── .gitignore                                    # Esclusioni git (token, cache, db, dumps)
+├── requirements_cloud.txt                        # Dipendenze headless minime per GitHub Actions
+├── config.py                                     # Validazione e caricamento impostazioni
+├── app.py                                        # ENTRY POINT APPLICAZIONE DESKTOP PYQT6
+├── web_server.py                                 # SERVER FLASK PER APP MOBILE ANDROID (PWA)
+├── avvia_gestionale.bat                          # Launcher desktop Windows doppio-clic
+├── avvia_app_mobile.bat                          # Launcher server mobile Android doppio-clic
+├── test_bench.py                                 # Banchetto prova interattivo CLI
+├── web/                                          # Frontend Web & PWA per Smartphone Android
+│   ├── index.html                                # Layout mobile SCADA con 5 Tab (Sinottico, Comandi, Grafici, Analisi, Sonde/Sync)
+│   ├── manifest.json                             # Manifest per installazione nativa Android
+│   ├── sw.js                                     # Service Worker per caching e offline (`vitocal-remote-v8`)
+│   ├── css/styles.css                            # Tema SCADA scuro industriale per schermi touch
+│   ├── icons/                                    # Icone 192px e 512px per Android
 │   └── js/
-│       ├── synoptic.js             # Motore di rendering SVG del Sinottico animato
-│       ├── charts.js               # Grafici interattivi touch Chart.js
-│       └── app.js                  # Controller PWA, sync GitHub e trigger on-demand
+│       ├── synoptic.js                           # Motore SVG responsive del Sinottico animato
+│       ├── charts.js                             # Grafici touch Chart.js (zoom X, Y bloccato, bande stato)
+│       ├── commands.js                           # Logica controlli bidirezionali & pannello Autopilota
+│       └── app.js                                # Controller PWA, sync GitHub, analytics & trigger
 ├── api/
-│   ├── viessmann.py                # Connettore Viessmann PyViCare (lettura/scrittura verificata)
-│   └── bticino.py                  # Connettore Netatmo/BTicino Smarther (read_smarther)
+│   ├── viessmann.py                              # Connettore Viessmann PyViCare (lettura/scrittura + diagnostica)
+│   └── bticino.py                                # Connettore Netatmo/BTicino Smarther (read/write_smarther)
 ├── storage/
-│   └── database.py                 # Manager SQLite (tabella telemetry_samples versionata)
+│   └── database.py                               # Manager SQLite (tabella telemetry_samples versionata)
 ├── models/
-│   └── telemetry.py                # Modelli Pydantic per telemetria
+│   └── telemetry.py                              # Modelli Pydantic per telemetria
 ├── ui/
-│   ├── main_window.py              # Interfaccia grafica desktop PyQt6
-│   ├── heating_curve_widget.py     # Visualizzatore dinamico Curva Climatica LWT vs OAT
-│   └── synoptic_widget.py          # Sinottico SCADA vettoriale desktop
+│   ├── main_window.py                            # Interfaccia grafica desktop PyQt6
+│   ├── heating_curve_widget.py                   # Visualizzatore dinamico Curva Climatica LWT vs OAT
+│   └── synoptic_widget.py                        # Sinottico SCADA vettoriale desktop
 ├── scripts/
-│   ├── feature_dumper.py           # Diagnostica completa e dump 193 features
-│   ├── cloud_logger.py             # Logger headless 24/7 per GitHub Actions
-│   ├── security_check.py           # Scanner preventivo di privacy e sicurezza pre-commit
-│   └── prepare_github_export.py    # Preparatore automatico cartella github_ready/
-├── github_ready/                   # Cartella pulita, verificata e anonimizzata per upload Git
+│   ├── feature_dumper.py                         # Diagnostica completa e dump 193 features
+│   ├── cloud_logger.py                           # Logger headless 24/7 + tick autopilota
+│   ├── cloud_commander.py                        # Esecutore sicuro comandi remoti & ricevute
+│   ├── autopilot.py                              # Macchina a stati Custodia Montagna & cron dinamico
+│   ├── audit_strategy.py                         # Report audit termodinamico su log reali
+│   ├── security_check.py                         # Scanner preventivo di privacy e sicurezza pre-commit
+│   └── prepare_github_export.py                  # Preparatore automatico cartella github_ready/
+├── github_ready/                                 # Cartella pulita, verificata e anonimizzata per upload Git
 ├── data/
-│   ├── vitocal_telemetry.db        # Database SQLite locale
-│   ├── cloud_telemetry.jsonl       # Log telemetrico rolling live (ultimi 30 giorni a 5 min)
-│   ├── archive/                    # Archivi mensili compressi (telemetry_YYYY-MM.jsonl.gz)
-│   └── dumps/                      # Dump JSON reali delle API
-├── AGENTS.md                       # Questa memoria persistente per tutte le chat
-├── PROJECT_STATUS.md               # Registro avanzamento e changelog
-└── README.md                       # Istruzioni d'uso
+│   ├── vitocal_telemetry.db                      # Database SQLite locale
+│   ├── cloud_telemetry.jsonl                     # Log telemetrico rolling live (6 mesi / 180 giorni)
+│   ├── autopilot_config.json                     # Parametri tunabili Autopilota Full-Auto
+│   ├── autopilot_state.json                      # Stato persistente macchina a stati Autopilota
+│   ├── last_command.json                         # Ricevuta ultimo comando remoto eseguito
+│   ├── archive/                                  # Archivi mensili compressi (telemetry_YYYY-MM.jsonl.gz)
+│   └── dumps/                                    # Dump JSON reali delle API
+├── AGENTS.md                                     # Questa memoria persistente per tutte le chat
+├── PROJECT_STATUS.md                             # Registro avanzamento e changelog
+└── README.md                                     # Istruzioni d'uso
 ```
 
 ---
