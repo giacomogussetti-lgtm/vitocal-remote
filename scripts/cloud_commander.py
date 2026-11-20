@@ -155,7 +155,7 @@ def _validate_command(command: str, params: dict[str, Any]) -> dict[str, Any]:
         return _validate_autopilot_params(params, force_enable=(command == "autopilot_activate_away"))
 
     if command == "cronjob_test":
-        return {}
+        return {"roundtrip_2m": bool(params.get("roundtrip_2m", False))}
 
     raise ValueError(f"Comando sconosciuto: '{command}'")
 
@@ -367,7 +367,7 @@ def execute_command(
 
         elif command == "cronjob_test":
             from scripts.autopilot import test_cronjob_secrets
-            ok_c, msg_c = test_cronjob_secrets()
+            ok_c, msg_c = test_cronjob_secrets(verify_2m_roundtrip=bool(clean_params.get("roundtrip_2m", False)))
             success = ok_c
             messages.append(msg_c)
 

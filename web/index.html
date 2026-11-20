@@ -110,8 +110,12 @@
       <div class="chart-container-card">
         <div class="chart-header">
           <div class="chart-header-top">
-            <div class="chart-title">📊 Telemetria Temporale</div>
+            <div class="chart-title label-with-help">
+              <span>📊 Telemetria Temporale</span>
+              <button type="button" class="help-info-btn" data-help-key="chart_axes_zoom" aria-label="Aiuto grafici">i</button>
+            </div>
             <div class="chart-tools-minimal">
+              <button type="button" class="btn-mini-tool" id="btnJumpLastCycle" title="Centra zoom sull'ultimo ciclo compressore">⏭️ Ciclo</button>
               <button type="button" class="btn-mini-tool" id="btnResetChartZoom" style="display: none;" title="Ripristina zoom asse X">↺ Reset</button>
               <button type="button" class="btn-mini-tool" id="btnChartModeToggle" title="Gesto 1 dito: Leggi valori o Sposta asse X">👆 Leggi</button>
             </div>
@@ -125,6 +129,12 @@
             <button type="button" class="btn-filter" data-hours="2160">3M</button>
             <button type="button" class="btn-filter" data-hours="0">Tutti</button>
           </div>
+          <div class="chart-presets-row" id="chartPresetButtons">
+            <button type="button" class="btn-preset-chip active" data-preset="thermo">🔥 Termo</button>
+            <button type="button" class="btn-preset-chip" data-preset="inverter">⚙️ Inverter</button>
+            <button type="button" class="btn-preset-chip" data-preset="home">🏠 Casa</button>
+            <button type="button" class="btn-preset-chip" data-preset="all">📋 Tutto</button>
+          </div>
         </div>
 
         <div class="chart-meta-strip">
@@ -132,11 +142,18 @@
             <button type="button" class="activity-legend-btn active" data-band="1"><i class="band-swatch swatch-pdc"></i>Solo PdC</button>
             <button type="button" class="activity-legend-btn active" data-band="2"><i class="band-swatch swatch-gf"></i>Solo GF</button>
             <button type="button" class="activity-legend-btn active" data-band="3"><i class="band-swatch swatch-both"></i>PdC + GF</button>
+            <button type="button" class="help-info-btn" data-help-key="chart_bands" aria-label="Aiuto bande">i</button>
+            <button type="button" class="activity-legend-btn active" id="btnToggleSetpointMarkers" title="Mostra/nascondi stop per raggiungimento setpoint"><i class="band-swatch swatch-stop-sp"></i>🎯 Stop SP</button>
+            <button type="button" class="help-info-btn" data-help-key="chart_setpoint_stop" aria-label="Aiuto stop setpoint">i</button>
           </div>
           <div class="axis-pills">
             <button type="button" class="axis-pill" id="btnScaleYTemp" title="Tocca per fissare scala °C">°C: Auto</button>
             <button type="button" class="axis-pill" id="btnScaleYOther" title="Tocca per fissare scala %/bar">%: Auto</button>
           </div>
+        </div>
+
+        <div class="chart-window-stats" id="chartWindowStats">
+          <span class="chart-stat-item">Caricamento statistiche finestra...</span>
         </div>
 
         <div class="chart-canvas-box">
@@ -168,7 +185,10 @@
       <!-- HERO FULL-AUTO MOUNTAIN CUSTODY CARD (Elderly-Friendly One-Click) -->
       <div class="sync-card autopilot-hero-card">
         <div class="cmd-card-header">
-          <h4>🤖 Custodia Automatica Montagna</h4>
+          <h4 class="label-with-help">
+            <span>🤖 Custodia Automatica Montagna</span>
+            <button type="button" class="help-info-btn" data-help-key="ap_away_hero" aria-label="Aiuto Autopilota">i</button>
+          </h4>
           <span class="led-badge" id="autopilotStatusBadge">DISABLED</span>
         </div>
         <p id="autopilotStateReason" style="margin-bottom: 8px;">
@@ -192,43 +212,48 @@
           <summary>⚙️ Parametri Strategia (Tuning Avanzato)</summary>
           <div class="cmd-sync-row" style="margin-top: 10px;">
             <div class="cmd-inline-field">
-              <label for="apTMin">Soglia Avvio T_min (°C)</label>
+              <label for="apTMin" class="label-with-help">Soglia Avvio T_min (°C) <button type="button" class="help-info-btn" data-help-key="ap_t_min" aria-label="Spiegazione T_min">i</button></label>
               <input type="number" id="apTMin" class="form-input" min="5.0" max="15.0" step="0.5" value="7.5">
             </div>
             <div class="cmd-inline-field">
-              <label for="apTMax">Soglia Stacco T_max (°C)</label>
+              <label for="apTMax" class="label-with-help">Soglia Stacco T_max (°C) <button type="button" class="help-info-btn" data-help-key="ap_t_max" aria-label="Spiegazione T_max">i</button></label>
               <input type="number" id="apTMax" class="form-input" min="6.0" max="18.0" step="0.5" value="8.8">
             </div>
             <div class="cmd-inline-field">
-              <label for="apTEmergency">Emergenza Notte (°C)</label>
+              <label for="apTEmergency" class="label-with-help">Emergenza Notte (°C) <button type="button" class="help-info-btn" data-help-key="ap_t_emergency" aria-label="Spiegazione Emergenza">i</button></label>
               <input type="number" id="apTEmergency" class="form-input" min="4.5" max="12.0" step="0.2" value="6.8">
             </div>
             <div class="cmd-inline-field">
-              <label for="apDeltaLwt">Salto LWT ΔT (K)</label>
+              <label for="apDeltaLwt" class="label-with-help">Salto LWT ΔT (K) <button type="button" class="help-info-btn" data-help-key="ap_delta_lwt" aria-label="Spiegazione Salto LWT">i</button></label>
               <input type="number" id="apDeltaLwt" class="form-input" min="10.0" max="25.0" step="0.5" value="18.0">
             </div>
             <div class="cmd-inline-field">
-              <label for="apMaxCycle">Durata Max Ciclo (min)</label>
+              <label for="apMaxCycle" class="label-with-help">Durata Max Ciclo (min) <button type="button" class="help-info-btn" data-help-key="ap_max_cycle" aria-label="Spiegazione Durata Max">i</button></label>
               <input type="number" id="apMaxCycle" class="form-input" min="30" max="360" step="10" value="300">
             </div>
             <div class="cmd-inline-field">
-              <label for="apDrainMin">Scarico Puffer (min)</label>
+              <label for="apDrainMin" class="label-with-help">Scarico Puffer (min) <button type="button" class="help-info-btn" data-help-key="ap_drain_min" aria-label="Spiegazione Scarico Puffer">i</button></label>
               <input type="number" id="apDrainMin" class="form-input" min="0" max="60" step="5" value="25">
             </div>
             <div class="cmd-inline-field">
-              <label for="apWinStart">Finestra COP Inizio</label>
+              <label for="apWinStart" class="label-with-help">Finestra COP Inizio <button type="button" class="help-info-btn" data-help-key="ap_cop_window" aria-label="Spiegazione Finestra COP">i</button></label>
               <input type="time" id="apWinStart" class="form-input" value="11:00">
             </div>
             <div class="cmd-inline-field">
-              <label for="apWinEnd">Finestra COP Fine</label>
+              <label for="apWinEnd" class="label-with-help">Finestra COP Fine <button type="button" class="help-info-btn" data-help-key="ap_cop_window" aria-label="Spiegazione Finestra COP">i</button></label>
               <input type="time" id="apWinEnd" class="form-input" value="16:00">
             </div>
           </div>
           <label class="ap-checkbox-row">
             <input type="checkbox" id="apDynamicCron" checked>
             <span>Frequenza dinamica cron-job.org (15m idle / 5m armato / 2m attivo)</span>
+            <button type="button" class="help-info-btn" data-help-key="ap_dynamic_cron" aria-label="Spiegazione Frequenza Dinamica">i</button>
           </label>
-          <button type="button" class="btn-action btn-secondary" id="btnTestCronjob" style="margin-top: 8px;">🧪 Testa Secrets cron-job.org (Solo Lettura)</button>
+          <div class="cmd-btn-pair" style="margin-top: 8px; align-items: center;">
+            <button type="button" class="btn-action btn-secondary" id="btnTestCronjob" style="margin-top: 0;">🧪 Solo Lettura</button>
+            <button type="button" class="btn-action btn-secondary" id="btnTestCronjobRoundtrip" style="margin-top: 0;">⏱️ Test Timer 2m</button>
+            <button type="button" class="help-info-btn" data-help-key="ap_test_cron" aria-label="Spiegazione Test Cronjob">i</button>
+          </div>
           <button type="button" class="btn-action btn-primary" id="btnSaveAutopilotConfig" style="margin-top: 8px;">💾 Salva Parametri Strategia</button>
         </details>
       </div>
@@ -236,7 +261,7 @@
       <!-- Quick Synchronized Presets -->
       <div class="sync-card">
         <div class="cmd-card-header">
-          <h4>⚡ Azioni Rapide Sincronizzate (PdC + Grundfos)</h4>
+          <h4 class="label-with-help">⚡ Azioni Rapide Sincronizzate (PdC + Grundfos) <button type="button" class="help-info-btn" data-help-key="cmd_sync_pulse" aria-label="Spiegazione Ciclo Sincronizzato">i</button></h4>
           <span class="cmd-live-tag" id="cmdPresetLiveState">--</span>
         </div>
         <p>Evita cicli brevi ON/OFF sincronizzando accensione/spegnimento di Vitocal e pompa pavimento.</p>
@@ -274,7 +299,7 @@
         </div>
 
         <div class="form-group">
-          <label for="cmdPdcModeSelect">Modalità Operativa Circuito</label>
+          <label for="cmdPdcModeSelect" class="label-with-help">Modalità Operativa Circuito <button type="button" class="help-info-btn" data-help-key="cmd_pdc_mode" aria-label="Spiegazione Modalità PdC">i</button></label>
           <div class="cmd-inline-submit">
             <select id="cmdPdcModeSelect" class="form-input">
               <option value="standby">⏸ Standby (Solo Antigelo)</option>
@@ -293,7 +318,7 @@
           </div>
           <div class="cmd-sync-row">
             <div class="cmd-inline-field">
-              <label for="cmdSlopeInput">Inclinazione (Slope)</label>
+              <label for="cmdSlopeInput" class="label-with-help">Inclinazione (Slope) <button type="button" class="help-info-btn" data-help-key="cmd_slope" aria-label="Spiegazione Slope">i</button></label>
               <div class="stepper-group">
                 <button type="button" class="btn-step" data-target="cmdSlopeInput" data-step="-0.1">−</button>
                 <input type="number" id="cmdSlopeInput" class="form-input step-input" min="0.0" max="3.5" step="0.1" value="0.6">
@@ -301,7 +326,7 @@
               </div>
             </div>
             <div class="cmd-inline-field">
-              <label for="cmdShiftInput">Livello (Shift)</label>
+              <label for="cmdShiftInput" class="label-with-help">Livello (Shift) <button type="button" class="help-info-btn" data-help-key="cmd_shift" aria-label="Spiegazione Shift">i</button></label>
               <div class="stepper-group">
                 <button type="button" class="btn-step" data-target="cmdShiftInput" data-step="-1">−</button>
                 <input type="number" id="cmdShiftInput" class="form-input step-input" min="-15" max="40" step="1" value="0">
@@ -319,7 +344,7 @@
         <!-- Setpoint Temperatures -->
         <div class="cmd-subbox">
           <div class="cmd-card-header">
-            <span class="cmd-sub-title">🌡️ Setpoint & Bollitore ACS</span>
+            <span class="cmd-sub-title label-with-help">🌡️ Setpoint & Bollitore ACS <button type="button" class="help-info-btn" data-help-key="cmd_pdc_temps" aria-label="Spiegazione Setpoint PdC">i</button></span>
             <span class="led-badge" id="ledPdcTemps">🟢 --</span>
           </div>
           <div class="cmd-temps-grid">
@@ -357,7 +382,7 @@
         <!-- Viessmann Schedule -->
         <div class="cmd-subbox">
           <div class="cmd-card-header">
-            <span class="cmd-sub-title">🗓️ Fascia Oraria PdC</span>
+            <span class="cmd-sub-title label-with-help">🗓️ Fascia Oraria PdC <button type="button" class="help-info-btn" data-help-key="cmd_pdc_schedule" aria-label="Spiegazione Fascia Oraria">i</button></span>
             <span class="cmd-live-tag" id="cmdPdcActiveProg">PROG: --</span>
           </div>
           <div class="cmd-sync-row">
@@ -397,7 +422,7 @@
       <!-- BTicino Smarther Controls -->
       <div class="sync-card">
         <div class="cmd-card-header">
-          <h4>🏠 Termostato BTicino Smarther (Grundfos)</h4>
+          <h4 class="label-with-help">🏠 Termostato BTicino Smarther (Grundfos) <button type="button" class="help-info-btn" data-help-key="cmd_bticino_manual" aria-label="Spiegazione Setpoint BTicino">i</button></h4>
           <span class="led-badge" id="ledBticinoSp">🟢 --</span>
         </div>
 
@@ -430,11 +455,12 @@
           <button type="button" class="btn-action btn-secondary btn-compact cmd-bt-mode" data-mode="home" style="margin-top: 0;">📅 Programma</button>
           <button type="button" class="btn-action btn-secondary btn-compact cmd-bt-mode" data-mode="hg" style="margin-top: 0;">❄️ Antigelo</button>
           <button type="button" class="btn-action btn-secondary btn-compact cmd-bt-mode" data-mode="away" style="margin-top: 0;">✈️ Assente</button>
+          <button type="button" class="help-info-btn" data-help-key="cmd_bticino_modes" aria-label="Spiegazione Modalità BTicino">i</button>
         </div>
 
         <div class="cmd-subbox" style="margin-top: 10px;">
           <div class="cmd-card-header">
-            <span class="cmd-sub-title">📋 Cambia Programmazione Oraria</span>
+            <span class="cmd-sub-title label-with-help">📋 Cambia Programmazione Oraria <button type="button" class="help-info-btn" data-help-key="cmd_bticino_schedule" aria-label="Spiegazione Programmazioni">i</button></span>
             <button type="button" class="btn-mini-tool" id="btnRefreshSchedules">🔄 Rileggi</button>
           </div>
           <div class="cmd-inline-submit">
@@ -510,7 +536,7 @@
       <!-- Modulation Quality Card -->
       <div class="sync-card" style="margin-top: 10px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <h4 style="color: var(--accent-cyan); font-size: 0.9rem;">🎯 Qualità Modulazione Inverter</h4>
+          <h4 class="label-with-help" style="color: var(--accent-cyan); font-size: 0.9rem;">🎯 Qualità Modulazione Inverter <button type="button" class="help-info-btn" data-help-key="analytics_score" aria-label="Spiegazione Score Modulazione">i</button></h4>
           <span class="brand-badge" id="modScoreBadge" style="font-size: 0.8rem; font-weight: 700; color: #10b981;">Score 95/100</span>
         </div>
         <div style="font-size: 0.95rem; font-weight: 700; margin-bottom: 6px;" id="modVerdictText">
@@ -557,8 +583,9 @@
 
     <!-- TAB 4: SONDE & VALORI DETTAGLIATI -->
     <section id="tab-sonde" class="tab-content">
-      <div class="section-title">
+      <div class="section-title label-with-help">
         <span>🌡️ Tutte le Sonde e Parametri Hardware</span>
+        <button type="button" class="help-info-btn" data-help-key="sonde_rod" aria-label="Spiegazione Sonde e Diagnostica">i</button>
       </div>
       <div class="cards-grid" id="sondeCardsContainer">
         <!-- Populated dynamically by app.js -->
@@ -603,7 +630,7 @@
           <input type="text" id="settingRepo" class="form-input" placeholder="es. giacomogussetti-lgtm/vitocal-remote">
         </div>
         <div class="form-group">
-          <label>GitHub Personal Access Token (Opzionale per repo privato o trigger):</label>
+          <label class="label-with-help">GitHub Personal Access Token (Opzionale per repo privato o trigger): <button type="button" class="help-info-btn" data-help-key="sync_pat" aria-label="Spiegazione GitHub Token">i</button></label>
           <input type="password" id="settingToken" class="form-input" placeholder="ghp_xxxxxxxxxxxxxxxxx">
         </div>
         <button class="btn-action btn-secondary" id="btnSaveSettings">
@@ -622,6 +649,8 @@
       </div>
     </section>
   </main>
+
+  <button type="button" id="btnLandscapeNavToggle" class="landscape-nav-fab" aria-label="Mostra/Nascondi menu" title="Menu navigazione">☰</button>
 
   <!-- Bottom Navigation Bar (Android Native Feel) -->
   <nav class="bottom-nav">
@@ -694,6 +723,31 @@
     </div>
   </div>
 
+  <!-- Contextual Help Modal -->
+  <div id="helpInfoModal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
+      <div class="modal-header">
+        <h4 id="helpModalTitle">ℹ️ Guida Parametro</h4>
+        <button type="button" class="modal-close-btn" id="btnCloseHelpModal" aria-label="Chiudi">✕</button>
+      </div>
+      <div class="help-modal-section">
+        <span class="help-modal-label">Cos'è</span>
+        <p id="helpModalWhat"></p>
+      </div>
+      <div class="help-modal-section">
+        <span class="help-modal-label">Effetto sull'impianto</span>
+        <p id="helpModalImpact"></p>
+      </div>
+      <div class="help-modal-section help-modal-tip">
+        <span class="help-modal-label">💡 Consiglio pratico</span>
+        <p id="helpModalTip"></p>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-action btn-primary" id="btnOkHelpModal">Ho capito</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification element -->
   <div id="toast"></div>
 
@@ -702,6 +756,7 @@
   <script src="js/charts.js"></script>
   <script src="js/analytics.js"></script>
   <script src="js/commands.js"></script>
+  <script src="js/help.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

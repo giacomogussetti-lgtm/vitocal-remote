@@ -46,14 +46,7 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/cloud_telemetry.jsonl
-          if [ -f "data/autopilot_state.json" ]; then git add data/autopilot_state.json; fi
-          if [ -f "data/autopilot_config.json" ]; then git add data/autopilot_config.json; fi
-          if [ -d "data/archive" ]; then git add data/archive/; fi
-          if git diff --staged --quiet; then
-            echo "Nessun nuovo dato da inviare."
-          else
-            git commit -m "chore(telemetry): record cloud sample [skip ci]"
-            git pull --rebase origin main
-            git push
-          fi
+          python scripts/git_safe_push.py \
+            --mode telemetry \
+            --message "chore(telemetry): record cloud sample [skip ci]" \
+            --files data/cloud_telemetry.jsonl data/autopilot_state.json data/archive

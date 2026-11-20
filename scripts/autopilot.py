@@ -263,8 +263,13 @@ def update_cronjob_frequency(interval_min: int) -> tuple[bool, str]:
         return False, str(exc)
 
 
-def test_cronjob_secrets() -> tuple[bool, str]:
-    """Read-only check of CRONJOB_API_KEY and CRONJOB_ID against cron-job.org REST API."""
+def test_cronjob_secrets(verify_2m_roundtrip: bool = False) -> tuple[bool, str]:
+    """
+    Verifies CRONJOB_API_KEY and CRONJOB_ID against cron-job.org REST API.
+    When verify_2m_roundtrip=True, writes 2-minute intervals ([0,2,4...58]),
+    reads back to confirm all 30 slots, and ALWAYS restores the original
+    schedule inside a finally block.
+    """
     api_key = os.environ.get("CRONJOB_API_KEY", "").strip()
     job_id = os.environ.get("CRONJOB_ID", "").strip()
     if not api_key and not job_id:
@@ -281,23 +286,81 @@ def test_cronjob_secrets() -> tuple[bool, str]:
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
+
+    def _extract_details(payload: dict[str, Any]) -> dict[str, Any]:
+        det = payload.get("jobDetails", {}) if isinstance(payload, dict) else {}
+        if isinstance(det, list):
+            det = det[0] if det else {}
+        return det if isinstance(det, dict) else {}
+
+    def _fmt_mins(mins: list[Any]) -> str:
+        return ",".join(str(m) for m in mins[:6]) + ("..." if len(mins) > 6 else "")
+
     try:
         resp = requests.get(url, headers=headers, timeout=15)
-        if resp.status_code == 200:
-            data = resp.json() if resp.text else {}
-            details = data.get("jobDetails", {})
-            if isinstance(details, list):
-                details = details[0] if details else {}
-            enabled = details.get("enabled")
-            mins = (details.get("schedule") or {}).get("minutes", [])
-            mins_txt = ",".join(str(m) for m in mins[:6]) + ("..." if len(mins) > 6 else "")
-            status_txt = "ATTIVO" if enabled else "DISABILITATO"
-            return True, f"Secrets cron-job.org OK! Job #{job_id} ({status_txt}), minuti=[{mins_txt}]"
         if resp.status_code == 401:
             return False, "CRONJOB_API_KEY non valida (HTTP 401 Unauthorized)."
         if resp.status_code == 404:
             return False, f"CRONJOB_ID #{job_id} non trovato su questo account (HTTP 404)."
-        return False, f"Errore cron-job.org HTTP {resp.status_code}: {resp.text[:180]}"
+        if resp.status_code != 200:
+            return False, f"Errore cron-job.org HTTP {resp.status_code}: {resp.text[:180]}"
+
+        data = resp.json() if resp.text else {}
+        details = _extract_details(data)
+        enabled = details.get("enabled")
+        orig_schedule = dict(details.get("schedule") or {})
+        mins = list(orig_schedule.get("minutes") or [])
+        mins_txt = _fmt_mins(mins)
+        status_txt = "ATTIVO" if enabled else "DISABILITATO"
+
+        if not verify_2m_roundtrip:
+            return True, f"Secrets cron-job.org OK! Job #{job_id} ({status_txt}), minuti=[{mins_txt}]"
+
+        restore_schedule = {
+            "timezone": orig_schedule.get("timezone", "Europe/Rome"),
+            "expiresAt": orig_schedule.get("expiresAt", 0),
+            "hours": orig_schedule.get("hours", [-1]),
+            "minutes": mins if mins else [0, 15, 30, 45],
+            "mdays": orig_schedule.get("mdays", [-1]),
+            "months": orig_schedule.get("months", [-1]),
+            "wdays": orig_schedule.get("wdays", [-1]),
+        }
+        test_schedule = dict(restore_schedule)
+        test_schedule["minutes"] = list(range(0, 60, 2))
+
+        patched_ok = False
+        readback_err: Optional[str] = None
+        restore_ok = False
+        try:
+            p_resp = requests.patch(url, headers=headers, json={"job": {"schedule": test_schedule}}, timeout=15)
+            if p_resp.status_code != 200:
+                return False, f"Test 2m fallito su PATCH (HTTP {p_resp.status_code}): {p_resp.text[:160]}"
+            patched_ok = True
+
+            v_resp = requests.get(url, headers=headers, timeout=15)
+            if v_resp.status_code != 200:
+                readback_err = f"Read-back GET fallito (HTTP {v_resp.status_code})"
+            else:
+                v_data = v_resp.json() if v_resp.text else {}
+                v_mins = list((_extract_details(v_data).get("schedule") or {}).get("minutes") or [])
+                if len(v_mins) != 30 or v_mins[:4] != [0, 2, 4, 6]:
+                    readback_err = f"Read-back 2m inatteso: len={len(v_mins)}, primi={v_mins[:6]}"
+        finally:
+            if patched_ok:
+                try:
+                    r_resp = requests.patch(url, headers=headers, json={"job": {"schedule": restore_schedule}}, timeout=15)
+                    restore_ok = (r_resp.status_code == 200)
+                except Exception as rest_exc:
+                    logger.error("Errore ripristino schedule originale cron-job.org: %s", rest_exc)
+
+        if readback_err:
+            return False, f"{readback_err} (ripristino=[{mins_txt}] {'OK' if restore_ok else 'FALLITO'})"
+        if not restore_ok:
+            return False, "Scrittura/verifica 2m riuscita, ma ripristino schedule originale fallito!"
+        return True, (
+            f"Test cambio timer 2m OK! Scritto [0,2,4...58] (30 slot/h), "
+            f"letto e verificato OK, ripristinato schedule originale ([{mins_txt}])."
+        )
     except Exception as exc:
         return False, f"Errore connessione cron-job.org: {exc}"
 

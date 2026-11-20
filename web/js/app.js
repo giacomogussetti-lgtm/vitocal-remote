@@ -34,6 +34,10 @@ document.addEventListener("DOMContentLoaded", () => {
   if (typeof initCommandsUI === "function") {
     initCommandsUI();
   }
+  if (typeof initHelpSystem === "function") {
+    initHelpSystem();
+  }
+  initLandscapeChromeToggle();
 
   // Initial Sync
   loadCachedSamples();
@@ -71,8 +75,16 @@ function initNavigation() {
       const targetTab = document.getElementById(tabId);
       if (targetTab) {
         targetTab.classList.add("active");
+        if (document.body.classList.contains("landscape-chrome-open")) {
+          document.body.classList.remove("landscape-chrome-open");
+          const fab = document.getElementById("btnLandscapeNavToggle");
+          if (fab) fab.textContent = "☰";
+        }
         if (tabId === "tab-charts") {
-          setTimeout(() => updateChartData(state.samples), 50);
+          setTimeout(() => {
+            updateChartData(state.samples);
+            if (typeof telemetryChart !== "undefined" && telemetryChart) telemetryChart.resize();
+          }, 50);
         } else if (tabId === "tab-analytics") {
           updateAnalyticsUI(state.analyticsHours);
         } else if (tabId === "tab-commands") {
@@ -93,6 +105,33 @@ function initNavigation() {
       setChartTimeframe(hours);
     });
   });
+}
+
+function initLandscapeChromeToggle() {
+  const fab = document.getElementById("btnLandscapeNavToggle");
+  if (fab && fab.dataset.bound !== "1") {
+    fab.dataset.bound = "1";
+    fab.addEventListener("click", () => {
+      const isOpen = document.body.classList.toggle("landscape-chrome-open");
+      fab.textContent = isOpen ? "✕" : "☰";
+    });
+  }
+
+  let resizeTimer = null;
+  const handleLayoutChange = () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (document.body.classList.contains("landscape-chrome-open") && window.innerHeight > 540) {
+        document.body.classList.remove("landscape-chrome-open");
+        if (fab) fab.textContent = "☰";
+      }
+      if (typeof telemetryChart !== "undefined" && telemetryChart) {
+        telemetryChart.resize();
+      }
+    }, 150);
+  };
+  window.addEventListener("resize", handleLayoutChange);
+  window.addEventListener("orientationchange", handleLayoutChange);
 }
 
 // Action Buttons

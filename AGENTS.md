@@ -164,12 +164,13 @@ L'impianto è idraulicamente disaccoppiato in due sottosistemi tramite un **Puff
 2. **Prevenzione Campioni Equidistanti (`distribution: 'linear'`, `bounds: 'ticks'`)**:
    - Per impedire che i campioni vengano disegnati a distanze orizzontali identiche nonostante intervalli temporali diversi (es. un buco di 1 ora o campioni a 5 min), la scala temporale adotta esplicitamente `distribution: 'linear'` e `bounds: 'ticks'`.
    - In `web/js/charts.js`, le funzioni `buildChart` e `updateChartData` calcolano dinamicamente `min = latestMs - hours` e `max = latestMs` ancorando l'asse X all'esatto intervallo temporale selezionato.
-   - La cache PWA in `web/sw.js` è versionata (`vitocal-remote-v8`) per forzare il refresh immediato su tutti i dispositivi mobili.
-3. **Zoom/Pan Solo X, Blocco Asse Y & Bande Attività Adiacenti (`web/js/charts.js`)**:
-   - **Gesti Touch Separati**: con 1 dito in modalità `👆 Leggi` resta attivo lo scrubbing dei valori; con 2 dita si esegue **pinch zoom + drag solo su asse X** ancorato al punto medio (senza librerie esterne). Toggle minimale `👆 Leggi / ✋ Sposta` in alto a destra per eventuale pan in X ad una mano + `↺ Reset`.
-   - **Asse Y Bloccato & Modale Tappabile**: durante zoom/pan in X gli assi Y vengono congelati (`yAutoFrozen`) così da non "saltare" verticalmente; tappando direttamente su asse Y sinistro/destro o sulle pillole `°C` / `%` si apre il modale `#yAxisModal` con preset e campi `Y Min` / `Y Max` persistenti in `localStorage` (`vitocal_y_scales`).
-   - **Bande Verticali Stato Impianto Adiacenti e Disattivabili (`activityBandsPlugin`)**: `beforeDatasetsDraw` disegna campiture verticali + banda superiore da 6px a 3 colori distinti (`Solo PdC`, `Solo Grundfos`, `PdC + Grundfos`), disattivabili singolarmente dai pulsanti legenda. Le transizioni di stato consecutive si saldano esattamente a metà intervallo senza buchi vuoti, mentre la fine ciclo si arresta sull'ultimo campione attivo.
-   - **Target LWT Calcolato WO1C & Semplificazione Setpoint BTicino**: aggiunta la traccia calcolata `Target LWT Curva (PdC)` mediante formula ufficiale PyViCare `variant2` (`computeVitocalTargetLwt`, attiva solo fuori da `standby`). `Setpoint BTicino` è nascosto di default per non schiacciare la scala Y sui picchi anti-grippaggio (30 °C), e il riepilogo `Casa / SP → GF` è sempre visibile nel tooltip.
+   - La cache PWA in `web/sw.js` è versionata (`vitocal-remote-v9`) per forzare il refresh immediato su tutti i dispositivi mobili.
+3. **Grafici Pro, Modalità Landscape Immersiva & Guida Contestuale (`web/js/charts.js`, `web/js/help.js`, `web/css/styles.css`)**:
+   - **Gesti Touch & Zoom X + Landscape Immersivo**: 1 dito in `👆 Leggi` esegue scrubbing e aggiorna i valori live nella legenda; 2 dita eseguono **pinch zoom + drag solo su asse X**; su smartphone orizzontale (`orientation: landscape` + `max-height: 540px`) `header` e `nav.bottom-nav` spariscono lasciando solo il pulsante flottante `☰` (`#btnLandscapeNavToggle`).
+   - **Asse Y Bloccato & Modale Tappabile**: durante zoom/pan in X gli assi Y restano congelati (`yAutoFrozen`, con `grace: '14%'` in auto su `yTemp` per lasciare spazio a bande e badge); toccando l'asse o le pillole `°C` / `%` si fissa il range in `localStorage`.
+   - **Bande Verticali Adiacenti + Pillole Durata ON (`activityBandsPlugin`)**: mostra fasce + nastro 6px per `Solo PdC`, `Solo Grundfos`, `PdC + Grundfos` con pillola di durata (`PdC 24m`, `PdC+GF 1h12m`) disegnata solo quando la larghezza visibile evita sovrapposizioni.
+   - **Preset Rapidi, Legenda ad Alto Contrasto & Stop Setpoint (`telemetryAnnotationsPlugin`)**: preset (`Termo`, `Inverter`, `Casa`, `Tutto`), legenda raggruppata Grafana-style con valori live/scrubbed + doppio-tap *Solo*, striscia KPI dinamica `#chartWindowStats` sulla finestra visibile, salto rapido `⏭️ Ciclo`, e marker `🎯 Stop SP` (`detectSetpointCutoffEvents`) dove il compressore stacca per raggiungimento/superamento `Target LWT`.
+   - **Guida Contestuale `(i)` Ovunque (`web/js/help.js`)**: ogni parametro dell'Autopilota, comando PdC/BTicino, grafico e diagnostica espone un pulsante `i` con scheda esplicativa modale (*Cos'è / Effetto / Consiglio*).
 4. **Sinottico SCADA PWA Responsive (`web/js/synoptic.js`)**:
    - Rilevamento automatico viewport/orientamento (`detectSynopticMode` + listener `resize`/`orientationchange`) tra **Verticale Portrait** (`viewBox 0 0 420 850`, zero scroll orizzontale) e **Orizzontale Landscape** (`viewBox 0 0 1260 560`).
    - Schematizzati: circolatore primario PdC `P1` con girante rotante e %, circolatore Grundfos secondario, ventilatore evaporatore, mini bollitore ACS 220L, puffer con gradiente termico dinamico e casetta con tetto a falde che contrappone aria esterna (`T Esterna OAT`) ad aria interna (`BTicino Smarther`) e serpentina radiante collegata alle tubazioni.
@@ -184,7 +185,8 @@ L'impianto è idraulicamente disaccoppiato in due sottosistemi tramite un **Puff
    - Configurazione in `data/autopilot_config.json` (disattivato di default; attivabile con 1 tap da `🛡️ ATTIVA ASSENZA MONTAGNA` nella PWA) e stato persistito in `data/autopilot_state.json`.
    - Stati: `DISABLED` / `IDLE` (tutto fermo in Standby + BTicino Antigelo 7 °C; assist scarico se antigelo hardware porta puffer >= 22 °C) → `ARMED` (conferma T_in <= `t_min_c` per `debounce_minutes`) → `HEATING_SYNC` (avvio sincronizzato in finestra COP `11:00–16:00` con cap `300 min` oppure emergenza notturna se `T_in <= t_emergency_c` o derivata ripida; Target LWT calcolato su `T_in` + `OAT` e bloccato all'avvio ciclo fino a fine scarico, convertito con formula inversa WO1C `compute_inverse_setpoint_for_target_lwt`) → `PUFFER_DRAIN` (PdC in `standby`, Grundfos attiva altri 25 min per svuotare il puffer) → `IDLE`.
    - **Doppio Fail-Safe Hardware**: manuale BTicino sempre con `duration_minutes` auto-scadente + fascia hardware `heating.schedule` Vitocal limitata alla finestra COP diurna.
-   - **Polling Dinamico `cron-job.org` & Test Sola Lettura**: tramite `CRONJOB_API_KEY` e `CRONJOB_ID` nei GitHub Secrets (verificati end-to-end con `cronjob_test` su Job `#8895676` / pulsante PWA `🧪 Testa Secrets cron-job.org`), adatta automaticamente la frequenza (`15 min` IDLE / `5 min` ARMED / `2 min` HEATING_SYNC o PUFFER_DRAIN).
+   - **Polling Dinamico `cron-job.org` & Test Sola Lettura / Roundtrip 2m**: tramite `CRONJOB_API_KEY` e `CRONJOB_ID` nei GitHub Secrets (verificati end-to-end con `cronjob_test` su Job `#8895676`; disponibile anche `roundtrip_2m: true` per testare scrittura 30 slot/ora `[0,2,...,58]` + ripristino automatico), adatta la frequenza (`15 min` IDLE / `5 min` ARMED / `2 min` HEATING_SYNC o PUFFER_DRAIN).
+   - **Push Concorrente Race-Free (`scripts/git_safe_push.py`)**: elimina i conflitti tra `telemetry_logger.yml` e `apply_command.yml` eseguendo fetch/reset, merge cronologico deduplicato di `cloud_telemetry.jsonl` (e `data/archive/*.gz`) e precedenza ai comandi espliciti su config/stato.
 3. **Audit Strategia Obbligatorio (`scripts/audit_strategy.py`, regola `.agents/rules/thermodynamic-rigor-and-telemetry-audit.md`)**:
    - Prima di qualsiasi tuning su ON/OFF, defrost o soglie, eseguire `python scripts/audit_strategy.py` per verificare dati reali, modalità applicate, durata cicli, pendenze termiche e contatori resistenza elettrica.
 
@@ -227,13 +229,14 @@ vitocal remote/
 ├── web/                                          # Frontend Web & PWA per Smartphone Android
 │   ├── index.html                                # Layout mobile SCADA con 5 Tab (Sinottico, Comandi, Grafici, Analisi, Sonde/Sync)
 │   ├── manifest.json                             # Manifest per installazione nativa Android
-│   ├── sw.js                                     # Service Worker per caching e offline (`vitocal-remote-v8`)
+│   ├── sw.js                                     # Service Worker per caching e offline (`vitocal-remote-v9`)
 │   ├── css/styles.css                            # Tema SCADA scuro industriale per schermi touch
 │   ├── icons/                                    # Icone 192px e 512px per Android
 │   └── js/
 │       ├── synoptic.js                           # Motore SVG responsive del Sinottico animato
-│       ├── charts.js                             # Grafici touch Chart.js (zoom X, Y bloccato, bande stato)
+│       ├── charts.js                             # Grafici Pro (zoom X, Stop SP, durata bande, preset)
 │       ├── commands.js                           # Logica controlli bidirezionali & pannello Autopilota
+│       ├── help.js                               # Catalogo spiegazioni contestuali tap `(i)`
 │       └── app.js                                # Controller PWA, sync GitHub, analytics & trigger
 ├── api/
 │   ├── viessmann.py                              # Connettore Viessmann PyViCare (lettura/scrittura + diagnostica)
@@ -250,6 +253,7 @@ vitocal remote/
 │   ├── feature_dumper.py                         # Diagnostica completa e dump 193 features
 │   ├── cloud_logger.py                           # Logger headless 24/7 + tick autopilota
 │   ├── cloud_commander.py                        # Esecutore sicuro comandi remoti & ricevute
+│   ├── git_safe_push.py                          # Helper push concorrente race-free per Actions
 │   ├── autopilot.py                              # Macchina a stati Custodia Montagna & cron dinamico
 │   ├── audit_strategy.py                         # Report audit termodinamico su log reali
 │   ├── security_check.py                         # Scanner preventivo di privacy e sicurezza pre-commit

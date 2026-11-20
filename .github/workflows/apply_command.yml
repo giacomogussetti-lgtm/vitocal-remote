@@ -63,18 +63,10 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          if [ -f "data/last_command.json" ]; then git add data/last_command.json; fi
-          if [ -f "data/autopilot_config.json" ]; then git add data/autopilot_config.json; fi
-          if [ -f "data/autopilot_state.json" ]; then git add data/autopilot_state.json; fi
-          if [ -f "data/cloud_telemetry.jsonl" ]; then git add data/cloud_telemetry.jsonl; fi
-          if [ -d "data/archive" ]; then git add data/archive/; fi
-          if git diff --staged --quiet; then
-            echo "Nessuna modifica da inviare."
-          else
-            git commit -m "chore(command): execute ${{ inputs.command }} [skip ci]"
-            git pull --rebase origin main
-            git push
-          fi
+          python scripts/git_safe_push.py \
+            --mode command \
+            --message "chore(command): execute ${{ inputs.command }} [skip ci]" \
+            --files data/last_command.json data/autopilot_config.json data/autopilot_state.json data/cloud_telemetry.jsonl data/archive
 
       - name: Enforce Command Exit Status
         if: steps.run_cmd.outputs.cmd_exit != '0'

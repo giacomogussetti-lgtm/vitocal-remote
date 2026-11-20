@@ -515,50 +515,273 @@ main {
 }
 
 @media (orientation: landscape) and (max-height: 540px) {
-  header {
-    height: 46px;
+  body:not(.landscape-chrome-open) header,
+  body:not(.landscape-chrome-open) nav.bottom-nav {
+    display: none;
+  }
+  body.landscape-chrome-open header {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 42px;
+    padding: 0 44px 0 10px;
+    z-index: 1200;
+  }
+  body.landscape-chrome-open nav.bottom-nav {
+    display: flex;
+    height: 50px;
+    padding-bottom: 0;
+    z-index: 1200;
+  }
+  body.landscape-chrome-open .nav-item {
+    height: 50px;
+  }
+  body.landscape-chrome-open .nav-item svg {
+    width: 18px;
+    height: 18px;
+    margin-bottom: 1px;
+  }
+  .landscape-nav-fab {
+    display: flex;
+    position: fixed;
+    top: 6px;
+    right: 6px;
+    z-index: 1300;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.84);
+    border: 1px solid rgba(56, 189, 248, 0.5);
+    color: var(--accent-cyan);
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
   }
   main {
-    padding: 8px;
-    padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 6px);
+    padding: 4px 6px 8px 6px;
+  }
+  .chart-container-card {
+    padding: 6px 8px;
+    margin-bottom: 6px;
+  }
+  .chart-header {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px 8px;
+    margin-bottom: 4px;
+  }
+  .chart-header-top {
+    width: 100%;
+    padding-right: 36px;
+  }
+  .chart-meta-strip {
+    margin-bottom: 4px;
+    gap: 4px;
+  }
+  .chart-window-stats {
+    padding: 3px 8px;
+    margin-bottom: 4px;
   }
   .chart-canvas-box {
-    height: clamp(220px, 60dvh, 380px);
+    height: clamp(200px, calc(100dvh - 110px), 360px);
   }
 }
 
-/* Legend Toggles */
-.chart-channels {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
+.landscape-nav-fab {
+  display: none;
 }
 
-.channel-pill {
-  font-size: 0.7rem;
-  padding: 4px 8px;
-  border-radius: 12px;
-  cursor: pointer;
-  border: 1px solid var(--border-color);
-  background: var(--bg-subtle);
-  color: var(--text-muted);
+@media (orientation: landscape) and (max-height: 540px) {
+  .landscape-nav-fab {
+    display: flex;
+  }
+}
+
+/* Chart View Presets & Visible-Window KPIs */
+.chart-presets-row {
   display: flex;
   align-items: center;
   gap: 5px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chart-presets-row::-webkit-scrollbar {
+  display: none;
+}
+
+.btn-preset-chip {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.2s;
 }
 
-.channel-pill.active {
-  color: #fff;
-  border-color: currentColor;
+.btn-preset-chip.active {
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+  border-color: rgba(16, 185, 129, 0.55);
 }
 
-.channel-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: currentColor;
+.chart-window-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 5px 8px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(51, 65, 85, 0.75);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.chart-stat-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.chart-stat-item strong {
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+/* Structured High-Contrast Legend (Grafana-style) */
+.chart-channels {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.legend-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.legend-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.45px;
+  color: var(--text-dim);
+}
+
+.legend-hint-mini {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-dim);
+}
+
+.legend-chips-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 5px;
+}
+
+@media (max-width: 420px) {
+  .legend-chips-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.legend-chip {
+  font-size: 0.68rem;
+  padding: 5px 7px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid rgba(51, 65, 85, 0.7);
+  background: rgba(15, 23, 42, 0.72);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  transition: all 0.18s;
+  min-width: 0;
+  text-align: left;
+}
+
+.legend-chip.active {
+  color: var(--text-main);
+  border-color: var(--chip-color, var(--accent-cyan));
+  background: rgba(22, 31, 48, 0.96);
+}
+
+.legend-chip:not(.active) {
+  opacity: 0.48;
+}
+
+.legend-chip-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.legend-chip-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+
+.legend-line-swatch {
+  width: 14px;
+  height: 0;
+  flex-shrink: 0;
+  border-top-width: 2.5px;
+  border-top-style: solid;
+  border-top-color: var(--chip-color, #fff);
+}
+
+.legend-line-swatch.dashed {
+  border-top-style: dashed;
+}
+
+.legend-line-swatch.dotted {
+  border-top-style: dotted;
+}
+
+.legend-val {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 0.68rem;
+  color: var(--chip-color, var(--text-main));
+  flex-shrink: 0;
+}
+
+.legend-chip:not(.active) .legend-val {
+  color: var(--text-dim);
+}
+
+.swatch-stop-sp {
+  background: rgba(239, 68, 68, 0.55);
+  border: 1px solid #ef4444;
 }
 
 /* Settings & Sync Tab */
@@ -1050,6 +1273,25 @@ nav.bottom-nav {
   box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);
 }
 
+.btn-hero-away.is-active {
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+  border: 2px solid #10b981;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.24);
+}
+
+.led-badge.state-heating {
+  color: #fecaca;
+  border-color: rgba(239, 68, 68, 0.65);
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.led-badge.state-drain {
+  color: #bae6fd;
+  border-color: rgba(56, 189, 248, 0.6);
+  background: rgba(56, 189, 248, 0.18);
+}
+
 .autopilot-tuning-drawer {
   margin-top: 12px;
   padding-top: 8px;
@@ -1078,4 +1320,82 @@ nav.bottom-nav {
   width: 16px;
   height: 16px;
   accent-color: var(--accent-cyan);
+}
+
+/* Universal Tap-to-Explain Help System */
+.label-with-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+}
+
+.help-info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  min-width: 17px;
+  border-radius: 50%;
+  border: 1px solid rgba(56, 189, 248, 0.48);
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--accent-cyan);
+  font-size: 0.64rem;
+  font-weight: 800;
+  font-family: Georgia, serif;
+  font-style: italic;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+  vertical-align: middle;
+  transition: all 0.15s;
+}
+
+.help-info-btn::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+
+.help-info-btn:active,
+.help-info-btn:hover {
+  background: var(--accent-cyan);
+  color: #04121e;
+  border-color: var(--accent-cyan);
+}
+
+.help-modal-section {
+  margin-bottom: 10px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: var(--bg-subtle);
+  border: 1px solid rgba(51, 65, 85, 0.75);
+}
+
+.help-modal-label {
+  display: block;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.45px;
+  color: var(--accent-cyan);
+  margin-bottom: 4px;
+}
+
+.help-modal-section p {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.help-modal-tip {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.help-modal-tip .help-modal-label {
+  color: #6ee7b7;
 }

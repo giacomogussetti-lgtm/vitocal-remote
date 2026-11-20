@@ -1,22 +1,30 @@
 /**
- * Telemetry Charts for Vitocal Remote Mobile App.
- * Uses Chart.js v4 with continuous TimeScale (date-fns adapter),
- * X-only 2-finger pinch + pan (keeping 1-finger value scrubbing intact),
- * minimal Read/Pan mode toggle, locked/tappable Y-axes, seamless toggleable
- * 3-color PdC / Grundfos activity bands, and WO1C Target LWT curve overlay.
+ * Pro-Grade Telemetry Charts for Vitocal Remote Mobile App.
+ * Features:
+ * - Chart.js v4 continuous TimeScale (date-fns adapter)
+ * - High-contrast colorblind-safe palette & distinct stroke patterns
+ * - 1-tap View Presets + structured Grafana-style legend with live/scrubbed readouts & Solo isolate
+ * - Setpoint-saturation cutoff detector (`🎯 Stop SP`) with anti-overlap diamond pointers & tooltips
+ * - Defrost markers & vertical crosshair
+ * - Seamless 3-color PdC / Grundfos activity bands with zoom-aware ON-duration pills
+ * - X-only 2-finger pinch + drag, 1-finger Read/Pan toggle, `⏭️ Ciclo` jump, locked/tappable Y-axes
+ * - Dynamic visible-window KPI summary strip (`#chartWindowStats`)
  */
 
 let telemetryChart = null;
 let currentSamples = [];
-let activeTimeframeHours = 24; // Default 24h
+let activeTimeframeHours = 24;
+let activePresetKey = "thermo";
 
 let chartInteractionMode = "read"; // "read" (1-finger tooltip) | "pan" (1-finger X drag)
-let xZoomRange = null; // { min, max } when zoomed/panned in X, null when showing full timeframe
-let yAutoFrozen = { yTemp: null, yOther: null }; // Snapshot of auto Y bounds during X zoom/pan
+let xZoomRange = null; // { min, max } when zoomed/panned in X
+let yAutoFrozen = { yTemp: null, yOther: null };
 let activeModalAxis = null;
 let visibleActivityBands = { 1: true, 2: true, 3: true };
+let showSetpointMarkers = true;
+let soloBackupActive = null;
 
-const MIN_X_SPAN_MS = 15 * 60 * 1000; // Minimum 15 min X window when zooming in
+const MIN_X_SPAN_MS = 15 * 60 * 1000;
 const Y_SCALE_STORAGE_KEY = "vitocal_y_scales";
 
 let yAxisCustom = loadYAxisCustom();
@@ -56,29 +64,63 @@ function computeVitocalTargetLwt(sample, allowStandby = false) {
 window.computeVitocalTargetLwt = computeVitocalTargetLwt;
 
 const CHANNEL_DEFS = [
-  { key: "external_temp_c", label: "T Esterna Sonda PdC", unit: "°C", color: "#38bdf8", yAxis: "yTemp", active: true },
-  { key: "buffer_temp_c", label: "T Accumulo Puffer 200L", unit: "°C", color: "#f59e0b", yAxis: "yTemp", active: true },
-  { key: "pdc_supply_temp_c", label: "T Mandata PdC", unit: "°C", color: "#ef4444", yAxis: "yTemp", active: true },
+  { key: "pdc_supply_temp_c", label: "Mandata PdC", unit: "°C", color: "#ff3b30", yAxis: "yTemp", group: "temp", borderWidth: 2.4, active: true },
   {
     key: "_target_lwt_c",
-    label: "Target LWT Curva (PdC)",
+    label: "Target LWT Curva",
     unit: "°C",
-    color: "#d946ef",
+    color: "#e879f9",
     yAxis: "yTemp",
-    borderDash: [6, 4],
+    group: "temp",
+    borderDash: [7, 4],
+    borderWidth: 2.0,
     active: true,
     spanGaps: false,
     computed: (s) => computeVitocalTargetLwt(s, false),
   },
-  { key: "pdc_return_temp_c", label: "T Ritorno PdC", unit: "°C", color: "#f43f5e", yAxis: "yTemp", active: false },
-  { key: "indoor_temp_bticino_c", label: "T Interna Corridoio", unit: "°C", color: "#10b981", yAxis: "yTemp", active: true },
-  { key: "indoor_setpoint_bticino_c", label: "Setpoint BTicino", unit: "°C", color: "#eab308", yAxis: "yTemp", borderDash: [5, 5], active: false },
-  { key: "dhw_storage_temp_c", label: "T Bollitore ACS", unit: "°C", color: "#a855f7", yAxis: "yTemp", active: false },
-  { key: "compressor_modulation_percent", label: "Modulazione Inverter (%)", unit: "%", color: "#facc15", yAxis: "yOther", active: true },
-  { key: "hot_gas_pressure_bar", label: "Pressione Gas Caldo (bar)", unit: "bar", color: "#ec4899", yAxis: "yOther", active: false },
-  { key: "cop_heating", label: "COP Riscaldamento", unit: "COP", color: "#34d399", yAxis: "yOther", active: false },
-  { key: "humidity_percent", label: "Umidità Ambiente (%)", unit: "%", color: "#60a5fa", yAxis: "yOther", borderDash: [3, 3], active: false },
+  { key: "buffer_temp_c", label: "Puffer 200L", unit: "°C", color: "#ff9f0a", yAxis: "yTemp", group: "temp", borderWidth: 2.2, active: true },
+  { key: "indoor_temp_bticino_c", label: "T Casa Corridoio", unit: "°C", color: "#22c55e", yAxis: "yTemp", group: "temp", borderWidth: 2.4, active: true },
+  { key: "external_temp_c", label: "T Esterna OAT", unit: "°C", color: "#00d4ff", yAxis: "yTemp", group: "temp", borderWidth: 2.0, active: true },
+  { key: "pdc_return_temp_c", label: "Ritorno PdC", unit: "°C", color: "#818cf8", yAxis: "yTemp", group: "temp", borderDash: [4, 3], borderWidth: 2.0, active: false },
+  { key: "dhw_storage_temp_c", label: "Bollitore ACS", unit: "°C", color: "#c084fc", yAxis: "yTemp", group: "temp", borderDash: [2, 3], borderWidth: 2.0, active: false },
+  { key: "indoor_setpoint_bticino_c", label: "Setpoint BTicino", unit: "°C", color: "#a3e635", yAxis: "yTemp", group: "temp", stepped: true, borderDash: [5, 4], borderWidth: 1.8, active: false },
+  {
+    key: "_delta_sup_buf",
+    label: "ΔT Mandata−Puffer",
+    unit: "K",
+    color: "#fb7185",
+    yAxis: "yTemp",
+    group: "temp",
+    borderDash: [2, 2],
+    borderWidth: 1.8,
+    active: false,
+    computed: (s) => (s && s.pdc_supply_temp_c != null && s.buffer_temp_c != null)
+      ? Math.round((Number(s.pdc_supply_temp_c) - Number(s.buffer_temp_c)) * 10) / 10
+      : null,
+  },
+  {
+    key: "compressor_modulation_percent",
+    label: "Modulazione Inverter",
+    unit: "%",
+    color: "#fde047",
+    yAxis: "yOther",
+    group: "system",
+    borderWidth: 1.8,
+    fill: true,
+    backgroundColor: "rgba(253, 224, 71, 0.08)",
+    active: true,
+  },
+  { key: "hot_gas_pressure_bar", label: "Gas Caldo", unit: "bar", color: "#f472b6", yAxis: "yOther", group: "system", borderDash: [6, 3], borderWidth: 1.8, active: false },
+  { key: "cop_heating", label: "COP Riscald.", unit: "COP", color: "#2dd4bf", yAxis: "yOther", group: "system", borderWidth: 2.0, active: false },
+  { key: "humidity_percent", label: "Umidità Casa", unit: "%", color: "#94a3b8", yAxis: "yOther", group: "system", borderDash: [3, 4], borderWidth: 1.8, active: false },
 ];
+
+const CHART_PRESETS = {
+  thermo: ["pdc_supply_temp_c", "_target_lwt_c", "buffer_temp_c", "indoor_temp_bticino_c", "external_temp_c", "compressor_modulation_percent"],
+  inverter: ["pdc_supply_temp_c", "_target_lwt_c", "_delta_sup_buf", "compressor_modulation_percent", "hot_gas_pressure_bar", "cop_heating"],
+  home: ["indoor_temp_bticino_c", "indoor_setpoint_bticino_c", "external_temp_c", "buffer_temp_c", "humidity_percent"],
+  all: CHANNEL_DEFS.map(ch => ch.key),
+};
 
 const Y_AXIS_CONFIG = {
   yTemp: {
@@ -104,9 +146,9 @@ const Y_AXIS_CONFIG = {
 };
 
 const ACTIVITY_STYLES = {
-  1: { fill: "rgba(245, 158, 11, 0.14)", ribbon: "rgba(245, 158, 11, 0.88)", text: "🔥 Stato: Solo PdC ON" },
-  2: { fill: "rgba(56, 189, 248, 0.14)", ribbon: "rgba(56, 189, 248, 0.88)", text: "💧 Stato: Solo Grundfos ON" },
-  3: { fill: "rgba(16, 185, 129, 0.19)", ribbon: "rgba(16, 185, 129, 0.94)", text: "⚡ Stato: PdC + Grundfos ON" },
+  1: { fill: "rgba(245, 158, 11, 0.14)", ribbon: "rgba(245, 158, 11, 0.90)", pillBorder: "#f59e0b", pillLabel: "PdC", text: "🔥 Stato: Solo PdC ON" },
+  2: { fill: "rgba(56, 189, 248, 0.14)", ribbon: "rgba(56, 189, 248, 0.90)", pillBorder: "#38bdf8", pillLabel: "GF", text: "💧 Stato: Solo Grundfos ON" },
+  3: { fill: "rgba(16, 185, 129, 0.19)", ribbon: "rgba(16, 185, 129, 0.94)", pillBorder: "#10b981", pillLabel: "PdC+GF", text: "⚡ Stato: PdC + Grundfos ON" },
 };
 
 function loadYAxisCustom() {
@@ -123,22 +165,26 @@ function loadYAxisCustom() {
         defaults[key] = { locked: true, min: parsed[key].min, max: parsed[key].max };
       }
     }
-  } catch (e) {
-    // Ignore malformed localStorage
-  }
+  } catch (e) {}
   return defaults;
 }
 
 function saveYAxisCustom() {
   try {
     localStorage.setItem(Y_SCALE_STORAGE_KEY, JSON.stringify(yAxisCustom));
-  } catch (e) {
-    // Ignore quota errors
-  }
+  } catch (e) {}
 }
 
 function clamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
+}
+
+function formatDurationCompact(minutes) {
+  const m = Math.max(0, Math.round(minutes || 0));
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem === 0 ? `${h}h` : `${h}h${String(rem).padStart(2, "0")}m`;
 }
 
 function parseSamplesChrono(samples) {
@@ -181,15 +227,10 @@ function classifyActivityStates(chronoFiltered) {
       gf = (i > 0 && i < n - 1 && (raw[i + 1].ts - raw[i - 1].ts) <= maxNeighborSpan && raw[i - 1].gfOn === true && raw[i + 1].gfOn === true);
     }
     const state = (comp ? 1 : 0) + (gf ? 2 : 0);
-    return { ts: item.ts, state };
+    return { ts: item.ts, state, comp: Boolean(comp), gf: Boolean(gf) };
   });
 }
 
-/**
- * Groups consecutive active states and snaps directly-adjacent state transitions
- * (e.g., Solo GF -> PdC + GF -> Solo PdC) at their midpoint so bands sit flush
- * without visual gaps between transitions, while never bleeding into OFF samples.
- */
 function buildActivityRuns(states) {
   const runs = [];
   let cur = null;
@@ -208,13 +249,12 @@ function buildActivityRuns(states) {
       cur.endIdx = i;
     } else {
       if (cur) runs.push(cur);
-      cur = { state, startTs: ts, endTs: ts, startIdx: i, endIdx: i, segStart: ts, segEnd: ts };
+      cur = { state, startTs: ts, endTs: ts, startIdx: i, endIdx: i, segStart: ts, segEnd: ts, durationMin: 0 };
     }
     prevTs = ts;
   }
   if (cur) runs.push(cur);
 
-  // Join directly-adjacent runs seamlessly at midpoint; pad isolated 1-sample runs
   for (let i = 0; i < runs.length; i++) {
     const r = runs[i];
     const hasAdjacentPrev = i > 0 && r.startIdx === runs[i - 1].endIdx + 1 && (r.startTs - runs[i - 1].endTs) <= maxGapMs;
@@ -239,7 +279,147 @@ function buildActivityRuns(states) {
     }
   }
 
+  for (let i = 0; i < runs.length; i++) {
+    runs[i].durationMin = Math.max(1, Math.round((runs[i].segEnd - runs[i].segStart) / 60000));
+  }
+
   return runs;
+}
+
+function buildCompressorOnRuns(states) {
+  const runs = [];
+  let cur = null;
+  let prevTs = null;
+  const maxGapMs = 25 * 60 * 1000;
+
+  for (let i = 0; i < states.length; i++) {
+    const s = states[i];
+    if (!s.comp) {
+      if (cur) {
+        runs.push(cur);
+        cur = null;
+      }
+    } else if (cur && prevTs !== null && (s.ts - prevTs) <= maxGapMs) {
+      cur.endTs = s.ts;
+      cur.endIdx = i;
+    } else {
+      if (cur) runs.push(cur);
+      cur = { startTs: s.ts, endTs: s.ts, startIdx: i, endIdx: i };
+    }
+    prevTs = s.ts;
+  }
+  if (cur) runs.push(cur);
+
+  for (let i = 0; i < runs.length; i++) {
+    const r = runs[i];
+    const startEdge = (r.startIdx > 0 && (r.startTs - states[r.startIdx - 1].ts) <= maxGapMs)
+      ? (states[r.startIdx - 1].ts + r.startTs) / 2
+      : r.startTs;
+    const endEdge = (r.endIdx + 1 < states.length && (states[r.endIdx + 1].ts - r.endTs) <= maxGapMs)
+      ? (r.endTs + states[r.endIdx + 1].ts) / 2
+      : r.endTs;
+    r.durationMin = Math.max(2, Math.round((endEdge - startEdge) / 60000));
+  }
+  return runs;
+}
+
+/**
+ * Detects events where the heat pump compressor shut off immediately after reaching
+ * or exceeding its calculated Target LWT (saturation / inability to modulate lower).
+ */
+function detectSetpointCutoffEvents(chronoFiltered, states) {
+  const events = [];
+  if (!chronoFiltered || !chronoFiltered.length || !states || states.length !== chronoFiltered.length) {
+    return events;
+  }
+
+  const maxGapMs = 25 * 60 * 1000;
+  let runStart = null;
+
+  for (let i = 0; i < states.length; i++) {
+    if (states[i].comp) {
+      if (runStart === null) runStart = i;
+      continue;
+    }
+    if (runStart === null) continue;
+
+    const endIdx = i - 1;
+    const offIdx = i;
+    if ((chronoFiltered[offIdx].ts - chronoFiltered[endIdx].ts) <= maxGapMs) {
+      const endSample = chronoFiltered[endIdx].sample;
+      const offSample = chronoFiltered[offIdx].sample;
+      const progEnd = (endSample.active_program || "").toLowerCase();
+      const progOff = (offSample.active_program || "").toLowerCase();
+      const phaseEnd = String(endSample.compressor_phase || "").toLowerCase();
+
+      if (progEnd !== "standby" && progOff !== "standby" && !phaseEnd.includes("defrost")) {
+        const targetLwt = computeVitocalTargetLwt(endSample, false);
+        if (targetLwt !== null) {
+          const checkStart = Math.max(runStart, endIdx - 1);
+          let peakSup = -Infinity;
+          let peakBuf = -Infinity;
+          for (let k = checkStart; k <= offIdx; k++) {
+            const sk = chronoFiltered[k].sample;
+            if (sk.pdc_supply_temp_c != null && !isNaN(Number(sk.pdc_supply_temp_c))) {
+              peakSup = Math.max(peakSup, Number(sk.pdc_supply_temp_c));
+            }
+            if (sk.buffer_temp_c != null && !isNaN(Number(sk.buffer_temp_c))) {
+              peakBuf = Math.max(peakBuf, Number(sk.buffer_temp_c));
+            }
+          }
+          if (peakSup >= targetLwt - 0.5 || peakBuf >= targetLwt - 0.5) {
+            const lastOnSup = endSample.pdc_supply_temp_c != null ? Number(endSample.pdc_supply_temp_c) : null;
+            const yVal = (lastOnSup !== null && !isNaN(lastOnSup)) ? lastOnSup : (peakSup > -Infinity ? peakSup : targetLwt);
+            const durMin = Math.max(2, Math.round((chronoFiltered[offIdx].ts - chronoFiltered[runStart].ts) / 60000));
+            events.push({
+              ts: chronoFiltered[endIdx].ts,
+              offTs: chronoFiltered[offIdx].ts,
+              yVal,
+              peakSup: peakSup > -Infinity ? Math.round(peakSup * 10) / 10 : yVal,
+              peakBuf: peakBuf > -Infinity ? Math.round(peakBuf * 10) / 10 : null,
+              targetLwt,
+              lastMod: endSample.compressor_modulation_percent != null ? Math.round(Number(endSample.compressor_modulation_percent)) : null,
+              durationMin: durMin,
+              gfOn: Boolean(states[endIdx].gf),
+            });
+          }
+        }
+      }
+    }
+    runStart = null;
+  }
+
+  return events;
+}
+
+function detectDefrostEvents(chronoFiltered) {
+  const out = [];
+  if (!chronoFiltered) return out;
+  for (let i = 0; i < chronoFiltered.length; i++) {
+    const phase = String(chronoFiltered[i].sample.compressor_phase || "").toLowerCase();
+    if (phase.includes("defrost")) {
+      out.push({ ts: chronoFiltered[i].ts, phase: chronoFiltered[i].sample.compressor_phase });
+    }
+  }
+  return out;
+}
+
+window.detectSetpointCutoffEvents = detectSetpointCutoffEvents;
+window.classifyActivityStates = classifyActivityStates;
+
+function drawRoundedRect(ctx, x, y, w, h, r) {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+  ctx.lineTo(x + w, y + h - radius);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+  ctx.lineTo(x + radius, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
 }
 
 const activityBandsPlugin = {
@@ -258,6 +438,10 @@ const activityBandsPlugin = {
     ctx.beginPath();
     ctx.rect(area.left, area.top, area.right - area.left, area.bottom - area.top);
     ctx.clip();
+
+    ctx.font = "700 10px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "center";
 
     for (let i = 0; i < runs.length; i++) {
       const r = runs[i];
@@ -281,9 +465,144 @@ const activityBandsPlugin = {
       ctx.fillStyle = style.fill;
       ctx.fillRect(x1, area.top, w, area.bottom - area.top);
 
-      // Top 6px status ribbon for unmistakable visibility even when many traces overlap
+      // Top 6px ribbon
       ctx.fillStyle = style.ribbon;
       ctx.fillRect(x1, area.top, w, 6);
+
+      // Zoom-aware duration pill inside visible segment width (anti-overlap guarantee)
+      const visLeft = Math.max(area.left + 2, x1);
+      const visRight = Math.min(area.right - 2, x2);
+      const visW = visRight - visLeft;
+      const pillText = `${style.pillLabel} ${formatDurationCompact(r.durationMin)}`;
+      const tw = ctx.measureText(pillText).width;
+      const pillW = tw + 12;
+
+      if (visW >= Math.max(46, pillW + 8)) {
+        const cx = (visLeft + visRight) / 2;
+        const px = cx - pillW / 2;
+        const py = area.top + 8;
+        const ph = 16;
+
+        drawRoundedRect(ctx, px, py, pillW, ph, 5);
+        ctx.fillStyle = "rgba(12, 19, 34, 0.88)";
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = style.pillBorder;
+        ctx.stroke();
+
+        ctx.fillStyle = "#f8fafc";
+        ctx.fillText(pillText, cx, py + ph / 2 + 0.5);
+      }
+    }
+
+    ctx.restore();
+  },
+};
+
+const telemetryAnnotationsPlugin = {
+  id: "telemetryAnnotations",
+  afterDatasetsDraw(chart) {
+    const area = chart.chartArea;
+    const xScale = chart.scales && chart.scales.x;
+    const yTempScale = chart.scales && chart.scales.yTemp;
+    if (!area || !xScale || !yTempScale) return;
+
+    const ctx = chart.ctx;
+    const viewMin = xScale.min;
+    const viewMax = xScale.max;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(area.left, area.top, area.right - area.left, area.bottom - area.top);
+    ctx.clip();
+
+    // 1. Active vertical crosshair while scrubbing / reading
+    if (typeof chart._activeHoverX === "number" && chart._activeHoverX >= area.left && chart._activeHoverX <= area.right) {
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.55)";
+      ctx.beginPath();
+      ctx.moveTo(chart._activeHoverX, area.top);
+      ctx.lineTo(chart._activeHoverX, area.bottom);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 2. Defrost event markers
+    const defrosts = chart._defrostEvents || [];
+    let lastDefrostX = -999;
+    ctx.font = "700 10px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "center";
+    for (let i = 0; i < defrosts.length; i++) {
+      const df = defrosts[i];
+      if (df.ts < viewMin || df.ts > viewMax) continue;
+      const px = xScale.getPixelForValue(df.ts);
+      if (px - lastDefrostX < 48) continue;
+      lastDefrostX = px;
+      ctx.fillStyle = "rgba(56, 189, 248, 0.92)";
+      ctx.fillText("❄️", px, area.top + 31);
+    }
+
+    // 3. Setpoint-saturation stop markers
+    const cutoffs = showSetpointMarkers ? (chart._setpointCutoffs || []) : [];
+    let lastLabelRightPx = -999;
+
+    for (let i = 0; i < cutoffs.length; i++) {
+      const ev = cutoffs[i];
+      if (ev.ts < viewMin || ev.ts > viewMax) continue;
+
+      const px = xScale.getPixelForValue(ev.ts);
+      const rawPy = yTempScale.getPixelForValue(ev.yVal);
+      const py = clamp(rawPy, area.top + 12, area.bottom - 12);
+
+      // Vertical dashed drop line
+      ctx.save();
+      ctx.setLineDash([3, 3]);
+      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = "rgba(255, 69, 58, 0.72)";
+      ctx.beginPath();
+      ctx.moveTo(px, Math.max(area.top + 26, py - 20));
+      ctx.lineTo(px, py);
+      ctx.stroke();
+      ctx.restore();
+
+      // High-contrast downward pointer diamond centered at cutoff point
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(px, py + 6);
+      ctx.lineTo(px - 6, py);
+      ctx.lineTo(px, py - 6);
+      ctx.lineTo(px + 6, py);
+      ctx.closePath();
+      ctx.fillStyle = "#ff453a";
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#fef08a";
+      ctx.stroke();
+      ctx.restore();
+
+      // Zoom-aware badge above marker (suppressed when adjacent labels would collide)
+      const labelTxt = `⊘ SP ${ev.peakSup.toFixed(1)}°`;
+      const tw = ctx.measureText(labelTxt).width;
+      const badgeW = tw + 10;
+      const badgeH = 16;
+      const badgeX = clamp(px - badgeW / 2, area.left + 2, area.right - badgeW - 2);
+      const badgeY = Math.max(area.top + 27, py - 24);
+
+      if (badgeX >= lastLabelRightPx + 6) {
+        drawRoundedRect(ctx, badgeX, badgeY, badgeW, badgeH, 5);
+        ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+        ctx.fill();
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = "#ff453a";
+        ctx.stroke();
+
+        ctx.fillStyle = "#fecaca";
+        ctx.fillText(labelTxt, badgeX + badgeW / 2, badgeY + badgeH / 2 + 0.5);
+        lastLabelRightPx = badgeX + badgeW;
+      }
     }
 
     ctx.restore();
@@ -307,6 +626,7 @@ function initChartControls() {
       if (telemetryChart) {
         telemetryChart.options.plugins.tooltip.enabled = (chartInteractionMode === "read");
         if (chartInteractionMode === "pan") {
+          telemetryChart._activeHoverX = null;
           telemetryChart.setActiveElements([]);
           if (telemetryChart.tooltip) telemetryChart.tooltip.setActiveElements([], { x: 0, y: 0 });
         }
@@ -316,6 +636,12 @@ function initChartControls() {
         showToast(chartInteractionMode === "pan" ? "✋ 1 dito sposta in X • 2 dita pinch zoom" : "👆 1 dito legge i valori • 2 dita zoom/sposta X");
       }
     });
+  }
+
+  const jumpBtn = document.getElementById("btnJumpLastCycle");
+  if (jumpBtn && jumpBtn.dataset.bound !== "1") {
+    jumpBtn.dataset.bound = "1";
+    jumpBtn.addEventListener("click", jumpToLastCycle);
   }
 
   const resetBtn = document.getElementById("btnResetChartZoom");
@@ -336,7 +662,7 @@ function initChartControls() {
     pillOther.addEventListener("click", () => openYAxisModal("yOther"));
   }
 
-  document.querySelectorAll(".activity-legend-btn").forEach(btn => {
+  document.querySelectorAll(".activity-legend-btn[data-band]").forEach(btn => {
     if (btn.dataset.bound === "1") return;
     btn.dataset.bound = "1";
     btn.addEventListener("click", () => {
@@ -348,9 +674,66 @@ function initChartControls() {
     });
   });
 
+  const spBtn = document.getElementById("btnToggleSetpointMarkers");
+  if (spBtn && spBtn.dataset.bound !== "1") {
+    spBtn.dataset.bound = "1";
+    spBtn.addEventListener("click", () => {
+      showSetpointMarkers = !showSetpointMarkers;
+      spBtn.classList.toggle("active", showSetpointMarkers);
+      if (telemetryChart) telemetryChart.update("none");
+    });
+  }
+
+  const presetWrap = document.getElementById("chartPresetButtons");
+  if (presetWrap && presetWrap.dataset.bound !== "1") {
+    presetWrap.dataset.bound = "1";
+    presetWrap.querySelectorAll(".btn-preset-chip").forEach(btn => {
+      btn.addEventListener("click", () => {
+        applyChartPreset(btn.dataset.preset);
+      });
+    });
+  }
+
   bindYAxisModalEvents();
   updateModeButtonUI();
   updateAxisPillsUI();
+  updatePresetButtonsUI();
+}
+
+function applyChartPreset(presetKey) {
+  const keys = CHART_PRESETS[presetKey];
+  if (!keys) return;
+  soloBackupActive = null;
+  activePresetKey = presetKey;
+  const allowSet = new Set(keys);
+  for (let i = 0; i < CHANNEL_DEFS.length; i++) {
+    CHANNEL_DEFS[i].active = allowSet.has(CHANNEL_DEFS[i].key);
+  }
+  yAutoFrozen = { yTemp: null, yOther: null };
+  updatePresetButtonsUI();
+  renderChannelPills();
+  updateChartData(currentSamples);
+}
+
+function syncPresetFromActiveChannels() {
+  const curKeys = CHANNEL_DEFS.filter(c => c.active).map(c => c.key).sort().join(",");
+  let matched = null;
+  for (const [k, list] of Object.entries(CHART_PRESETS)) {
+    if ([...list].sort().join(",") === curKeys) {
+      matched = k;
+      break;
+    }
+  }
+  activePresetKey = matched;
+  updatePresetButtonsUI();
+}
+
+function updatePresetButtonsUI() {
+  const presetWrap = document.getElementById("chartPresetButtons");
+  if (!presetWrap) return;
+  presetWrap.querySelectorAll(".btn-preset-chip").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.preset === activePresetKey);
+  });
 }
 
 function updateModeButtonUI() {
@@ -387,6 +770,41 @@ function formatCompactNum(n) {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
+function jumpToLastCycle() {
+  const chronoAll = parseSamplesChrono(currentSamples);
+  if (!chronoAll.length) return;
+  const allStates = classifyActivityStates(chronoAll);
+  const compRuns = buildCompressorOnRuns(allStates);
+  if (!compRuns.length) {
+    if (typeof showToast === "function") showToast("ℹ️ Nessun ciclo compressore trovato nei dati disponibili.");
+    return;
+  }
+
+  const lastRun = compRuns[compRuns.length - 1];
+  const reqMin = lastRun.startTs - 20 * 60 * 1000;
+  const reqMax = lastRun.endTs + 45 * 60 * 1000;
+
+  let fullBounds = getFullXBounds(chronoAll, activeTimeframeHours);
+  if (fullBounds.min !== undefined && reqMin < fullBounds.min) {
+    setChartTimeframe(0);
+    fullBounds = getFullXBounds(chronoAll, 0);
+  }
+  if (!telemetryChart) buildChart();
+  freezeAutoYIfNeeded();
+  const minClamp = clamp(reqMin, fullBounds.min, fullBounds.max - MIN_X_SPAN_MS);
+  const maxClamp = clamp(reqMax, minClamp + MIN_X_SPAN_MS, fullBounds.max);
+  xZoomRange = { min: minClamp, max: maxClamp };
+  telemetryChart.options.scales.x.min = xZoomRange.min;
+  telemetryChart.options.scales.x.max = xZoomRange.max;
+  applyYScaleOptions(telemetryChart);
+  updateResetButtonUI();
+  telemetryChart.update("none");
+  updateVisibleWindowStats();
+  if (typeof showToast === "function") {
+    showToast(`⏭️ Centrato sull'ultimo ciclo (${formatDurationCompact(lastRun.durationMin)})`);
+  }
+}
+
 function resetChartXZoom() {
   xZoomRange = null;
   yAutoFrozen = { yTemp: null, yOther: null };
@@ -403,6 +821,7 @@ function resetChartXZoom() {
   }
   applyYScaleOptions(telemetryChart);
   telemetryChart.update("none");
+  updateVisibleWindowStats();
 }
 
 function applyYScaleOptions(chart) {
@@ -414,12 +833,19 @@ function applyYScaleOptions(chart) {
     if (custom && custom.locked) {
       scaleOpt.min = custom.min;
       scaleOpt.max = custom.max;
+      delete scaleOpt.grace;
     } else if (xZoomRange !== null && yAutoFrozen[axisId]) {
       scaleOpt.min = yAutoFrozen[axisId].min;
       scaleOpt.max = yAutoFrozen[axisId].max;
+      delete scaleOpt.grace;
     } else {
       delete scaleOpt.min;
       delete scaleOpt.max;
+      if (axisId === "yTemp") {
+        scaleOpt.grace = "14%";
+      } else {
+        delete scaleOpt.grace;
+      }
     }
   }
   updateAxisPillsUI();
@@ -454,6 +880,9 @@ function updateChartData(samples) {
   telemetryChart._activityChrono = chronoFiltered;
   telemetryChart._activityStates = states;
   telemetryChart._activityRuns = buildActivityRuns(states);
+  telemetryChart._compRuns = buildCompressorOnRuns(states);
+  telemetryChart._setpointCutoffs = detectSetpointCutoffEvents(chronoFiltered, states);
+  telemetryChart._defrostEvents = detectDefrostEvents(chronoFiltered);
   telemetryChart.data.datasets = getDatasets(chronoFiltered);
 
   if (xZoomRange && fullBounds.min !== undefined && fullBounds.max !== undefined) {
@@ -474,6 +903,8 @@ function updateChartData(samples) {
   applyYScaleOptions(telemetryChart);
   updateResetButtonUI();
   telemetryChart.update();
+  updateLegendValues(chronoAll.length ? chronoAll[chronoAll.length - 1].sample : null);
+  updateVisibleWindowStats();
 }
 
 function setChartTimeframe(hours) {
@@ -528,11 +959,13 @@ function getDatasets(chronoFiltered) {
       label: ch.label,
       data: points,
       borderColor: ch.color,
-      backgroundColor: ch.color + "22",
-      borderWidth: 2,
-      pointRadius: points.length > 60 ? 0 : 2.5,
+      backgroundColor: ch.backgroundColor || (ch.color + "22"),
+      fill: ch.fill ? "origin" : false,
+      stepped: ch.stepped ? "before" : false,
+      borderWidth: ch.borderWidth || 2,
+      pointRadius: points.length > 70 ? 0 : 2.5,
       pointHoverRadius: 6,
-      tension: ch.spanGaps === false ? 0 : 0.2,
+      tension: (ch.stepped || ch.spanGaps === false) ? 0 : 0.18,
       borderDash: ch.borderDash || [],
       yAxisID: ch.yAxis,
       spanGaps: ch.spanGaps !== undefined ? ch.spanGaps : true,
@@ -555,6 +988,89 @@ function findClosestByTs(list, targetTs) {
   return list[lo];
 }
 
+function updateVisibleWindowStats() {
+  const box = document.getElementById("chartWindowStats");
+  if (!box) return;
+  const chrono = (telemetryChart && telemetryChart._activityChrono) ? telemetryChart._activityChrono : parseSamplesChrono(currentSamples);
+  if (!chrono || !chrono.length) {
+    box.innerHTML = '<span class="chart-stat-item">Nessun dato nella finestra.</span>';
+    return;
+  }
+
+  const xScale = telemetryChart && telemetryChart.scales ? telemetryChart.scales.x : null;
+  const vMin = (xZoomRange && xZoomRange.min != null) ? xZoomRange.min : ((xScale && typeof xScale.min === "number") ? xScale.min : chrono[0].ts);
+  const vMax = (xZoomRange && xZoomRange.max != null) ? xZoomRange.max : ((xScale && typeof xScale.max === "number") ? xScale.max : chrono[chrono.length - 1].ts);
+
+  const visibleChrono = chrono.filter(it => it.ts >= vMin && it.ts <= vMax);
+  const sub = visibleChrono.length ? visibleChrono : chrono;
+  const subStates = classifyActivityStates(sub);
+  const subCompRuns = buildCompressorOnRuns(subStates);
+  const subCutoffs = detectSetpointCutoffEvents(sub, subStates);
+
+  let totalOnMin = 0;
+  for (const r of subCompRuns) totalOnMin += r.durationMin;
+  const avgMin = subCompRuns.length ? Math.round(totalOnMin / subCompRuns.length) : 0;
+
+  let tinMin = Infinity, tinMax = -Infinity;
+  let oatMin = Infinity, oatMax = -Infinity;
+  let copSum = 0, copCnt = 0;
+  for (const { sample } of sub) {
+    if (sample.indoor_temp_bticino_c != null) {
+      const v = Number(sample.indoor_temp_bticino_c);
+      tinMin = Math.min(tinMin, v);
+      tinMax = Math.max(tinMax, v);
+    }
+    if (sample.external_temp_c != null) {
+      const v = Number(sample.external_temp_c);
+      oatMin = Math.min(oatMin, v);
+      oatMax = Math.max(oatMax, v);
+    }
+    if (sample.cop_heating != null && Number(sample.cop_heating) > 0) {
+      copSum += Number(sample.cop_heating);
+      copCnt++;
+    }
+  }
+
+  const parts = [];
+  if (subCompRuns.length > 0) {
+    parts.push(`<span class="chart-stat-item">🔥 PdC ON: <strong>${formatDurationCompact(totalOnMin)}</strong> (${subCompRuns.length} cicli · media ${avgMin}m)</span>`);
+  } else {
+    parts.push('<span class="chart-stat-item">⏸ PdC ON: <strong>0m</strong></span>');
+  }
+  if (subCutoffs.length > 0) {
+    parts.push(`<span class="chart-stat-item" style="color:#fca5a5;">🎯 Stop SP: <strong>${subCutoffs.length}</strong></span>`);
+  }
+  if (tinMin < Infinity) {
+    parts.push(`<span class="chart-stat-item">🏠 Casa: <strong>${tinMin.toFixed(1)}–${tinMax.toFixed(1)}°</strong></span>`);
+  }
+  if (oatMin < Infinity) {
+    parts.push(`<span class="chart-stat-item">❄️ OAT: <strong>${oatMin.toFixed(1)}–${oatMax.toFixed(1)}°</strong></span>`);
+  }
+  if (copCnt > 0) {
+    parts.push(`<span class="chart-stat-item">⚡ COP: <strong>${(copSum / copCnt).toFixed(2)}</strong></span>`);
+  }
+  box.innerHTML = parts.join("");
+}
+
+function updateLegendValues(sample) {
+  document.querySelectorAll(".legend-val[data-legend-key]").forEach(el => {
+    const key = el.getAttribute("data-legend-key");
+    const ch = CHANNEL_DEFS.find(c => c.key === key);
+    if (!ch || !sample) {
+      el.textContent = "--";
+      return;
+    }
+    const raw = ch.computed ? ch.computed(sample) : sample[ch.key];
+    if (raw === null || raw === undefined || raw === "" || isNaN(Number(raw))) {
+      el.textContent = "--";
+      return;
+    }
+    const num = Number(raw);
+    const valStr = Number.isInteger(num) ? String(num) : num.toFixed(1);
+    el.textContent = `${valStr}${ch.unit === "COP" ? "" : ch.unit}`;
+  });
+}
+
 function buildChart() {
   const canvas = document.getElementById("telemetryChartCanvas");
   if (!canvas) return;
@@ -564,6 +1080,9 @@ function buildChart() {
   const chronoFiltered = filterChronoByBounds(chronoAll, bounds);
   const states = classifyActivityStates(chronoFiltered);
   const runs = buildActivityRuns(states);
+  const compRuns = buildCompressorOnRuns(states);
+  const cutoffs = detectSetpointCutoffEvents(chronoFiltered, states);
+  const defrosts = detectDefrostEvents(chronoFiltered);
 
   if (telemetryChart) {
     telemetryChart.destroy();
@@ -572,7 +1091,7 @@ function buildChart() {
   const ctx = canvas.getContext("2d");
   telemetryChart = new Chart(ctx, {
     type: "line",
-    plugins: [activityBandsPlugin],
+    plugins: [activityBandsPlugin, telemetryAnnotationsPlugin],
     data: {
       datasets: getDatasets(chronoFiltered),
     },
@@ -587,11 +1106,11 @@ function buildChart() {
       },
       plugins: {
         legend: {
-          display: false, // Custom pills legend below
+          display: false,
         },
         tooltip: {
           enabled: chartInteractionMode === "read",
-          backgroundColor: "rgba(15, 23, 42, 0.95)",
+          backgroundColor: "rgba(15, 23, 42, 0.96)",
           titleColor: "#38bdf8",
           bodyColor: "#f8fafc",
           borderColor: "#334155",
@@ -622,24 +1141,41 @@ function buildChart() {
             afterBody: function(items) {
               if (!items || !items.length || !telemetryChart) return [];
               const targetTs = items[0].parsed.x;
+              if (items[0].element && typeof items[0].element.x === "number") {
+                telemetryChart._activeHoverX = items[0].element.x;
+              }
               const lines = [];
               const st = findClosestByTs(telemetryChart._activityStates, targetTs);
               if (st) {
                 const info = ACTIVITY_STYLES[st.state];
-                lines.push(info ? info.text : "⏸ Stato: Standby");
+                let bandDurTxt = "";
+                const runsList = telemetryChart._activityRuns || [];
+                const hitRun = runsList.find(r => targetTs >= r.segStart && targetTs <= r.segEnd);
+                if (hitRun) bandDurTxt = ` (${formatDurationCompact(hitRun.durationMin)})`;
+                lines.push((info ? info.text : "⏸ Stato: Standby") + bandDurTxt);
               }
               const rawEntry = findClosestByTs(telemetryChart._activityChrono, targetTs);
               if (rawEntry && rawEntry.sample) {
                 const s = rawEntry.sample;
+                updateLegendValues(s);
                 const tin = s.indoor_temp_bticino_c != null ? `${Number(s.indoor_temp_bticino_c).toFixed(1)}°C` : "--";
                 const sp = s.indoor_setpoint_bticino_c != null ? `${Number(s.indoor_setpoint_bticino_c).toFixed(1)}°C` : "--";
                 const gfTxt = s.grundfos_pump_active === 1 ? "GF ON" : (s.grundfos_pump_active === 0 ? "GF OFF" : "GF --");
                 lines.push(`🏠 Casa: ${tin} / SP ${sp} → ${gfTxt}`);
+                if (s.pdc_supply_temp_c != null && s.buffer_temp_c != null) {
+                  const dtSupBuf = (Number(s.pdc_supply_temp_c) - Number(s.buffer_temp_c)).toFixed(1);
+                  lines.push(`🌡️ ΔT Mandata−Puffer: ${Number(dtSupBuf) >= 0 ? "+" : ""}${dtSupBuf} K`);
+                }
                 if ((s.active_program || "").toLowerCase() === "standby") {
                   const potentialLwt = computeVitocalTargetLwt(s, true);
                   if (potentialLwt !== null) {
                     lines.push(`🎯 Curva PdC (in Standby): ${potentialLwt.toFixed(1)} °C`);
                   }
+                }
+                const nearbyCutoff = (telemetryChart._setpointCutoffs || []).find(ev => Math.abs(ev.ts - targetTs) <= 10 * 60 * 1000);
+                if (nearbyCutoff) {
+                  const modTxt = nearbyCutoff.lastMod != null ? `mod ${nearbyCutoff.lastMod}%` : "";
+                  lines.push(`⊘ Stop Setpoint: Mandata ${nearbyCutoff.peakSup.toFixed(1)}°C ≥ Target ${nearbyCutoff.targetLwt.toFixed(1)}°C (${modTxt}, ciclo ${formatDurationCompact(nearbyCutoff.durationMin)})`);
                 }
                 const phase = String(s.compressor_phase || "").toLowerCase();
                 if (phase.includes("defrost")) {
@@ -686,6 +1222,7 @@ function buildChart() {
         yTemp: {
           type: "linear",
           position: "left",
+          grace: "14%",
           title: { display: true, text: "°C", color: "#94a3b8", font: { size: 10 } },
           grid: { color: "rgba(51, 65, 85, 0.4)" },
           ticks: { color: "#cbd5e1", font: { size: 10 } },
@@ -704,8 +1241,15 @@ function buildChart() {
   telemetryChart._activityChrono = chronoFiltered;
   telemetryChart._activityStates = states;
   telemetryChart._activityRuns = runs;
+  telemetryChart._compRuns = compRuns;
+  telemetryChart._setpointCutoffs = cutoffs;
+  telemetryChart._defrostEvents = defrosts;
+  telemetryChart._activeHoverX = null;
+
   applyYScaleOptions(telemetryChart);
   telemetryChart.update("none");
+  updateLegendValues(chronoAll.length ? chronoAll[chronoAll.length - 1].sample : null);
+  updateVisibleWindowStats();
 
   attachChartInteractions(canvas);
 }
@@ -748,7 +1292,6 @@ function attachChartInteractions(canvas) {
     const minSpan = Math.min(MIN_X_SPAN_MS, fullSpan);
     const targetSpan = clamp(reqMax - reqMin, minSpan, fullSpan);
 
-    // If essentially full width, snap cleanly back to unzoomed state
     if (targetSpan >= fullSpan * 0.995) {
       xZoomRange = null;
       yAutoFrozen = { yTemp: null, yOther: null };
@@ -764,12 +1307,14 @@ function attachChartInteractions(canvas) {
     applyYScaleOptions(telemetryChart);
     updateResetButtonUI();
     telemetryChart.update("none");
+    updateVisibleWindowStats();
   }
 
   function setTooltipTempEnabled(enabled) {
     if (!telemetryChart) return;
     telemetryChart.options.plugins.tooltip.enabled = enabled && (chartInteractionMode === "read");
     if (!enabled) {
+      telemetryChart._activeHoverX = null;
       telemetryChart.setActiveElements([]);
       if (telemetryChart.tooltip) telemetryChart.tooltip.setActiveElements([], { x: 0, y: 0 });
     }
@@ -855,7 +1400,6 @@ function attachChartInteractions(canvas) {
         const shiftMs = -(dx / plotW) * span;
         applyXRange(pan1State.startMin + shiftMs, pan1State.startMax + shiftMs);
       } else if (chartInteractionMode === "read" && tapCandidate && tapCandidate.x >= area.left && tapCandidate.x <= area.right) {
-        // Keep 1-finger horizontal value scrubbing locked to canvas without page scroll
         e.preventDefault();
       }
     }
@@ -898,6 +1442,15 @@ function attachChartInteractions(canvas) {
 
   canvas.addEventListener("touchend", handleTouchEnd);
   canvas.addEventListener("touchcancel", handleTouchEnd);
+
+  canvas.addEventListener("mouseleave", () => {
+    if (telemetryChart) {
+      telemetryChart._activeHoverX = null;
+      telemetryChart.update("none");
+    }
+    const chronoAll = parseSamplesChrono(currentSamples);
+    updateLegendValues(chronoAll.length ? chronoAll[chronoAll.length - 1].sample : null);
+  });
 
   // Desktop mouse wheel X-only zoom
   canvas.addEventListener("wheel", (e) => {
@@ -1078,24 +1631,88 @@ function bindYAxisModalEvents() {
   }
 }
 
+function toggleSoloChannel(idx, prevSnapshot = null) {
+  const targetKey = CHANNEL_DEFS[idx].key;
+  const activeCount = CHANNEL_DEFS.filter(c => c.active).length;
+  if (activeCount === 1 && CHANNEL_DEFS[idx].active && soloBackupActive) {
+    for (let i = 0; i < CHANNEL_DEFS.length; i++) {
+      CHANNEL_DEFS[i].active = Boolean(soloBackupActive[i]);
+    }
+    soloBackupActive = null;
+  } else {
+    soloBackupActive = prevSnapshot || CHANNEL_DEFS.map(c => c.active);
+    for (let i = 0; i < CHANNEL_DEFS.length; i++) {
+      CHANNEL_DEFS[i].active = (CHANNEL_DEFS[i].key === targetKey);
+    }
+  }
+  yAutoFrozen = { yTemp: null, yOther: null };
+  syncPresetFromActiveChannels();
+  renderChannelPills();
+  updateChartData(currentSamples);
+}
+
 function renderChannelPills() {
   const container = document.getElementById("channelPillsContainer");
   if (!container) return;
 
-  container.innerHTML = CHANNEL_DEFS.map((ch, idx) => `
-    <button type="button" class="channel-pill ${ch.active ? "active" : ""}" data-idx="${idx}" style="color: ${ch.color}">
-      <span class="channel-dot" style="background-color: ${ch.color}"></span>
-      ${ch.label}
-    </button>
-  `).join("");
+  const groups = [
+    { id: "temp", title: "🌡️ Temperature (°C / K)", hint: "Tap: on/off · 2×Tap: isola" },
+    { id: "system", title: "⚙️ Inverter, Pressioni & COP", hint: "" },
+  ];
 
-  container.querySelectorAll(".channel-pill").forEach(btn => {
+  container.innerHTML = groups.map(grp => {
+    const items = CHANNEL_DEFS
+      .map((ch, idx) => ({ ch, idx }))
+      .filter(({ ch }) => ch.group === grp.id);
+
+    const chipsHtml = items.map(({ ch, idx }) => {
+      const styleClass = ch.borderDash ? (ch.borderDash[0] <= 3 ? "dotted" : "dashed") : "";
+      return `
+        <button type="button" class="legend-chip ${ch.active ? "active" : ""}" data-idx="${idx}" style="--chip-color: ${ch.color}">
+          <span class="legend-chip-left">
+            <span class="legend-line-swatch ${styleClass}"></span>
+            <span class="legend-chip-label">${ch.label}</span>
+          </span>
+          <span class="legend-val" data-legend-key="${ch.key}">--</span>
+        </button>
+      `;
+    }).join("");
+
+    return `
+      <div class="legend-group">
+        <div class="legend-group-header">
+          <span>${grp.title}</span>
+          ${grp.hint ? `<span class="legend-hint-mini">${grp.hint}</span>` : ""}
+        </div>
+        <div class="legend-chips-grid">${chipsHtml}</div>
+      </div>
+    `;
+  }).join("");
+
+  let lastChipTap = { idx: -1, at: 0, snapshot: null };
+  container.querySelectorAll(".legend-chip").forEach(btn => {
     btn.addEventListener("click", () => {
       const idx = parseInt(btn.dataset.idx, 10);
+      const now = Date.now();
+      if (lastChipTap.idx === idx && (now - lastChipTap.at) < 340) {
+        const snap = lastChipTap.snapshot;
+        lastChipTap = { idx: -1, at: 0, snapshot: null };
+        toggleSoloChannel(idx, snap);
+        return;
+      }
+      lastChipTap = { idx, at: now, snapshot: CHANNEL_DEFS.map(c => c.active) };
+
+      soloBackupActive = null;
       CHANNEL_DEFS[idx].active = !CHANNEL_DEFS[idx].active;
       btn.classList.toggle("active", CHANNEL_DEFS[idx].active);
       yAutoFrozen = { yTemp: null, yOther: null };
+      syncPresetFromActiveChannels();
       updateChartData(currentSamples);
     });
   });
+
+  const chronoAll = parseSamplesChrono(currentSamples);
+  if (chronoAll.length) {
+    updateLegendValues(chronoAll[chronoAll.length - 1].sample);
+  }
 }

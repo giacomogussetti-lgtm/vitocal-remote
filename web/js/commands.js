@@ -8,6 +8,8 @@ const cmdState = {
   initialized: false,
   hydratedOnce: false,
   isSending: false,
+  autopilotEnabled: false,
+  autopilotState: "DISABLED",
   pendingAction: null,
   baseline: {
     pdcMode: "dhwAndHeating",
@@ -688,18 +690,20 @@ function bindAutopilotButtons() {
         showToast("⚠️ T_max deve essere maggiore di T_min.");
         return;
       }
-      requestCommandConfirm(
-        "autopilot_activate_away",
-        vals,
-        `Attivare CUSTODIA AUTOMATICA MONTAGNA (Full-Auto)?\nMetterà subito la PdC in Standby (fascia sicurezza ${vals.cop_window_start}–${vals.cop_window_end}), BTicino in Antigelo (7.0 °C) e gestirà automaticamente cicli lunghi se T casa scende sotto ${vals.t_min_c.toFixed(1)} °C.`,
-        null
-      );
+      const promptMsg = cmdState.autopilotEnabled
+        ? `L'Autopilota è già attivo (${cmdState.autopilotState}). Ri-applicare i fail-safe hardware e i parametri attuali (fascia ${vals.cop_window_start}–${vals.cop_window_end}, avvio ≤ ${vals.t_min_c.toFixed(1)} °C)?`
+        : `Attivare CUSTODIA AUTOMATICA MONTAGNA (Full-Auto)?\nMetterà subito la PdC in Standby (fascia sicurezza ${vals.cop_window_start}–${vals.cop_window_end}), BTicino in Antigelo (7.0 °C) e gestirà automaticamente cicli lunghi se T casa scende sotto ${vals.t_min_c.toFixed(1)} °C.`;
+      requestCommandConfirm("autopilot_activate_away", vals, promptMsg, null);
     });
   }
 
   const btnDisable = document.getElementById("btnDisableAutopilot");
   if (btnDisable) {
     btnDisable.addEventListener("click", () => {
+      if (!cmdState.autopilotEnabled) {
+        showToast("ℹ️ L'Autopilota è già disattivato (controllo manuale).");
+        return;
+      }
       requestCommandConfirm(
         "autopilot_configure",
         { enabled: false },
@@ -731,8 +735,20 @@ function bindAutopilotButtons() {
     btnTestCron.addEventListener("click", () => {
       requestCommandConfirm(
         "cronjob_test",
-        {},
+        { roundtrip_2m: false },
         "Verificare in sola lettura su GitHub Actions che i secrets CRONJOB_API_KEY e CRONJOB_ID funzionino su cron-job.org? (Nessuna modifica a PdC, BTicino o orari.)",
+        null
+      );
+    });
+  }
+
+  const btnTestCron2m = document.getElementById("btnTestCronjobRoundtrip");
+  if (btnTestCron2m) {
+    btnTestCron2m.addEventListener("click", () => {
+      requestCommandConfirm(
+        "cronjob_test",
+        { roundtrip_2m: true },
+        "Eseguire il test completo di scrittura timer 2 min su cron-job.org?\nScriverà temporaneamente [0,2,4...58] (30 slot/ora), rileggerà per conferma e ripristinerà subito lo schedule precedente. Nessuna modifica a PdC o BTicino.",
         null
       );
     });
@@ -762,12 +778,44 @@ async function refreshAutopilotStatus() {
 function renderAutopilotUI(cfg, st) {
   const enabled = Boolean(cfg.enabled);
   const stateCode = enabled ? (st.state || "IDLE") : "DISABLED";
+  cmdState.autopilotEnabled = enabled;
+  cmdState.autopilotState = stateCode;
+
+  const tMin = cfg.t_min_c != null ? Number(cfg.t_min_c).toFixed(1) : "7.5";
 
   const badge = document.getElementById("autopilotStatusBadge");
   if (badge) {
     badge.textContent = stateCode;
-    badge.classList.toggle("synced", enabled);
-    badge.classList.toggle("pending", stateCode === "HEATING_SYNC" || stateCode === "ARMED" || stateCode === "PUFFER_DRAIN");
+    badge.classList.remove("synced", "pending", "state-heating", "state-drain");
+    if (stateCode === "HEATING_SYNC") badge.classList.add("state-heating");
+    else if (stateCode === "PUFFER_DRAIN") badge.classList.add("state-drain");
+    else if (stateCode === "ARMED") badge.classList.add("pending");
+    else if (enabled) badge.classList.add("synced");
+  }
+
+  const btnAway = document.getElementById("btnActivateFullAutoAway");
+  if (btnAway) {
+    btnAway.classList.toggle("is-active", enabled);
+    if (!enabled) {
+      btnAway.textContent = `🛡️ ATTIVA ASSENZA MONTAGNA (Full-Auto ${tMin} °C)`;
+    } else if (stateCode === "ARMED") {
+      btnAway.textContent = "🟠 ASSENZA ATTIVA — ARMATO (Attesa COP)";
+    } else if (stateCode === "HEATING_SYNC") {
+      btnAway.textContent = "🔥 ASSENZA ATTIVA — RISCALDAMENTO IN CORSO";
+    } else if (stateCode === "PUFFER_DRAIN") {
+      btnAway.textContent = "💧 ASSENZA ATTIVA — SCARICO PUFFER";
+    } else {
+      btnAway.textContent = `✅ ASSENZA ATTIVA (Standby · Avvio ≤ ${tMin} °C)`;
+    }
+  }
+
+  const btnDisable = document.getElementById("btnDisableAutopilot");
+  if (btnDisable) {
+    btnDisable.disabled = !enabled;
+    btnDisable.style.opacity = enabled ? "1" : "0.55";
+    btnDisable.textContent = enabled ? "✋ Disattiva (Torna Manuale)" : "✋ Già in Manuale";
+    btnDisable.classList.toggle("btn-danger", enabled);
+    btnDisable.classList.toggle("btn-secondary", !enabled);
   }
 
   const reasonEl = document.getElementById("autopilotStateReason");
@@ -799,7 +847,6 @@ function renderAutopilotUI(cfg, st) {
     synBanner.classList.toggle("active", enabled);
     synBanner.classList.toggle("inactive", !enabled);
     if (enabled) {
-      const tMin = cfg.t_min_c != null ? Number(cfg.t_min_c).toFixed(1) : "7.5";
       synText.textContent = `🛡️ AUTOPILOTA FULL-AUTO: ATTIVO (${stateCode} • Avvio ≤ ${tMin} °C)`;
     } else {
       synText.textContent = "🤖 AUTOPILOTA: DISATTIVATO (Tocca per attivare Custodia Montagna)";
