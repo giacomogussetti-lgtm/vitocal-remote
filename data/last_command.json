@@ -1,8 +1,20 @@
 {
-  "timestamp_utc": "2026-11-20T01:10:52.393325+00:00",
+  "timestamp_utc": "2026-11-20T01:11:45.673862+00:00",
   "command": "autopilot_configure",
   "params": {
-    "enabled": false
+    "t_min_c": 7.5,
+    "t_max_c": 8.8,
+    "t_emergency_c": 6.8,
+    "target_lwt_delta_k": 18.0,
+    "max_cycle_minutes": 300,
+    "puffer_drain_minutes": 25,
+    "cron_idle_minutes": 15,
+    "cron_armed_minutes": 5,
+    "cron_active_minutes": 1,
+    "dynamic_cron_enabled": true,
+    "soft_curve_tuning_enabled": false,
+    "cop_window_start": "11:00",
+    "cop_window_end": "16:00"
   },
   "success": true,
   "message": "cron-job.org aggiornato a ogni 5 min | Autopilota disattivato manualmente dalla PWA.",

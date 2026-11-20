@@ -20,7 +20,7 @@
   "dynamic_cron_enabled": true,
   "cron_idle_minutes": 15,
   "cron_armed_minutes": 5,
-  "cron_active_minutes": 2,
+  "cron_active_minutes": 1,
   "soft_curve_tuning_enabled": false,
   "soft_curve_max_shift_delta_k": 2,
   "soft_curve_cooldown_minutes": 60
