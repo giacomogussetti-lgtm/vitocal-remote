@@ -1,29 +1,29 @@
 {
-  "state": "IDLE",
+  "state": "DISABLED",
   "state_since_utc": "2026-11-19T23:34:47.449346+00:00",
   "below_threshold_since_utc": null,
   "cycle_started_utc": null,
   "cycle_is_emergency": false,
   "drain_started_utc": null,
   "last_eval_utc": "2026-11-20T01:01:40.934244+00:00",
-  "last_action_utc": "2026-11-19T23:34:47.449346+00:00",
-  "last_action_reason": "Standby OK: T=8.4°C > 7.5°C (pendenza -0.05°C/h).",
+  "last_action_utc": "2026-11-20T01:10:45.424001+00:00",
+  "last_action_reason": "Autopilota disattivato manualmente dalla PWA.",
   "indoor_slope_c_per_h": -0.052,
   "calculated_target_lwt_c": 26.4,
   "calculated_pdc_setpoint_c": 15,
-  "current_cron_interval_min": 15,
+  "current_cron_interval_min": 5,
   "defrost_detected_today": 0,
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": 0,
   "soft_curve_last_trim_utc": null,
   "api_usage": {
     "date_utc": "2026-11-20",
-    "viessmann_reads": 4,
+    "viessmann_reads": 6,
     "viessmann_writes": 0,
-    "bticino_reads": 5,
+    "bticino_reads": 7,
     "bticino_writes": 1,
-    "cronjob_patches": 0,
-    "github_runs": 3,
+    "cronjob_patches": 1,
+    "github_runs": 5,
     "recent_events": [
       {
         "ts": "2026-11-20T01:01:40.933375+00:00",
@@ -41,6 +41,19 @@
       },
       {
         "ts": "2026-11-20T01:09:29.633888+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-20T01:10:45.914527+00:00",
+        "lbl": "cmd:autopilot_configure",
+        "cp": 1,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-20T01:10:52.392951+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,

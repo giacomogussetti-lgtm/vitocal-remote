@@ -1,19 +1,17 @@
 {
-  "timestamp_utc": "2026-11-20T01:09:29.634572+00:00",
-  "command": "bticino_setpoint",
+  "timestamp_utc": "2026-11-20T01:10:52.393325+00:00",
+  "command": "autopilot_configure",
   "params": {
-    "mode": "manual",
-    "temp": 20.0,
-    "duration_minutes": 240
+    "enabled": false
   },
   "success": true,
-  "message": "Setpoint BTicino aggiornato con successo a 20.0 °C (modalità: manual)",
+  "message": "cron-job.org aggiornato a ogni 5 min | Autopilota disattivato manualmente dalla PWA.",
   "sample_logged": true,
   "api_calls": {
     "v_reads": 0,
     "v_writes": 0,
-    "b_reads": 1,
-    "b_writes": 1,
-    "cron_patches": 0
+    "b_reads": 0,
+    "b_writes": 0,
+    "cron_patches": 1
   }
 }

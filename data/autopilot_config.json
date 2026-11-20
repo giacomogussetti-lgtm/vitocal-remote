@@ -1,5 +1,5 @@
 {
-  "enabled": true,
+  "enabled": false,
   "mode": "away_antifrost",
   "t_min_c": 7.5,
   "t_max_c": 8.8,
@@ -20,5 +20,8 @@
   "dynamic_cron_enabled": true,
   "cron_idle_minutes": 15,
   "cron_armed_minutes": 5,
-  "cron_active_minutes": 2
+  "cron_active_minutes": 2,
+  "soft_curve_tuning_enabled": false,
+  "soft_curve_max_shift_delta_k": 2,
+  "soft_curve_cooldown_minutes": 60
 }
