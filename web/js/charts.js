@@ -26,8 +26,37 @@ let soloBackupActive = null;
 
 const MIN_X_SPAN_MS = 15 * 60 * 1000;
 const Y_SCALE_STORAGE_KEY = "vitocal_y_scales";
+const EXTRA_CHANNELS_STORAGE_KEY = "vitocal_extra_channels";
 
 let yAxisCustom = loadYAxisCustom();
+
+function estimateSamplePower(sample) {
+  if (!sample) return { pElecKw: 0, pThermalKw: 0, cop: null };
+  const isComp = sample.compressor_active === 1 || (Number(sample.compressor_modulation_percent) || 0) > 0;
+  if (!isComp) return { pElecKw: 0.025, pThermalKw: 0, cop: null };
+  const mod = Number(sample.compressor_modulation_percent) || 0;
+  const pElecKw = 0.70 + (mod / 100.0) * 2.80;
+  const cop = (sample.cop_heating != null && Number(sample.cop_heating) > 0) ? Number(sample.cop_heating) : 3.1;
+  return { pElecKw, pThermalKw: pElecKw * cop, cop };
+}
+
+function loadExtraChannelsSet() {
+  try {
+    const raw = localStorage.getItem(EXTRA_CHANNELS_STORAGE_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr);
+    }
+  } catch (e) {}
+  return new Set();
+}
+
+function saveExtraChannelsSet() {
+  try {
+    const extras = CHANNEL_DEFS.filter(c => !c.defaultInLegend && c.inLegend).map(c => c.key);
+    localStorage.setItem(EXTRA_CHANNELS_STORAGE_KEY, JSON.stringify(extras));
+  } catch (e) {}
+}
 
 /**
  * Calculates the Viessmann Vitotronic WO1C target supply temperature (LWT)
@@ -64,7 +93,8 @@ function computeVitocalTargetLwt(sample, allowStandby = false) {
 window.computeVitocalTargetLwt = computeVitocalTargetLwt;
 
 const CHANNEL_DEFS = [
-  { key: "pdc_supply_temp_c", label: "Mandata PdC", unit: "°C", color: "#ff3b30", yAxis: "yTemp", group: "temp", borderWidth: 2.4, active: true },
+  // --- Default Core Channels ---
+  { key: "pdc_supply_temp_c", label: "Mandata PdC", unit: "°C", color: "#ff3b30", yAxis: "yTemp", group: "temp", borderWidth: 2.4, active: true, defaultInLegend: true, keywords: "lwt mandata primaria pdc" },
   {
     key: "_target_lwt_c",
     label: "Target LWT Curva",
@@ -75,15 +105,33 @@ const CHANNEL_DEFS = [
     borderDash: [7, 4],
     borderWidth: 2.0,
     active: true,
+    defaultInLegend: true,
     spanGaps: false,
+    keywords: "target lwt curva climatica setpoint mandata",
     computed: (s) => computeVitocalTargetLwt(s, false),
   },
-  { key: "buffer_temp_c", label: "Puffer 200L", unit: "°C", color: "#ff9f0a", yAxis: "yTemp", group: "temp", borderWidth: 2.2, active: true },
-  { key: "indoor_temp_bticino_c", label: "T Casa Corridoio", unit: "°C", color: "#22c55e", yAxis: "yTemp", group: "temp", borderWidth: 2.4, active: true },
-  { key: "external_temp_c", label: "T Esterna OAT", unit: "°C", color: "#00d4ff", yAxis: "yTemp", group: "temp", borderWidth: 2.0, active: true },
-  { key: "pdc_return_temp_c", label: "Ritorno PdC", unit: "°C", color: "#818cf8", yAxis: "yTemp", group: "temp", borderDash: [4, 3], borderWidth: 2.0, active: false },
-  { key: "dhw_storage_temp_c", label: "Bollitore ACS", unit: "°C", color: "#c084fc", yAxis: "yTemp", group: "temp", borderDash: [2, 3], borderWidth: 2.0, active: false },
-  { key: "indoor_setpoint_bticino_c", label: "Setpoint BTicino", unit: "°C", color: "#a3e635", yAxis: "yTemp", group: "temp", stepped: true, borderDash: [5, 4], borderWidth: 1.8, active: false },
+  { key: "buffer_temp_c", label: "Puffer 200L", unit: "°C", color: "#ff9f0a", yAxis: "yTemp", group: "temp", borderWidth: 2.2, active: true, defaultInLegend: true, keywords: "puffer accumulo inerziale 200l" },
+  { key: "indoor_temp_bticino_c", label: "T Casa Corridoio", unit: "°C", color: "#22c55e", yAxis: "yTemp", group: "temp", borderWidth: 2.4, active: true, defaultInLegend: true, keywords: "interna casa corridoio bticino smarther" },
+  { key: "external_temp_c", label: "T Esterna OAT", unit: "°C", color: "#00d4ff", yAxis: "yTemp", group: "temp", borderWidth: 2.0, active: true, defaultInLegend: true, keywords: "esterna oat fuori sonda climatica" },
+  { key: "pdc_return_temp_c", label: "Ritorno PdC", unit: "°C", color: "#818cf8", yAxis: "yTemp", group: "temp", borderDash: [4, 3], borderWidth: 2.0, active: false, defaultInLegend: true, keywords: "ewt ritorno scambiatore primaria" },
+  {
+    key: "_delta_lwt_ewt",
+    label: "ΔT Primario (LWT−EWT)",
+    unit: "K",
+    color: "#38bdf8",
+    yAxis: "yTemp",
+    group: "temp",
+    borderDash: [5, 2],
+    borderWidth: 2.1,
+    active: false,
+    defaultInLegend: true,
+    keywords: "delta lwt ewt mandata ritorno primario salto termico",
+    computed: (s) => (s && s.pdc_supply_temp_c != null && s.pdc_return_temp_c != null)
+      ? Math.round((Number(s.pdc_supply_temp_c) - Number(s.pdc_return_temp_c)) * 10) / 10
+      : null,
+  },
+  { key: "dhw_storage_temp_c", label: "Bollitore ACS", unit: "°C", color: "#c084fc", yAxis: "yTemp", group: "temp", borderDash: [2, 3], borderWidth: 2.0, active: false, defaultInLegend: true, keywords: "acs sanitario bollitore acqua calda" },
+  { key: "indoor_setpoint_bticino_c", label: "Setpoint BTicino", unit: "°C", color: "#a3e635", yAxis: "yTemp", group: "temp", stepped: true, borderDash: [5, 4], borderWidth: 1.8, active: false, defaultInLegend: true, keywords: "setpoint bticino termostato" },
   {
     key: "_delta_sup_buf",
     label: "ΔT Mandata−Puffer",
@@ -94,6 +142,8 @@ const CHANNEL_DEFS = [
     borderDash: [2, 2],
     borderWidth: 1.8,
     active: false,
+    defaultInLegend: true,
+    keywords: "delta mandata puffer stratificazione scambio",
     computed: (s) => (s && s.pdc_supply_temp_c != null && s.buffer_temp_c != null)
       ? Math.round((Number(s.pdc_supply_temp_c) - Number(s.buffer_temp_c)) * 10) / 10
       : null,
@@ -109,17 +159,117 @@ const CHANNEL_DEFS = [
     fill: true,
     backgroundColor: "rgba(253, 224, 71, 0.08)",
     active: true,
+    defaultInLegend: true,
+    keywords: "modulazione inverter compressore percentuale carico",
   },
-  { key: "hot_gas_pressure_bar", label: "Gas Caldo", unit: "bar", color: "#f472b6", yAxis: "yOther", group: "system", borderDash: [6, 3], borderWidth: 1.8, active: false },
-  { key: "cop_heating", label: "COP Riscald.", unit: "COP", color: "#2dd4bf", yAxis: "yOther", group: "system", borderWidth: 2.0, active: false },
-  { key: "humidity_percent", label: "Umidità Casa", unit: "%", color: "#94a3b8", yAxis: "yOther", group: "system", borderDash: [3, 4], borderWidth: 1.8, active: false },
+  { key: "primary_pump_rotation_percent", label: "Circolatore Primario P1", unit: "%", color: "#34d399", yAxis: "yOther", group: "system", borderWidth: 2.0, active: false, defaultInLegend: true, keywords: "circolatore primario p1 velocità rotazione pompa" },
+  { key: "hot_gas_pressure_bar", label: "Gas Caldo", unit: "bar", color: "#f472b6", yAxis: "yOther", group: "system", borderDash: [6, 3], borderWidth: 1.8, active: false, defaultInLegend: true, keywords: "pressione gas caldo bar refrigerante" },
+  { key: "cop_heating", label: "COP Riscald.", unit: "COP", color: "#2dd4bf", yAxis: "yOther", group: "system", borderWidth: 2.0, active: false, defaultInLegend: true, keywords: "cop rendimento efficienza riscaldamento" },
+  { key: "humidity_percent", label: "Umidità Casa", unit: "%", color: "#94a3b8", yAxis: "yOther", group: "system", borderDash: [3, 4], borderWidth: 1.8, active: false, defaultInLegend: true, keywords: "umidità relativa casa" },
+
+  // --- Extra Searchable Channels (Added on demand via 🔍 + Canali) ---
+  { key: "hot_gas_temp_c", label: "T Gas Caldo Frigo", unit: "°C", color: "#f97316", yAxis: "yTemp", group: "temp", borderWidth: 1.8, active: false, defaultInLegend: false, keywords: "temperatura gas caldo scarico compressore frigo" },
+  { key: "liquid_gas_temp_c", label: "T Gas Liquido Frigo", unit: "°C", color: "#06b6d4", yAxis: "yTemp", group: "temp", borderWidth: 1.8, active: false, defaultInLegend: false, keywords: "temperatura gas liquido condensatore frigo" },
+  { key: "suction_gas_temp_c", label: "T Gas Aspirazione", unit: "°C", color: "#60a5fa", yAxis: "yTemp", group: "temp", borderWidth: 1.8, active: false, defaultInLegend: false, keywords: "temperatura gas aspirazione evaporatore frigo" },
+  {
+    key: "_delta_buf_ewt",
+    label: "ΔT Puffer−Ritorno",
+    unit: "K",
+    color: "#fbbf24",
+    yAxis: "yTemp",
+    group: "temp",
+    borderDash: [4, 2],
+    borderWidth: 1.8,
+    active: false,
+    defaultInLegend: false,
+    keywords: "delta puffer ritorno ewt stratificazione secondario",
+    computed: (s) => (s && s.buffer_temp_c != null && s.pdc_return_temp_c != null)
+      ? Math.round((Number(s.buffer_temp_c) - Number(s.pdc_return_temp_c)) * 10) / 10
+      : null,
+  },
+  {
+    key: "_delta_in_oat",
+    label: "ΔT Casa−Esterno",
+    unit: "K",
+    color: "#4ade80",
+    yAxis: "yTemp",
+    group: "temp",
+    borderDash: [3, 3],
+    borderWidth: 1.8,
+    active: false,
+    defaultInLegend: false,
+    keywords: "salto termico casa esterna dispersione involucro",
+    computed: (s) => (s && s.indoor_temp_bticino_c != null && s.external_temp_c != null)
+      ? Math.round((Number(s.indoor_temp_bticino_c) - Number(s.external_temp_c)) * 10) / 10
+      : null,
+  },
+  { key: "normal_setpoint_c", label: "Setpoint Normale PdC", unit: "°C", color: "#f43f5e", yAxis: "yTemp", group: "temp", stepped: true, borderDash: [6, 3], borderWidth: 1.7, active: false, defaultInLegend: false, keywords: "setpoint normale pdc curva" },
+  { key: "reduced_setpoint_c", label: "Setpoint Ridotta PdC", unit: "°C", color: "#ec4899", yAxis: "yTemp", group: "temp", stepped: true, borderDash: [3, 3], borderWidth: 1.7, active: false, defaultInLegend: false, keywords: "setpoint ridotta pdc curva" },
+  { key: "dhw_setpoint_c", label: "Setpoint Bollitore ACS", unit: "°C", color: "#a855f7", yAxis: "yTemp", group: "temp", stepped: true, borderDash: [2, 3], borderWidth: 1.7, active: false, defaultInLegend: false, keywords: "setpoint bollitore acs sanitario" },
+  { key: "heating_curve_shift", label: "Curva Livello (Shift)", unit: "K", color: "#c084fc", yAxis: "yTemp", group: "temp", stepped: true, borderWidth: 1.7, active: false, defaultInLegend: false, keywords: "curva shift livello parallelo" },
+  {
+    key: "_thermal_power_kw",
+    label: "Potenza Termica Stimata",
+    unit: "kWₜ",
+    color: "#fb923c",
+    yAxis: "yOther",
+    group: "system",
+    borderWidth: 2.0,
+    active: false,
+    defaultInLegend: false,
+    keywords: "potenza resa termica kw calore",
+    computed: (s) => s ? Number(estimateSamplePower(s).pThermalKw.toFixed(2)) : null,
+  },
+  {
+    key: "_elec_power_kw",
+    label: "Potenza Elettrica Stimata",
+    unit: "kWₑ",
+    color: "#eab308",
+    yAxis: "yOther",
+    group: "system",
+    borderWidth: 1.8,
+    active: false,
+    defaultInLegend: false,
+    keywords: "potenza elettrica assorbita kw consumo",
+    computed: (s) => s ? Number(estimateSamplePower(s).pElecKw.toFixed(2)) : null,
+  },
+  { key: "cop_total", label: "COP Totale Macchina", unit: "COP", color: "#14b8a6", yAxis: "yOther", group: "system", borderWidth: 1.8, active: false, defaultInLegend: false, keywords: "cop totale rendimento" },
+  { key: "cop_dhw", label: "COP Sanitario ACS", unit: "COP", color: "#a78bfa", yAxis: "yOther", group: "system", borderWidth: 1.8, active: false, defaultInLegend: false, keywords: "cop acs sanitario" },
+  { key: "heating_curve_slope", label: "Curva Inclinazione (Slope)", unit: "", color: "#38bdf8", yAxis: "yOther", group: "system", stepped: true, borderWidth: 1.7, active: false, defaultInLegend: false, keywords: "curva slope inclinazione" },
+  {
+    key: "_heating_rod_total_h",
+    label: "Resistenza Backup (S1+S2)",
+    unit: "h",
+    color: "#ef4444",
+    yAxis: "yOther",
+    group: "system",
+    stepped: true,
+    borderWidth: 1.9,
+    active: false,
+    defaultInLegend: false,
+    keywords: "resistenza elettrica backup s1 s2 runtime",
+    computed: (s) => (s && (s.heating_rod_level1_s != null || s.heating_rod_level2_s != null))
+      ? Number(((Number(s.heating_rod_level1_s || 0) + Number(s.heating_rod_level2_s || 0)) / 3600.0).toFixed(2))
+      : null,
+  },
+  { key: "compressor_hours", label: "Ore Compressore", unit: "h", color: "#cbd5e1", yAxis: "yOther", group: "system", borderWidth: 1.7, active: false, defaultInLegend: false, keywords: "ore compressore totali runtime" },
+  { key: "compressor_starts", label: "Avvii Compressore", unit: "avvii", color: "#94a3b8", yAxis: "yOther", group: "system", stepped: true, borderWidth: 1.7, active: false, defaultInLegend: false, keywords: "avvii starts compressore accensioni" },
+  { key: "grundfos_pump_active", label: "Stato Grundfos (0/1)", unit: "", color: "#10b981", yAxis: "yOther", group: "system", stepped: true, borderWidth: 1.8, active: false, defaultInLegend: false, keywords: "grundfos pompa rilancio consenso stato" },
 ];
+
+(function hydrateChannelLegendFlags() {
+  const savedExtras = loadExtraChannelsSet();
+  for (let i = 0; i < CHANNEL_DEFS.length; i++) {
+    const ch = CHANNEL_DEFS[i];
+    ch.inLegend = Boolean(ch.defaultInLegend || savedExtras.has(ch.key));
+  }
+})();
 
 const CHART_PRESETS = {
   thermo: ["pdc_supply_temp_c", "_target_lwt_c", "buffer_temp_c", "indoor_temp_bticino_c", "external_temp_c", "compressor_modulation_percent"],
-  inverter: ["pdc_supply_temp_c", "_target_lwt_c", "_delta_sup_buf", "compressor_modulation_percent", "hot_gas_pressure_bar", "cop_heating"],
+  inverter: ["pdc_supply_temp_c", "pdc_return_temp_c", "_target_lwt_c", "_delta_lwt_ewt", "primary_pump_rotation_percent", "compressor_modulation_percent", "hot_gas_pressure_bar", "cop_heating"],
   home: ["indoor_temp_bticino_c", "indoor_setpoint_bticino_c", "external_temp_c", "buffer_temp_c", "humidity_percent"],
-  all: CHANNEL_DEFS.map(ch => ch.key),
+  all: null,
 };
 
 const Y_AXIS_CONFIG = {
@@ -231,7 +381,32 @@ function classifyActivityStates(chronoFiltered) {
   });
 }
 
-function buildActivityRuns(states) {
+function computeRunEnergyMetrics(startIdx, endIdx, durationMin, chronoFiltered) {
+  let thermalKwSum = 0;
+  let elecKwSum = 0;
+  let cnt = 0;
+  if (chronoFiltered && chronoFiltered.length) {
+    for (let k = startIdx; k <= endIdx && k < chronoFiltered.length; k++) {
+      const pwr = estimateSamplePower(chronoFiltered[k].sample);
+      if (pwr.pThermalKw > 0) {
+        thermalKwSum += pwr.pThermalKw;
+        elecKwSum += pwr.pElecKw;
+        cnt++;
+      }
+    }
+  }
+  const avgThermalKw = cnt > 0 ? (thermalKwSum / cnt) : 0;
+  const avgElecKw = cnt > 0 ? (elecKwSum / cnt) : 0;
+  const durH = Math.max(1, durationMin) / 60.0;
+  return {
+    avgThermalKw,
+    avgElecKw,
+    thermalKwh: avgThermalKw * durH,
+    elecKwh: avgElecKw * durH,
+  };
+}
+
+function buildActivityRuns(states, chronoFiltered) {
   const runs = [];
   let cur = null;
   let prevTs = null;
@@ -280,13 +455,26 @@ function buildActivityRuns(states) {
   }
 
   for (let i = 0; i < runs.length; i++) {
-    runs[i].durationMin = Math.max(1, Math.round((runs[i].segEnd - runs[i].segStart) / 60000));
+    const r = runs[i];
+    r.durationMin = Math.max(1, Math.round((r.segEnd - r.segStart) / 60000));
+    if (r.state === 1 || r.state === 3) {
+      const metrics = computeRunEnergyMetrics(r.startIdx, r.endIdx, r.durationMin, chronoFiltered);
+      r.avgThermalKw = metrics.avgThermalKw;
+      r.avgElecKw = metrics.avgElecKw;
+      r.thermalKwh = metrics.thermalKwh;
+      r.elecKwh = metrics.elecKwh;
+    } else {
+      r.avgThermalKw = 0;
+      r.avgElecKw = 0;
+      r.thermalKwh = 0;
+      r.elecKwh = 0;
+    }
   }
 
   return runs;
 }
 
-function buildCompressorOnRuns(states) {
+function buildCompressorOnRuns(states, chronoFiltered) {
   const runs = [];
   let cur = null;
   let prevTs = null;
@@ -319,6 +507,11 @@ function buildCompressorOnRuns(states) {
       ? (r.endTs + states[r.endIdx + 1].ts) / 2
       : r.endTs;
     r.durationMin = Math.max(2, Math.round((endEdge - startEdge) / 60000));
+    const metrics = computeRunEnergyMetrics(r.startIdx, r.endIdx, r.durationMin, chronoFiltered);
+    r.avgThermalKw = metrics.avgThermalKw;
+    r.avgElecKw = metrics.avgElecKw;
+    r.thermalKwh = metrics.thermalKwh;
+    r.elecKwh = metrics.elecKwh;
   }
   return runs;
 }
@@ -469,11 +662,21 @@ const activityBandsPlugin = {
       ctx.fillStyle = style.ribbon;
       ctx.fillRect(x1, area.top, w, 6);
 
-      // Zoom-aware duration pill inside visible segment width (anti-overlap guarantee)
+      // Zoom-aware duration + thermal yield pill inside visible segment width (anti-overlap guarantee)
       const visLeft = Math.max(area.left + 2, x1);
       const visRight = Math.min(area.right - 2, x2);
       const visW = visRight - visLeft;
-      const pillText = `${style.pillLabel} ${formatDurationCompact(r.durationMin)}`;
+      const basePill = `${style.pillLabel} ${formatDurationCompact(r.durationMin)}`;
+      let pillText = basePill;
+      if ((r.state === 1 || r.state === 3) && r.thermalKwh > 0) {
+        const fullPill = `${basePill} · ~${r.thermalKwh.toFixed(1)} kWhₜ (${r.avgThermalKw.toFixed(1)} kWₜ)`;
+        const medPill = `${basePill} · ~${r.thermalKwh.toFixed(1)} kWhₜ`;
+        if (visW >= ctx.measureText(fullPill).width + 20) {
+          pillText = fullPill;
+        } else if (visW >= ctx.measureText(medPill).width + 20) {
+          pillText = medPill;
+        }
+      }
       const tw = ctx.measureText(pillText).width;
       const pillW = tw + 12;
 
@@ -694,14 +897,19 @@ function initChartControls() {
     });
   }
 
+  initChannelSearchDrawer();
   bindYAxisModalEvents();
   updateModeButtonUI();
   updateAxisPillsUI();
   updatePresetButtonsUI();
 }
 
+function getAllPresetKeys() {
+  return CHANNEL_DEFS.filter(ch => ch.inLegend || ch.defaultInLegend).map(ch => ch.key);
+}
+
 function applyChartPreset(presetKey) {
-  const keys = CHART_PRESETS[presetKey];
+  const keys = presetKey === "all" ? getAllPresetKeys() : CHART_PRESETS[presetKey];
   if (!keys) return;
   soloBackupActive = null;
   activePresetKey = presetKey;
@@ -712,6 +920,7 @@ function applyChartPreset(presetKey) {
   yAutoFrozen = { yTemp: null, yOther: null };
   updatePresetButtonsUI();
   renderChannelPills();
+  renderChannelSearchResults();
   updateChartData(currentSamples);
 }
 
@@ -719,7 +928,8 @@ function syncPresetFromActiveChannels() {
   const curKeys = CHANNEL_DEFS.filter(c => c.active).map(c => c.key).sort().join(",");
   let matched = null;
   for (const [k, list] of Object.entries(CHART_PRESETS)) {
-    if ([...list].sort().join(",") === curKeys) {
+    const targetList = k === "all" ? getAllPresetKeys() : list;
+    if (targetList && [...targetList].sort().join(",") === curKeys) {
       matched = k;
       break;
     }
@@ -774,7 +984,7 @@ function jumpToLastCycle() {
   const chronoAll = parseSamplesChrono(currentSamples);
   if (!chronoAll.length) return;
   const allStates = classifyActivityStates(chronoAll);
-  const compRuns = buildCompressorOnRuns(allStates);
+  const compRuns = buildCompressorOnRuns(allStates, chronoAll);
   if (!compRuns.length) {
     if (typeof showToast === "function") showToast("ℹ️ Nessun ciclo compressore trovato nei dati disponibili.");
     return;
@@ -879,8 +1089,8 @@ function updateChartData(samples) {
   const states = classifyActivityStates(chronoFiltered);
   telemetryChart._activityChrono = chronoFiltered;
   telemetryChart._activityStates = states;
-  telemetryChart._activityRuns = buildActivityRuns(states);
-  telemetryChart._compRuns = buildCompressorOnRuns(states);
+  telemetryChart._activityRuns = buildActivityRuns(states, chronoFiltered);
+  telemetryChart._compRuns = buildCompressorOnRuns(states, chronoFiltered);
   telemetryChart._setpointCutoffs = detectSetpointCutoffEvents(chronoFiltered, states);
   telemetryChart._defrostEvents = detectDefrostEvents(chronoFiltered);
   telemetryChart.data.datasets = getDatasets(chronoFiltered);
@@ -904,6 +1114,7 @@ function updateChartData(samples) {
   updateResetButtonUI();
   telemetryChart.update();
   updateLegendValues(chronoAll.length ? chronoAll[chronoAll.length - 1].sample : null);
+  renderChannelSearchResults();
   updateVisibleWindowStats();
 }
 
@@ -1004,11 +1215,17 @@ function updateVisibleWindowStats() {
   const visibleChrono = chrono.filter(it => it.ts >= vMin && it.ts <= vMax);
   const sub = visibleChrono.length ? visibleChrono : chrono;
   const subStates = classifyActivityStates(sub);
-  const subCompRuns = buildCompressorOnRuns(subStates);
+  const subCompRuns = buildCompressorOnRuns(subStates, sub);
   const subCutoffs = detectSetpointCutoffEvents(sub, subStates);
 
   let totalOnMin = 0;
-  for (const r of subCompRuns) totalOnMin += r.durationMin;
+  let totalThermalKwh = 0;
+  let totalElecKwh = 0;
+  for (const r of subCompRuns) {
+    totalOnMin += r.durationMin;
+    totalThermalKwh += r.thermalKwh || 0;
+    totalElecKwh += r.elecKwh || 0;
+  }
   const avgMin = subCompRuns.length ? Math.round(totalOnMin / subCompRuns.length) : 0;
 
   let tinMin = Infinity, tinMax = -Infinity;
@@ -1034,6 +1251,9 @@ function updateVisibleWindowStats() {
   const parts = [];
   if (subCompRuns.length > 0) {
     parts.push(`<span class="chart-stat-item">🔥 PdC ON: <strong>${formatDurationCompact(totalOnMin)}</strong> (${subCompRuns.length} cicli · media ${avgMin}m)</span>`);
+    if (totalThermalKwh > 0) {
+      parts.push(`<span class="chart-stat-item" style="color:#fde047;">🔆 Resa: <strong>~${totalThermalKwh.toFixed(1)} kWhₜ</strong> (El ${totalElecKwh.toFixed(1)} kWhₑ)</span>`);
+    }
   } else {
     parts.push('<span class="chart-stat-item">⏸ PdC ON: <strong>0m</strong></span>');
   }
@@ -1079,8 +1299,8 @@ function buildChart() {
   const bounds = getFullXBounds(chronoAll, activeTimeframeHours);
   const chronoFiltered = filterChronoByBounds(chronoAll, bounds);
   const states = classifyActivityStates(chronoFiltered);
-  const runs = buildActivityRuns(states);
-  const compRuns = buildCompressorOnRuns(states);
+  const runs = buildActivityRuns(states, chronoFiltered);
+  const compRuns = buildCompressorOnRuns(states, chronoFiltered);
   const cutoffs = detectSetpointCutoffEvents(chronoFiltered, states);
   const defrosts = detectDefrostEvents(chronoFiltered);
 
@@ -1146,13 +1366,17 @@ function buildChart() {
               }
               const lines = [];
               const st = findClosestByTs(telemetryChart._activityStates, targetTs);
+              let hitRun = null;
               if (st) {
                 const info = ACTIVITY_STYLES[st.state];
                 let bandDurTxt = "";
                 const runsList = telemetryChart._activityRuns || [];
-                const hitRun = runsList.find(r => targetTs >= r.segStart && targetTs <= r.segEnd);
+                hitRun = runsList.find(r => targetTs >= r.segStart && targetTs <= r.segEnd);
                 if (hitRun) bandDurTxt = ` (${formatDurationCompact(hitRun.durationMin)})`;
                 lines.push((info ? info.text : "⏸ Stato: Standby") + bandDurTxt);
+                if (hitRun && (hitRun.state === 1 || hitRun.state === 3) && hitRun.thermalKwh > 0) {
+                  lines.push(`🔥 Resa blocco: ~${hitRun.thermalKwh.toFixed(2)} kWhₜ · media ${hitRun.avgThermalKw.toFixed(1)} kWₜ`);
+                }
               }
               const rawEntry = findClosestByTs(telemetryChart._activityChrono, targetTs);
               if (rawEntry && rawEntry.sample) {
@@ -1162,6 +1386,11 @@ function buildChart() {
                 const sp = s.indoor_setpoint_bticino_c != null ? `${Number(s.indoor_setpoint_bticino_c).toFixed(1)}°C` : "--";
                 const gfTxt = s.grundfos_pump_active === 1 ? "GF ON" : (s.grundfos_pump_active === 0 ? "GF OFF" : "GF --");
                 lines.push(`🏠 Casa: ${tin} / SP ${sp} → ${gfTxt}`);
+                if (s.pdc_supply_temp_c != null && s.pdc_return_temp_c != null) {
+                  const dtPrim = (Number(s.pdc_supply_temp_c) - Number(s.pdc_return_temp_c)).toFixed(1);
+                  const p1Txt = s.primary_pump_rotation_percent != null ? ` · P1 ${Math.round(Number(s.primary_pump_rotation_percent))}%` : "";
+                  lines.push(`🔁 ΔT Primario (LWT−EWT): ${Number(dtPrim) >= 0 ? "+" : ""}${dtPrim} K${p1Txt}`);
+                }
                 if (s.pdc_supply_temp_c != null && s.buffer_temp_c != null) {
                   const dtSupBuf = (Number(s.pdc_supply_temp_c) - Number(s.buffer_temp_c)).toFixed(1);
                   lines.push(`🌡️ ΔT Mandata−Puffer: ${Number(dtSupBuf) >= 0 ? "+" : ""}${dtSupBuf} K`);
@@ -1657,23 +1886,29 @@ function renderChannelPills() {
 
   const groups = [
     { id: "temp", title: "🌡️ Temperature (°C / K)", hint: "Tap: on/off · 2×Tap: isola" },
-    { id: "system", title: "⚙️ Inverter, Pressioni & COP", hint: "" },
+    { id: "system", title: "⚙️ Inverter, Circolatori, Pressioni & COP", hint: "" },
   ];
 
   container.innerHTML = groups.map(grp => {
     const items = CHANNEL_DEFS
       .map((ch, idx) => ({ ch, idx }))
-      .filter(({ ch }) => ch.group === grp.id);
+      .filter(({ ch }) => ch.group === grp.id && ch.inLegend);
 
     const chipsHtml = items.map(({ ch, idx }) => {
       const styleClass = ch.borderDash ? (ch.borderDash[0] <= 3 ? "dotted" : "dashed") : "";
+      const removeBadge = !ch.defaultInLegend
+        ? `<span class="legend-chip-remove" data-remove-idx="${idx}" title="Rimuovi dalla legenda">×</span>`
+        : "";
       return `
         <button type="button" class="legend-chip ${ch.active ? "active" : ""}" data-idx="${idx}" style="--chip-color: ${ch.color}">
           <span class="legend-chip-left">
             <span class="legend-line-swatch ${styleClass}"></span>
             <span class="legend-chip-label">${ch.label}</span>
           </span>
-          <span class="legend-val" data-legend-key="${ch.key}">--</span>
+          <span class="legend-chip-right">
+            <span class="legend-val" data-legend-key="${ch.key}">--</span>
+            ${removeBadge}
+          </span>
         </button>
       `;
     }).join("");
@@ -1688,6 +1923,24 @@ function renderChannelPills() {
       </div>
     `;
   }).join("");
+
+  container.querySelectorAll(".legend-chip-remove").forEach(rm => {
+    rm.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const idx = parseInt(rm.dataset.removeIdx, 10);
+      if (isNaN(idx) || !CHANNEL_DEFS[idx]) return;
+      CHANNEL_DEFS[idx].inLegend = false;
+      CHANNEL_DEFS[idx].active = false;
+      saveExtraChannelsSet();
+      yAutoFrozen = { yTemp: null, yOther: null };
+      syncPresetFromActiveChannels();
+      renderChannelPills();
+      renderChannelSearchResults();
+      updateExtraChannelsBadge();
+      updateChartData(currentSamples);
+    });
+  });
 
   let lastChipTap = { idx: -1, at: 0, snapshot: null };
   container.querySelectorAll(".legend-chip").forEach(btn => {
@@ -1707,6 +1960,7 @@ function renderChannelPills() {
       btn.classList.toggle("active", CHANNEL_DEFS[idx].active);
       yAutoFrozen = { yTemp: null, yOther: null };
       syncPresetFromActiveChannels();
+      renderChannelSearchResults();
       updateChartData(currentSamples);
     });
   });
@@ -1715,4 +1969,119 @@ function renderChannelPills() {
   if (chronoAll.length) {
     updateLegendValues(chronoAll[chronoAll.length - 1].sample);
   }
+  updateExtraChannelsBadge();
+}
+
+function updateExtraChannelsBadge() {
+  const btn = document.getElementById("btnToggleChannelSearch");
+  if (!btn) return;
+  const extraCount = CHANNEL_DEFS.filter(c => !c.defaultInLegend && c.inLegend).length;
+  btn.textContent = extraCount > 0 ? `🔍 + Canali (${extraCount})` : "🔍 + Canali";
+  btn.classList.toggle("has-extras", extraCount > 0);
+}
+
+function initChannelSearchDrawer() {
+  const toggleBtn = document.getElementById("btnToggleChannelSearch");
+  const drawer = document.getElementById("channelSearchDrawer");
+  const input = document.getElementById("inputChannelSearch");
+  const clearBtn = document.getElementById("btnClearChannelSearch");
+
+  if (toggleBtn && toggleBtn.dataset.bound !== "1") {
+    toggleBtn.dataset.bound = "1";
+    toggleBtn.addEventListener("click", () => {
+      if (!drawer) return;
+      const open = drawer.classList.toggle("open");
+      toggleBtn.classList.toggle("active", open);
+      if (open) {
+        renderChannelSearchResults();
+        if (input) setTimeout(() => input.focus(), 40);
+      }
+    });
+  }
+
+  if (input && input.dataset.bound !== "1") {
+    input.dataset.bound = "1";
+    input.addEventListener("input", renderChannelSearchResults);
+  }
+
+  if (clearBtn && clearBtn.dataset.bound !== "1") {
+    clearBtn.dataset.bound = "1";
+    clearBtn.addEventListener("click", () => {
+      if (input) {
+        input.value = "";
+        input.focus();
+      }
+      renderChannelSearchResults();
+    });
+  }
+
+  renderChannelSearchResults();
+  updateExtraChannelsBadge();
+}
+
+function renderChannelSearchResults() {
+  const listEl = document.getElementById("channelSearchResults");
+  if (!listEl) return;
+  const input = document.getElementById("inputChannelSearch");
+  const q = (input ? input.value : "").trim().toLowerCase();
+
+  const chronoAll = parseSamplesChrono(currentSamples);
+  const latestSample = chronoAll.length ? chronoAll[chronoAll.length - 1].sample : null;
+
+  const matches = CHANNEL_DEFS.map((ch, idx) => ({ ch, idx })).filter(({ ch }) => {
+    if (!q) return !ch.defaultInLegend || ch.active;
+    const hay = `${ch.label} ${ch.key} ${ch.unit || ""} ${ch.yAxis} ${ch.keywords || ""}`.toLowerCase();
+    return q.split(/\s+/).every(tok => hay.includes(tok));
+  });
+
+  if (!matches.length) {
+    listEl.innerHTML = '<div class="channel-search-empty">Nessun canale trovato per la ricerca.</div>';
+    return;
+  }
+
+  listEl.innerHTML = matches.map(({ ch, idx }) => {
+    let valText = "--";
+    if (latestSample) {
+      const raw = ch.computed ? ch.computed(latestSample) : latestSample[ch.key];
+      if (raw !== null && raw !== undefined && raw !== "" && !isNaN(Number(raw))) {
+        const num = Number(raw);
+        valText = `${Number.isInteger(num) ? num : num.toFixed(1)}${ch.unit ? " " + ch.unit : ""}`;
+      }
+    }
+    const axisTag = ch.yAxis === "yTemp" ? "Asse °C/K" : "Asse %/kW";
+    const btnLabel = ch.inLegend ? (ch.active ? "✓ Attivo" : "+ Mostra") : "+ Aggiungi";
+    return `
+      <div class="channel-search-item ${ch.active ? "is-active" : ""}">
+        <div class="channel-search-info">
+          <span class="channel-search-dot" style="background:${ch.color};"></span>
+          <div class="channel-search-text">
+            <span class="channel-search-name">${ch.label}</span>
+            <span class="channel-search-meta">${axisTag} · live: <strong>${valText}</strong></span>
+          </div>
+        </div>
+        <button type="button" class="btn-channel-toggle ${ch.active ? "active" : ""}" data-search-idx="${idx}">${btnLabel}</button>
+      </div>
+    `;
+  }).join("");
+
+  listEl.querySelectorAll(".btn-channel-toggle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = parseInt(btn.dataset.searchIdx, 10);
+      const ch = CHANNEL_DEFS[idx];
+      if (!ch) return;
+      soloBackupActive = null;
+      if (!ch.inLegend) {
+        ch.inLegend = true;
+        ch.active = true;
+      } else {
+        ch.active = !ch.active;
+      }
+      saveExtraChannelsSet();
+      yAutoFrozen = { yTemp: null, yOther: null };
+      syncPresetFromActiveChannels();
+      renderChannelPills();
+      renderChannelSearchResults();
+      updateChartData(currentSamples);
+    });
+  });
 }

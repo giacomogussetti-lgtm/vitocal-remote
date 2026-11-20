@@ -44,6 +44,26 @@ def _validate_hhmm(val: str, label: str) -> str:
     return f"{hh:02d}:{mm:02d}"
 
 
+def _validate_schedule_params(params: dict[str, Any]) -> dict[str, Any]:
+    raw_days = params.get("days", list(VALID_DAYS))
+    if not isinstance(raw_days, list):
+        raise ValueError("days deve essere una lista.")
+    days = [str(d).strip().lower() for d in raw_days if str(d).strip().lower() in VALID_DAYS]
+    if not days:
+        raise ValueError("Selezionare almeno un giorno valido (mon..sun).")
+    clear = bool(params.get("clear", False))
+    if clear:
+        return {"days": days, "clear": True}
+    start = _validate_hhmm(str(params.get("start", "11:00")), "inizio")
+    end = _validate_hhmm(str(params.get("end", "16:00")), "fine")
+    if start >= end:
+        raise ValueError(f"L'ora di fine ({end}) deve seguire l'inizio ({start}).")
+    mode = str(params.get("mode", "reduced")).strip()
+    if mode not in ("reduced", "normal", "fixed"):
+        raise ValueError(f"Modo fascia non valido: {mode}")
+    return {"days": days, "start": start, "end": end, "mode": mode, "clear": False}
+
+
 def _validate_command(command: str, params: dict[str, Any]) -> dict[str, Any]:
     """Validates command name and strictly clamps/checks parameter ranges."""
     if not isinstance(params, dict):
@@ -86,23 +106,7 @@ def _validate_command(command: str, params: dict[str, Any]) -> dict[str, Any]:
         return {"mode": mode}
 
     if command == "viessmann_schedule":
-        raw_days = params.get("days", list(VALID_DAYS))
-        if not isinstance(raw_days, list):
-            raise ValueError("days deve essere una lista.")
-        days = [str(d).strip().lower() for d in raw_days if str(d).strip().lower() in VALID_DAYS]
-        if not days:
-            raise ValueError("Selezionare almeno un giorno valido (mon..sun).")
-        clear = bool(params.get("clear", False))
-        if clear:
-            return {"days": days, "clear": True}
-        start = _validate_hhmm(str(params.get("start", "11:00")), "inizio")
-        end = _validate_hhmm(str(params.get("end", "16:00")), "fine")
-        if start >= end:
-            raise ValueError(f"L'ora di fine ({end}) deve seguire l'inizio ({start}).")
-        mode = str(params.get("mode", "reduced")).strip()
-        if mode not in ("reduced", "normal", "fixed"):
-            raise ValueError(f"Modo fascia non valido: {mode}")
-        return {"days": days, "start": start, "end": end, "mode": mode, "clear": False}
+        return _validate_schedule_params(params)
 
     if command == "viessmann_dhw_boost":
         return {"active": bool(params.get("active", True))}
@@ -151,6 +155,61 @@ def _validate_command(command: str, params: dict[str, Any]) -> dict[str, Any]:
             clean["pdc_normal"] = pn
         return clean
 
+    if command == "apply_full_profile":
+        clean: dict[str, Any] = {}
+        if params.get("profile_name") is not None:
+            clean["profile_name"] = str(params["profile_name"]).strip()[:60]
+        if params.get("autopilot_enabled") is not None:
+            clean["autopilot_enabled"] = bool(params["autopilot_enabled"])
+        if params.get("pdc_mode") is not None:
+            mode = str(params["pdc_mode"]).strip()
+            if mode not in ("standby", "dhw", "dhwAndHeating"):
+                raise ValueError(f"Modalità PdC non valida: '{mode}'.")
+            clean["pdc_mode"] = mode
+        if params.get("pdc_normal") is not None:
+            pn = int(round(float(params["pdc_normal"])))
+            if not (10 <= pn <= 30):
+                raise ValueError("Temperatura Normale PdC fuori range (10 – 30 °C).")
+            clean["pdc_normal"] = pn
+        if params.get("pdc_reduced") is not None:
+            pr = int(round(float(params["pdc_reduced"])))
+            if not (10 <= pr <= 30):
+                raise ValueError("Temperatura Ridotta PdC fuori range (10 – 30 °C).")
+            clean["pdc_reduced"] = pr
+        if params.get("pdc_dhw") is not None:
+            pd = int(round(float(params["pdc_dhw"])))
+            if not (10 <= pd <= 60):
+                raise ValueError("Temperatura ACS fuori range (10 – 60 °C).")
+            clean["pdc_dhw"] = pd
+        if params.get("curve_slope") is not None and params.get("curve_shift") is not None:
+            slp = round(float(params["curve_slope"]), 1)
+            shf = int(round(float(params["curve_shift"])))
+            if not (0.0 <= slp <= 3.5) or not (-15 <= shf <= 40):
+                raise ValueError("Curva climatica fuori range.")
+            clean["curve_slope"] = slp
+            clean["curve_shift"] = shf
+        if isinstance(params.get("pdc_schedule"), dict):
+            clean["pdc_schedule"] = _validate_schedule_params(params["pdc_schedule"])
+        if params.get("bticino_mode") is not None:
+            bm = str(params["bticino_mode"]).strip().lower()
+            if bm not in ("manual", "home", "away", "hg"):
+                raise ValueError(f"Modalità BTicino non valida: '{bm}'.")
+            clean["bticino_mode"] = bm
+            if bm == "manual":
+                bt = round(float(params.get("bticino_temp", 18.0)) * 2) / 2.0
+                if not (5.0 <= bt <= 30.0):
+                    raise ValueError("Setpoint BTicino fuori range (5.0 – 30.0 °C).")
+                bd = int(params.get("bticino_duration_minutes", 180))
+                if not (0 <= bd <= 1440):
+                    raise ValueError("Durata manuale BTicino fuori range (0 – 1440 min).")
+                clean["bticino_temp"] = bt
+                clean["bticino_duration_minutes"] = bd
+        if params.get("bticino_schedule_name"):
+            clean["bticino_schedule_name"] = str(params["bticino_schedule_name"]).strip()[:80]
+        if not clean:
+            raise ValueError("Il profilo non contiene impostazioni valide.")
+        return clean
+
     if command in ("autopilot_configure", "autopilot_activate_away"):
         return _validate_autopilot_params(params, force_enable=(command == "autopilot_activate_away"))
 
@@ -179,6 +238,11 @@ def _validate_autopilot_params(params: dict[str, Any], force_enable: bool = Fals
         "max_cycle_minutes": (30, 360, int),
         "puffer_drain_minutes": (0, 60, int),
         "puffer_drain_stop_temp_c": (10.0, 20.0, float),
+        "cron_idle_minutes": (1, 60, int),
+        "cron_armed_minutes": (1, 30, int),
+        "cron_active_minutes": (1, 15, int),
+        "soft_curve_max_shift_delta_k": (1, 4, int),
+        "soft_curve_cooldown_minutes": (15, 180, int),
     }
     for key, (lo, hi, caster) in bounds.items():
         if params.get(key) is not None:
@@ -189,6 +253,8 @@ def _validate_autopilot_params(params: dict[str, Any], force_enable: bool = Fals
 
     if "dynamic_cron_enabled" in params:
         clean["dynamic_cron_enabled"] = bool(params["dynamic_cron_enabled"])
+    if "soft_curve_tuning_enabled" in params:
+        clean["soft_curve_tuning_enabled"] = bool(params["soft_curve_tuning_enabled"])
 
     for tkey in ("cop_window_start", "cop_window_end"):
         if params.get(tkey) is not None:
@@ -241,17 +307,34 @@ def execute_command(
 
     success = False
     messages: list[str] = []
+    v_reads = 0
+    v_writes = 0
+    b_reads = 0
+    b_writes = 0
+    cron_patches = 0
+    state_already_recorded = False
+    is_gha = os.environ.get("GITHUB_ACTIONS", "").lower() == "true"
 
     try:
-        if command.startswith("viessmann_") or command.startswith("preset_") or command == "autopilot_activate_away":
+        needs_v = command.startswith("viessmann_") or command.startswith("preset_") or command == "autopilot_activate_away" or (
+            command == "apply_full_profile" and any(k in clean_params for k in ("pdc_mode", "pdc_normal", "pdc_reduced", "pdc_dhw", "curve_slope", "pdc_schedule"))
+        )
+        needs_b = command.startswith("bticino_") or command.startswith("preset_") or command == "autopilot_activate_away" or (
+            command == "apply_full_profile" and any(k in clean_params for k in ("bticino_mode", "bticino_schedule_name"))
+        )
+
+        if needs_v:
             v_conn = ViessmannConnector()
             v_conn.connect()
+            v_reads += 1
 
-        if command.startswith("bticino_") or command.startswith("preset_") or command == "autopilot_activate_away":
+        if needs_b:
             b_conn = BTicinoConnector()
 
         if command == "viessmann_curve":
             ok, msg = v_conn.set_heating_curve(clean_params["slope"], clean_params["shift"])
+            v_writes += 1
+            v_reads += 1
             success = ok
             messages.append(msg)
 
@@ -259,20 +342,28 @@ def execute_command(
             all_ok = True
             if "normal" in clean_params:
                 ok, msg = v_conn.set_normal_temperature(clean_params["normal"])
+                v_writes += 1
+                v_reads += 1
                 all_ok = all_ok and ok
                 messages.append(msg)
             if "reduced" in clean_params:
                 ok, msg = v_conn.set_reduced_temperature(clean_params["reduced"])
+                v_writes += 1
+                v_reads += 1
                 all_ok = all_ok and ok
                 messages.append(msg)
             if "dhw" in clean_params:
                 ok, msg = v_conn.set_dhw_temperature(clean_params["dhw"])
+                v_writes += 1
+                v_reads += 1
                 all_ok = all_ok and ok
                 messages.append(msg)
             success = all_ok
 
         elif command == "viessmann_mode":
             ok, msg = v_conn.set_mode(clean_params["mode"])
+            v_writes += 1
+            v_reads += 1
             success = ok
             messages.append(msg)
 
@@ -284,11 +375,14 @@ def execute_command(
                 mode=clean_params.get("mode", "reduced"),
                 clear=clean_params["clear"],
             )
+            v_writes += 1
+            v_reads += 2
             success = ok
             messages.append(msg)
 
         elif command == "viessmann_dhw_boost":
             ok, msg = v_conn.set_dhw_onetime_charge(clean_params["active"])
+            v_writes += 1
             success = ok
             messages.append(msg)
 
@@ -301,6 +395,8 @@ def execute_command(
                 )
             else:
                 ok, msg = b_conn.set_thermostat_mode(clean_params["mode"])
+            b_reads += 1
+            b_writes += 1
             success = ok
             messages.append(msg)
 
@@ -309,12 +405,18 @@ def execute_command(
                 schedule_id=clean_params.get("schedule_id"),
                 schedule_name=clean_params.get("schedule_name"),
             )
+            b_reads += 1
+            b_writes += 1
             success = ok
             messages.append(msg)
 
         elif command == "preset_stop_all":
             ok_v, msg_v = v_conn.set_mode("standby")
             ok_b, msg_b = b_conn.set_thermostat_mode("hg")
+            v_writes += 1
+            v_reads += 1
+            b_reads += 1
+            b_writes += 1
             success = ok_v and ok_b
             messages.extend([msg_v, msg_b])
 
@@ -322,10 +424,14 @@ def execute_command(
             all_ok = True
             if "pdc_normal" in clean_params:
                 ok_n, msg_n = v_conn.set_normal_temperature(clean_params["pdc_normal"])
+                v_writes += 1
+                v_reads += 1
                 all_ok = all_ok and ok_n
                 messages.append(msg_n)
             if "pdc_reduced" in clean_params:
                 ok_r, msg_r = v_conn.set_reduced_temperature(clean_params["pdc_reduced"])
+                v_writes += 1
+                v_reads += 1
                 all_ok = all_ok and ok_r
                 messages.append(msg_r)
             ok_v, msg_v = v_conn.set_mode("dhwAndHeating")
@@ -334,11 +440,107 @@ def execute_command(
                 mode="manual",
                 duration_minutes=clean_params["duration_minutes"],
             )
+            v_writes += 1
+            v_reads += 1
+            b_reads += 1
+            b_writes += 1
             success = all_ok and ok_v and ok_b
             messages.extend([msg_v, msg_b])
 
+        elif command == "apply_full_profile":
+            all_ok = True
+            prof_name = clean_params.get("profile_name") or "Profilo Personalizzato"
+            if clean_params.get("autopilot_enabled") is False:
+                from scripts.autopilot import load_config, save_config, load_state, save_state
+                cfg = load_config()
+                if cfg.get("enabled"):
+                    cfg["enabled"] = False
+                    save_config(cfg)
+                    st = load_state()
+                    st["state"] = "DISABLED"
+                    st["below_threshold_since_utc"] = None
+                    st["last_action_utc"] = datetime.now(timezone.utc).isoformat()
+                    st["last_action_reason"] = f"Autopilota messo in pausa da profilo '{prof_name}'."
+                    save_state(st)
+                    messages.append("Autopilota disattivato")
+
+            if "curve_slope" in clean_params and "curve_shift" in clean_params:
+                ok_c, msg_c = v_conn.set_heating_curve(clean_params["curve_slope"], clean_params["curve_shift"])
+                v_writes += 1
+                v_reads += 1
+                all_ok = all_ok and ok_c
+                messages.append(msg_c)
+            if "pdc_normal" in clean_params:
+                ok_n, msg_n = v_conn.set_normal_temperature(clean_params["pdc_normal"])
+                v_writes += 1
+                v_reads += 1
+                all_ok = all_ok and ok_n
+                messages.append(msg_n)
+            if "pdc_reduced" in clean_params:
+                ok_r, msg_r = v_conn.set_reduced_temperature(clean_params["pdc_reduced"])
+                v_writes += 1
+                v_reads += 1
+                all_ok = all_ok and ok_r
+                messages.append(msg_r)
+            if "pdc_dhw" in clean_params:
+                ok_d, msg_d = v_conn.set_dhw_temperature(clean_params["pdc_dhw"])
+                v_writes += 1
+                v_reads += 1
+                all_ok = all_ok and ok_d
+                messages.append(msg_d)
+            if "pdc_schedule" in clean_params:
+                sc = clean_params["pdc_schedule"]
+                ok_s, msg_s = v_conn.set_heating_schedule_simple(
+                    days=sc["days"],
+                    start=sc.get("start", "11:00"),
+                    end=sc.get("end", "16:00"),
+                    mode=sc.get("mode", "reduced"),
+                    clear=sc["clear"],
+                )
+                v_writes += 1
+                v_reads += 2
+                all_ok = all_ok and ok_s
+                messages.append(msg_s)
+            if "pdc_mode" in clean_params:
+                ok_m, msg_m = v_conn.set_mode(clean_params["pdc_mode"])
+                v_writes += 1
+                v_reads += 1
+                all_ok = all_ok and ok_m
+                messages.append(msg_m)
+
+            if clean_params.get("bticino_schedule_name"):
+                ok_bs, msg_bs = b_conn.switch_schedule(schedule_name=clean_params["bticino_schedule_name"])
+                b_reads += 1
+                b_writes += 1
+                all_ok = all_ok and ok_bs
+                messages.append(msg_bs)
+            if "bticino_mode" in clean_params:
+                bm = clean_params["bticino_mode"]
+                if bm == "manual":
+                    ok_b, msg_b = b_conn.set_thermostat_setpoint(
+                        temp=clean_params["bticino_temp"],
+                        mode="manual",
+                        duration_minutes=clean_params["bticino_duration_minutes"],
+                    )
+                else:
+                    ok_b, msg_b = b_conn.set_thermostat_mode(bm)
+                b_reads += 1
+                b_writes += 1
+                all_ok = all_ok and ok_b
+                messages.append(msg_b)
+
+            success = all_ok
+            messages.insert(0, f"Profilo '{prof_name}' applicato")
+
         elif command == "autopilot_configure":
-            from scripts.autopilot import load_config, save_config, load_state, save_state, update_cronjob_frequency
+            from scripts.autopilot import (
+                load_config,
+                save_config,
+                load_state,
+                save_state,
+                update_cronjob_frequency,
+                record_api_usage,
+            )
             cfg = load_config()
             cfg.update(clean_params)
             if float(cfg["t_max_c"]) <= float(cfg["t_min_c"]):
@@ -350,29 +552,60 @@ def execute_command(
                 st["below_threshold_since_utc"] = None
                 st["last_action_utc"] = datetime.now(timezone.utc).isoformat()
                 st["last_action_reason"] = "Autopilota disattivato manualmente dalla PWA."
-                if saved_cfg.get("dynamic_cron_enabled"):
-                    ok_c, msg_c = update_cronjob_frequency(5)
-                    if ok_c:
-                        st["current_cron_interval_min"] = 5
-                    messages.append(msg_c)
+                desired_cron = int(saved_cfg.get("cron_armed_minutes") or 5)
             else:
                 if st.get("state") == "DISABLED":
                     st["state"] = "IDLE"
                     st["state_since_utc"] = datetime.now(timezone.utc).isoformat()
+                cur_st = st.get("state")
+                if cur_st in ("HEATING_SYNC", "PUFFER_DRAIN"):
+                    desired_cron = int(saved_cfg["cron_active_minutes"])
+                elif cur_st == "ARMED":
+                    desired_cron = int(saved_cfg["cron_armed_minutes"])
+                else:
+                    desired_cron = int(saved_cfg["cron_idle_minutes"])
                 st["last_action_utc"] = datetime.now(timezone.utc).isoformat()
-                st["last_action_reason"] = f"Parametri autopilota aggiornati (T_min={saved_cfg['t_min_c']}°C, T_max={saved_cfg['t_max_c']}°C)."
+                st["last_action_reason"] = (
+                    f"Parametri autopilota aggiornati (T_min={saved_cfg['t_min_c']}°C, "
+                    f"T_max={saved_cfg['t_max_c']}°C, poll={saved_cfg['cron_idle_minutes']}/"
+                    f"{saved_cfg['cron_armed_minutes']}/{saved_cfg['cron_active_minutes']}m)."
+                )
+
+            if saved_cfg.get("dynamic_cron_enabled"):
+                ok_c, msg_c = update_cronjob_frequency(desired_cron)
+                cron_patches += 1
+                if ok_c:
+                    st["current_cron_interval_min"] = desired_cron
+                messages.append(msg_c)
+
+            record_api_usage(
+                cron_patches=cron_patches,
+                gh_runs=1 if is_gha else 0,
+                event_label="cmd:autopilot_configure",
+                state_dict=st,
+            )
+            state_already_recorded = True
             save_state(st)
             success = True
             messages.append(st["last_action_reason"])
 
         elif command == "cronjob_test":
             from scripts.autopilot import test_cronjob_secrets
-            ok_c, msg_c = test_cronjob_secrets(verify_2m_roundtrip=bool(clean_params.get("roundtrip_2m", False)))
+            is_rt = bool(clean_params.get("roundtrip_2m", False))
+            ok_c, msg_c = test_cronjob_secrets(verify_2m_roundtrip=is_rt)
+            cron_patches += 2 if is_rt else 1
             success = ok_c
             messages.append(msg_c)
 
         elif command == "autopilot_activate_away":
-            from scripts.autopilot import load_config, save_config, load_state, save_state, update_cronjob_frequency
+            from scripts.autopilot import (
+                load_config,
+                save_config,
+                load_state,
+                save_state,
+                update_cronjob_frequency,
+                record_api_usage,
+            )
             cfg = load_config()
             cfg.update(clean_params)
             if float(cfg["t_max_c"]) <= float(cfg["t_min_c"]):
@@ -390,6 +623,10 @@ def execute_command(
             ok_d, msg_d = v_conn.set_dhw_temperature(10)
             ok_v, msg_v = v_conn.set_mode("standby")
             ok_b, msg_b = b_conn.set_thermostat_mode("hg")
+            v_writes += 3
+            v_reads += 4
+            b_reads += 1
+            b_writes += 1
 
             now_iso = datetime.now(timezone.utc).isoformat()
             st = load_state()
@@ -399,12 +636,26 @@ def execute_command(
             st["cycle_started_utc"] = None
             st["drain_started_utc"] = None
             st["cycle_is_emergency"] = False
+            st["soft_curve_trim_k"] = 0
+            st["soft_curve_last_trim_utc"] = None
             st["last_action_utc"] = now_iso
             st["last_action_reason"] = f"Assenza Montagna Full-Auto ATTIVATA (T_min={saved_cfg['t_min_c']}°C, Standby+Antigelo)."
             if saved_cfg.get("dynamic_cron_enabled"):
                 ok_c, _ = update_cronjob_frequency(int(saved_cfg["cron_idle_minutes"]))
+                cron_patches += 1
                 if ok_c:
                     st["current_cron_interval_min"] = int(saved_cfg["cron_idle_minutes"])
+            record_api_usage(
+                v_reads=v_reads,
+                v_writes=v_writes,
+                b_reads=b_reads,
+                b_writes=b_writes,
+                cron_patches=cron_patches,
+                gh_runs=1 if is_gha else 0,
+                event_label="cmd:autopilot_activate_away",
+                state_dict=st,
+            )
+            state_already_recorded = True
             save_state(st)
             success = ok_s and ok_d and ok_v and ok_b
             messages.extend([msg_s, msg_d, msg_v, msg_b, st["last_action_reason"]])
@@ -413,6 +664,21 @@ def execute_command(
         logger.error("Errore esecuzione comando '%s': %s", command, exc)
         success = False
         messages.append(str(exc))
+
+    if not state_already_recorded and any((v_reads, v_writes, b_reads, b_writes, cron_patches, is_gha)):
+        try:
+            from scripts.autopilot import record_api_usage
+            record_api_usage(
+                v_reads=v_reads,
+                v_writes=v_writes,
+                b_reads=b_reads,
+                b_writes=b_writes,
+                cron_patches=cron_patches,
+                gh_runs=1 if is_gha else 0,
+                event_label=f"cmd:{command}",
+            )
+        except Exception as usage_err:
+            logger.debug("Errore conteggio API comando: %s", usage_err)
 
     # Wait briefly for cloud state propagation, then refresh telemetry log
     sample_logged = False
@@ -430,6 +696,13 @@ def execute_command(
         "success": bool(success),
         "message": " | ".join(m for m in messages if m) or ("Comando eseguito" if success else "Errore comando"),
         "sample_logged": sample_logged,
+        "api_calls": {
+            "v_reads": v_reads,
+            "v_writes": v_writes,
+            "b_reads": b_reads,
+            "b_writes": b_writes,
+            "cron_patches": cron_patches,
+        },
     }
     if write_receipt_file:
         _write_receipt(receipt)

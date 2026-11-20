@@ -91,6 +91,9 @@ function initNavigation() {
           if (typeof updateCommandsTransportUI === "function") updateCommandsTransportUI();
           if (typeof refreshLastCommandReceipt === "function") refreshLastCommandReceipt();
           if (typeof refreshAutopilotStatus === "function") refreshAutopilotStatus();
+          if (typeof renderApiQuotaMonitor === "function") renderApiQuotaMonitor();
+        } else if (tabId === "tab-settings") {
+          if (typeof renderApiQuotaMonitor === "function") renderApiQuotaMonitor();
         } else if (tabId === "tab-synoptic" && state.latestSample) {
           renderSynoptic(state.latestSample);
         }
@@ -358,6 +361,7 @@ async function syncWithGitHub(showNotification = false) {
     // If token provided (e.g. private repo), use GitHub API (handles CORS)
     if (state.githubToken) {
       const apiUrl = `https://api.github.com/repos/${state.repo}/contents/data/cloud_telemetry.jsonl?ref=main`;
+      if (typeof trackClientGithubCall === "function") trackClientGithubCall(1);
       const apiRes = await fetch(apiUrl, {
         headers: {
           "Authorization": `token ${state.githubToken}`,
@@ -435,6 +439,7 @@ async function triggerGitHubWorkflow() {
 
   try {
     const url = `https://api.github.com/repos/${state.repo}/actions/workflows/telemetry_logger.yml/dispatches`;
+    if (typeof trackClientGithubCall === "function") trackClientGithubCall(1);
     const res = await fetch(url, {
       method: "POST",
       headers: {
@@ -541,20 +546,7 @@ function updateUI() {
   document.getElementById("cardComp").textContent = compActive ? `${(s.compressor_modulation_percent || 0).toFixed(0)} %` : "OFF";
   document.getElementById("cardComp").style.color = compActive ? "#10b981" : "#94a3b8";
 
-  // 4. Update Grundfos Banner
-  const banner = document.getElementById("grundfosBanner");
-  const bannerText = document.getElementById("grundfosBannerText");
-  const isPumpOn = s.grundfos_pump_active === 1;
-
-  if (banner && bannerText) {
-    banner.classList.toggle("active", isPumpOn);
-    banner.classList.toggle("inactive", !isPumpOn);
-    bannerText.textContent = isPumpOn 
-      ? "POMPA GRUNDFOS: ACCESA (Rilancio attivo al pavimento radiante)" 
-      : "POMPA GRUNDFOS: SPENTA (Massetto isolato, riscalda solo Puffer)";
-  }
-
-  // 5. Update Sonde Details Table
+  // 4. Update Sonde Details Table
   renderDetailedSondeList(s);
 
   // 6. Header Status Timestamp
@@ -572,6 +564,9 @@ function updateUI() {
   // 8. Sync Bidirectional Commands Controls
   if (typeof syncCommandsFromTelemetry === "function") {
     syncCommandsFromTelemetry(s);
+  }
+  if (typeof renderApiQuotaMonitor === "function") {
+    renderApiQuotaMonitor();
   }
 }
 

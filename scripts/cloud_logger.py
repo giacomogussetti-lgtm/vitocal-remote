@@ -153,6 +153,19 @@ def log_sample(run_autopilot: bool = True) -> bool:
     # 5. Rotate buffer if threshold exceeded (6-month sliding window)
     rotate_hot_buffer_if_needed(cloud_file)
 
+    # 5b. Record API read consumption (Viessmann + BTicino + GitHub runner)
+    try:
+        from scripts.autopilot import record_api_usage
+        is_gha = os.environ.get("GITHUB_ACTIONS", "").lower() == "true"
+        record_api_usage(
+            v_reads=2 if v_data else 0,
+            b_reads=2 if b_data else 0,
+            gh_runs=1 if is_gha else 0,
+            event_label="telemetry_poll",
+        )
+    except Exception as usage_err:
+        logger.debug("Errore aggiornamento contatore API: %s", usage_err)
+
     # 6. Evaluate Full-Auto Mountain Custody Autopilot tick (fail-safe wrapped)
     if run_autopilot:
         try:

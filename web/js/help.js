@@ -54,16 +54,28 @@ const HELP_CATALOG = {
     tip: "11:00–16:00 centra il picco termico pomeridiano in montagna."
   },
   ap_dynamic_cron: {
-    title: "⚡ Frequenza Dinamica cron-job.org",
-    what: "Adatta in automatico ogni quanto tempo il logger cloud interroga PdC e BTicino tramite l'API cron-job.org.",
-    impact: "15 min a riposo (IDLE, risparmia API Viessmann), 5 min in attesa conferma (ARMED), 2 min ad alta risoluzione durante HEATING_SYNC e PUFFER_DRAIN per tracciare curve e consumi al dettaglio.",
-    tip: "Richiede i GitHub Secrets CRONJOB_API_KEY e CRONJOB_ID configurati sul repository."
+    title: "⚡ Frequenza Dinamica cron-job.org (Editabile)",
+    what: "Adatta automaticamente ogni quanti minuti il logger interroga PdC e BTicino tramite cron-job.org in base allo stato dell'Autopilota (IDLE, Armato, Ciclo Attivo).",
+    impact: "Puoi personalizzare ogni intervallo fino a un minimo di 1 minuto. Intervalli più fitti migliorano il dettaglio dei grafici ma consumano più chiamate Viessmann (limite 1.450/24h).",
+    tip: "Valori equilibrati: 15 min in IDLE (192 chiamate/24h), 5 min in Armato, 1–2 min durante i cicli attivi per catturare ogni variazione."
   },
-  ap_test_cron: {
-    title: "🧪 Verifica Secrets & Cambio Timer 2 min",
-    what: "Usa GitHub Actions per interrogare cron-job.org: 'Solo Lettura' verifica chiavi e ID senza toccare nulla; 'Test Cambio Timer 2m' scrive davvero 2 min (30 slot/ora), rilegge per conferma e ripristina subito lo schedule iniziale.",
-    impact: "Zero modifiche su PdC o termostato di casa; ti dà certezza matematica che l'Autopilota riuscirà a passare a 2 min quando partirà il riscaldamento.",
-    tip: "Puoi eseguirlo ogni volta che cambi i Secrets su GitHub o modifichi il job su cron-job.org."
+  ap_soft_curve: {
+    title: "🎛️ Self-Tuning Soft Curva (Anti-Overshoot)",
+    what: "Quando abilitato, invece di lasciare che il termostato tagli di colpo la pompa Grundfos quando casa sale troppo velocemente, riduce dolcemente di −1 K il riferimento PdC (fino a max −2 K, ogni 60 min).",
+    impact: "Mantiene il circolatore secondario sempre aperto e costringe l'inverter Vitocal a modulare verso il basso, allungando il ciclo ed evitando stacchi secchi sul puffer.",
+    tip: "Ideale in presenza o in giornate miti quando la casa tende a scaldarsi prima della fine finestra COP."
+  },
+  cmd_profiles_smart: {
+    title: "🎯 Scenari & Profili Coordinati (PdC + Consenso Pompa)",
+    what: "Combina in un solo tocco i parametri Vitocal (modo, curva, temperature, fascia oraria) e il consenso relè del BTicino Smarther.",
+    impact: "Poiché nel tuo impianto il BTicino funge da interruttore ON/OFF della Grundfos, coordinare entrambi evita che la PdC scaldi i soli 200L del puffer a pompa ferma.",
+    tip: "Puoi usare i 4 profili pronti oppure salvare le impostazioni attuali con '➕ Salva Attuale'."
+  },
+  api_quota_monitor: {
+    title: "📊 Monitor Quote & Token API (Letture + Scritture)",
+    what: "Somma in tempo reale le letture telemetriche periodiche e le scritture di comando verso Viessmann ViCare (1.450/24h, burst 120/10m), BTicino/Netatmo (500/1h), cron-job.org e GitHub.",
+    impact: "Ti permette di vedere subito quanto margine resta prima dei rate-limit, soprattutto se abbassi la frequenza di polling dinamico a 1–2 minuti.",
+    tip: "In verde (<50%) sei in piena sicurezza; se superi l'80% in giallo/rosso, aumenta l'intervallo IDLE."
   },
   cmd_sync_pulse: {
     title: "⚡ Ciclo Sincronizzato (PdC + Grundfos)",
@@ -120,9 +132,9 @@ const HELP_CATALOG = {
     tip: "Usa 🔄 Rileggi (in Wi-Fi locale) se hai creato nuove programmazioni dall'app ufficiale Home + Control."
   },
   chart_bands: {
-    title: "🎨 Bande Verticali & Durate ON",
+    title: "🎨 Bande Verticali, Durate ON & Resa Termica",
     what: "Le fasce colorate sullo sfondo evidenziano quando sta lavorando la sola PdC (Ambra), la sola Grundfos (Ciano) o entrambe insieme in sincronia (Verde).",
-    impact: "Quando fai zoom sufficiente su un blocco, sopra la banda compare la durata esatta dell'intervallo (es. 'PdC 24m'). Tocca ciascuna pillola in alto per mostrare o nascondere i singoli colori.",
+    impact: "Espandendo o zoomando il grafico, la pillola mostra la durata e la resa termica stimata (kWhₜ e kWₜ medi, calcolati da modulazione e COP). Tocca le pillole in alto per filtrare i colori.",
     tip: "L'obiettivo di efficienza è avere bande Verdi lunghe e continue, riducendo al minimo le bande Ambra isolate."
   },
   chart_setpoint_stop: {

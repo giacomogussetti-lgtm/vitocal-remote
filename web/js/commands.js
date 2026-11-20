@@ -4,13 +4,88 @@
  * GitHub Actions workflow_dispatch (apply_command.yml) when running over 4G/5G.
  */
 
+const CUSTOM_PROFILES_KEY = "vitocal_custom_profiles";
+const SAVED_SCHEDULES_KEY = "vitocal_saved_schedules";
+const GH_CLIENT_CALLS_KEY = "vitocal_gh_client_calls";
+
+const BUILTIN_PROFILES = {
+  standby_hg: {
+    summary: "Mettere Vitocal in STANDBY, BTicino in ANTIGELO (Grundfos spenta) e mettere in pausa l'Autopilota?",
+    params: {
+      profile_name: "Tutto Standby / Antigelo",
+      autopilot_enabled: false,
+      pdc_mode: "standby",
+      bticino_mode: "hg",
+    },
+  },
+  cop_day: {
+    summary: "Attivare Carica Diurna Alto COP: PdC 11:00–16:00 (14°C, Risc+ACS) e BTicino 18.0°C per 5h (Grundfos accesa)?",
+    params: {
+      profile_name: "Carica Diurna Alto COP",
+      autopilot_enabled: false,
+      pdc_mode: "dhwAndHeating",
+      pdc_reduced: 14,
+      pdc_normal: 14,
+      pdc_schedule: { days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"], start: "11:00", end: "16:00", mode: "reduced", clear: false },
+      bticino_mode: "manual",
+      bticino_temp: 18.0,
+      bticino_duration_minutes: 300,
+    },
+  },
+  preheat_arrival: {
+    summary: "Avviare Pre-Riscaldamento Arrivo: PdC 07:00–22:00 (18°C, ACS 45°C) e BTicino 20.0°C per 4h (Grundfos attiva)?",
+    params: {
+      profile_name: "Pre-Riscaldamento Arrivo",
+      autopilot_enabled: false,
+      pdc_mode: "dhwAndHeating",
+      pdc_normal: 18,
+      pdc_reduced: 18,
+      pdc_dhw: 45,
+      pdc_schedule: { days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"], start: "07:00", end: "22:00", mode: "normal", clear: false },
+      bticino_mode: "manual",
+      bticino_temp: 20.0,
+      bticino_duration_minutes: 240,
+    },
+  },
+  comfort_modulate: {
+    summary: "Attivare Comfort Modulante Anti-ON/OFF: PdC 07:00–22:00 (20°/17°C, ACS 45°C) e consenso Grundfos attivo 12h (22.0°C)?",
+    params: {
+      profile_name: "Comfort Modulante Anti-ON/OFF",
+      autopilot_enabled: false,
+      pdc_mode: "dhwAndHeating",
+      pdc_normal: 20,
+      pdc_reduced: 17,
+      pdc_dhw: 45,
+      pdc_schedule: { days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"], start: "07:00", end: "22:00", mode: "normal", clear: false },
+      bticino_mode: "manual",
+      bticino_temp: 22.0,
+      bticino_duration_minutes: 720,
+    },
+  },
+};
+
+function trackClientGithubCall(count = 1) {
+  try {
+    const now = Date.now();
+    const cutoff = now - 24 * 3600 * 1000;
+    const raw = JSON.parse(localStorage.getItem(GH_CLIENT_CALLS_KEY) || "[]");
+    const list = Array.isArray(raw) ? raw.filter(ts => typeof ts === "number" && ts >= cutoff) : [];
+    for (let i = 0; i < count; i++) list.push(now);
+    localStorage.setItem(GH_CLIENT_CALLS_KEY, JSON.stringify(list.slice(-1000)));
+  } catch (e) {}
+}
+window.trackClientGithubCall = trackClientGithubCall;
+
 const cmdState = {
   initialized: false,
   hydratedOnce: false,
   isSending: false,
   autopilotEnabled: false,
   autopilotState: "DISABLED",
+  lastAutopilotConfig: null,
+  lastAutopilotState: null,
   pendingAction: null,
+  saveModalMode: null,
   baseline: {
     pdcMode: "dhwAndHeating",
     slope: 0.6,
@@ -37,10 +112,15 @@ function initCommandsUI() {
   populateTimeSelects();
   bindSteppers();
   bindDirtyWatchers();
+  bindSchedulePlannerUI();
+  bindProfileButtons();
+  bindSaveProfileModal();
   bindCommandButtons();
   bindAutopilotButtons();
   bindConfirmModal();
   updateCommandsTransportUI();
+  updateCronQuotaPreview();
+  renderApiQuotaMonitor();
 }
 
 function populateTimeSelects() {
@@ -217,9 +297,17 @@ function syncCommandsFromTelemetry(sample) {
     progTag.textContent = `PROG: ${(sample.active_program || "--").toUpperCase()}`;
   }
 
+  const gfLiveBadge = document.getElementById("bticinoGrundfosLiveBadge");
+  if (gfLiveBadge) {
+    const gfOn = sample.grundfos_pump_active === 1;
+    gfLiveBadge.textContent = gfOn ? "💧 Grundfos: ACCESA (Consenso attivo)" : "⏸ Grundfos: SPENTA (Standby)";
+    gfLiveBadge.style.color = gfOn ? "#6ee7b7" : "#94a3b8";
+  }
+
   cmdState.hydratedOnce = true;
   updateCurvePreview();
   updateCommandLeds();
+  renderApiQuotaMonitor();
 }
 
 function updateCommandsTransportUI() {
@@ -237,10 +325,310 @@ function updateCommandsTransportUI() {
   }
 }
 
-function getDaysListFromSelect(val) {
-  if (val === "weekdays") return ["mon", "tue", "wed", "thu", "fri"];
-  if (val === "weekend") return ["sat", "sun"];
-  return ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+function getSelectedScheduleDays() {
+  const chips = document.querySelectorAll("#schedDayPills .sched-day-chip.active");
+  const out = [];
+  chips.forEach(c => {
+    if (c.dataset.day) out.push(c.dataset.day);
+  });
+  return out;
+}
+
+function setSelectedScheduleDays(days) {
+  const allow = new Set(days || []);
+  document.querySelectorAll("#schedDayPills .sched-day-chip").forEach(c => {
+    c.classList.toggle("active", allow.has(c.dataset.day));
+  });
+}
+
+function hhmmToMinutes(hhmm) {
+  const parts = String(hhmm || "00:00").split(":");
+  return (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
+}
+
+function updateScheduleTimelineUI() {
+  const startEl = document.getElementById("cmdSchedStart");
+  const endEl = document.getElementById("cmdSchedEnd");
+  const modeEl = document.getElementById("cmdSchedMode");
+  const blockEl = document.getElementById("pdcScheduleBlock");
+  const sumEl = document.getElementById("pdcScheduleSummaryText");
+  if (!startEl || !endEl || !blockEl) return;
+
+  const start = startEl.value || "11:00";
+  const end = endEl.value || "16:00";
+  const mode = modeEl ? modeEl.value : "reduced";
+  const m1 = hhmmToMinutes(start);
+  const m2 = hhmmToMinutes(end);
+  const days = getSelectedScheduleDays();
+
+  if (m2 <= m1) {
+    blockEl.style.left = "0%";
+    blockEl.style.width = "0%";
+    blockEl.textContent = "";
+    if (sumEl) sumEl.textContent = "⚠️ Orario fine deve seguire l'inizio.";
+    return;
+  }
+
+  const leftPct = (m1 / 1440) * 100;
+  const widthPct = ((m2 - m1) / 1440) * 100;
+  blockEl.style.left = `${leftPct.toFixed(2)}%`;
+  blockEl.style.width = `${widthPct.toFixed(2)}%`;
+  blockEl.textContent = widthPct >= 14 ? `${start}–${end}` : "";
+  blockEl.classList.toggle("is-normal", mode === "normal");
+
+  if (sumEl) {
+    const durH = ((m2 - m1) / 60).toFixed(1).replace(/\.0$/, "");
+    const modeLabel = mode === "normal" ? "Normale" : "Ridotta";
+    const daysLabel = days.length === 7 ? "Tutti i giorni" : `${days.length} gg (${days.join(", ")})`;
+    sumEl.textContent = `${daysLabel} · ${start}–${end} (${durH}h, ${modeLabel}) · Fuori fascia: Standby`;
+  }
+}
+
+function bindSchedulePlannerUI() {
+  document.querySelectorAll("#schedDayPills .sched-day-chip").forEach(btn => {
+    btn.addEventListener("click", () => {
+      btn.classList.toggle("active");
+      updateScheduleTimelineUI();
+    });
+  });
+
+  for (const id of ["cmdSchedStart", "cmdSchedEnd", "cmdSchedMode"]) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("change", updateScheduleTimelineUI);
+  }
+
+  document.querySelectorAll(".sched-quick-tpl").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const sEl = document.getElementById("cmdSchedStart");
+      const eEl = document.getElementById("cmdSchedEnd");
+      const mEl = document.getElementById("cmdSchedMode");
+      if (sEl && btn.dataset.start) sEl.value = btn.dataset.start;
+      if (eEl && btn.dataset.end) eEl.value = btn.dataset.end;
+      if (mEl && btn.dataset.mode) mEl.value = btn.dataset.mode;
+      updateScheduleTimelineUI();
+    });
+  });
+
+  const btnSaveSched = document.getElementById("btnSaveSchedulePreset");
+  if (btnSaveSched) {
+    btnSaveSched.addEventListener("click", () => openSaveProfileModal("schedule"));
+  }
+
+  renderSavedSchedulePresets();
+  updateScheduleTimelineUI();
+}
+
+function loadJsonList(storageKey) {
+  try {
+    const raw = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    return Array.isArray(raw) ? raw : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveJsonList(storageKey, arr) {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(arr));
+  } catch (e) {}
+}
+
+function renderSavedSchedulePresets() {
+  const wrap = document.getElementById("savedSchedulePresets");
+  if (!wrap) return;
+  const list = loadJsonList(SAVED_SCHEDULES_KEY);
+  if (!list.length) {
+    wrap.innerHTML = "";
+    return;
+  }
+  wrap.innerHTML = list.map((item, idx) => `
+    <span class="saved-chip-item">
+      <button type="button" class="saved-chip-apply" data-sched-idx="${idx}">🗓️ ${item.name} (${item.start}–${item.end})</button>
+      <button type="button" class="saved-chip-del" data-sched-del="${idx}" title="Elimina">×</button>
+    </span>
+  `).join("");
+
+  wrap.querySelectorAll("[data-sched-idx]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const item = loadJsonList(SAVED_SCHEDULES_KEY)[parseInt(btn.dataset.schedIdx, 10)];
+      if (!item) return;
+      setSelectedScheduleDays(item.days || ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
+      const sEl = document.getElementById("cmdSchedStart");
+      const eEl = document.getElementById("cmdSchedEnd");
+      const mEl = document.getElementById("cmdSchedMode");
+      const syncEl = document.getElementById("cmdSchedSyncGrundfos");
+      if (sEl) sEl.value = item.start;
+      if (eEl) eEl.value = item.end;
+      if (mEl) mEl.value = item.mode || "reduced";
+      if (syncEl && item.syncGrundfos != null) syncEl.checked = Boolean(item.syncGrundfos);
+      updateScheduleTimelineUI();
+      showToast(`🗓️ Caricato orario "${item.name}"`);
+    });
+  });
+
+  wrap.querySelectorAll("[data-sched-del]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = parseInt(btn.dataset.schedDel, 10);
+      const cur = loadJsonList(SAVED_SCHEDULES_KEY);
+      cur.splice(idx, 1);
+      saveJsonList(SAVED_SCHEDULES_KEY, cur);
+      renderSavedSchedulePresets();
+    });
+  });
+}
+
+function bindProfileButtons() {
+  document.querySelectorAll("[data-builtin-profile]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const prof = BUILTIN_PROFILES[btn.dataset.builtinProfile];
+      if (!prof) return;
+      requestCommandConfirm("apply_full_profile", prof.params, prof.summary, "all");
+    });
+  });
+
+  const btnSaveProf = document.getElementById("btnSaveCustomProfile");
+  if (btnSaveProf) {
+    btnSaveProf.addEventListener("click", () => openSaveProfileModal("profile"));
+  }
+
+  const btnQuickArrival = document.getElementById("btnQuickPreheatArrival");
+  if (btnQuickArrival) {
+    btnQuickArrival.addEventListener("click", () => {
+      const prof = BUILTIN_PROFILES.preheat_arrival;
+      if (prof) requestCommandConfirm("apply_full_profile", prof.params, prof.summary, "all");
+    });
+  }
+
+  renderCustomProfiles();
+}
+
+function renderCustomProfiles() {
+  const wrap = document.getElementById("customProfilesList");
+  if (!wrap) return;
+  const list = loadJsonList(CUSTOM_PROFILES_KEY);
+  if (!list.length) {
+    wrap.innerHTML = '<span class="cmd-muted-note">Nessun profilo personalizzato salvato.</span>';
+    return;
+  }
+  wrap.innerHTML = list.map((p, idx) => `
+    <span class="saved-chip-item">
+      <button type="button" class="saved-chip-apply" data-prof-idx="${idx}">⭐ ${p.name}</button>
+      <button type="button" class="saved-chip-del" data-prof-del="${idx}" title="Elimina">×</button>
+    </span>
+  `).join("");
+
+  wrap.querySelectorAll("[data-prof-idx]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const item = loadJsonList(CUSTOM_PROFILES_KEY)[parseInt(btn.dataset.profIdx, 10)];
+      if (!item || !item.params) return;
+      const summary = `Applicare profilo salvato "${item.name}" (PdC ${item.params.pdc_mode}, T=${item.params.pdc_normal}/${item.params.pdc_reduced}°C, BTicino ${item.params.bticino_temp || item.params.bticino_mode})?`;
+      requestCommandConfirm("apply_full_profile", item.params, summary, "all");
+    });
+  });
+
+  wrap.querySelectorAll("[data-prof-del]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = parseInt(btn.dataset.profDel, 10);
+      const cur = loadJsonList(CUSTOM_PROFILES_KEY);
+      cur.splice(idx, 1);
+      saveJsonList(CUSTOM_PROFILES_KEY, cur);
+      renderCustomProfiles();
+    });
+  });
+}
+
+function openSaveProfileModal(mode) {
+  cmdState.saveModalMode = mode;
+  const modal = document.getElementById("saveProfileModal");
+  const titleEl = document.getElementById("saveProfileModalTitle");
+  const hintEl = document.getElementById("saveProfileModalHint");
+  const inp = document.getElementById("inputSaveProfileName");
+  if (!modal) return;
+  if (mode === "schedule") {
+    if (titleEl) titleEl.textContent = "🗓️ Salva Preset Fascia Oraria";
+    if (hintEl) hintEl.textContent = "Salva giorni, orario inizio/fine e coordinazione pompa Grundfos per richiamarli in 1 tocco.";
+    if (inp) inp.value = "";
+  } else {
+    if (titleEl) titleEl.textContent = "⭐ Salva Profilo Impianto Completo";
+    if (hintEl) hintEl.textContent = "Salva curva, temperature PdC, fascia oraria e consenso pompa BTicino attualmente impostati a video.";
+    if (inp) inp.value = "";
+  }
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+  if (inp) setTimeout(() => inp.focus(), 40);
+}
+
+function closeSaveProfileModal() {
+  const modal = document.getElementById("saveProfileModal");
+  if (!modal) return;
+  modal.classList.remove("open");
+  modal.setAttribute("aria-hidden", "true");
+  cmdState.saveModalMode = null;
+}
+
+function bindSaveProfileModal() {
+  const modal = document.getElementById("saveProfileModal");
+  if (!modal || modal.dataset.bound === "1") return;
+  modal.dataset.bound = "1";
+
+  const closeBtn = document.getElementById("btnCloseSaveProfileModal");
+  const cancelBtn = document.getElementById("btnCancelSaveProfile");
+  const confirmBtn = document.getElementById("btnConfirmSaveProfile");
+  if (closeBtn) closeBtn.addEventListener("click", closeSaveProfileModal);
+  if (cancelBtn) cancelBtn.addEventListener("click", closeSaveProfileModal);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeSaveProfileModal();
+  });
+
+  if (confirmBtn) {
+    confirmBtn.addEventListener("click", () => {
+      const nameEl = document.getElementById("inputSaveProfileName");
+      const name = (nameEl ? nameEl.value : "").trim();
+      if (!name) {
+        showToast("⚠️ Inserisci un nome per il preset.");
+        return;
+      }
+
+      if (cmdState.saveModalMode === "schedule") {
+        const days = getSelectedScheduleDays();
+        const start = document.getElementById("cmdSchedStart").value;
+        const end = document.getElementById("cmdSchedEnd").value;
+        const mode = document.getElementById("cmdSchedMode").value;
+        const syncGrundfos = Boolean(document.getElementById("cmdSchedSyncGrundfos").checked);
+        const list = loadJsonList(SAVED_SCHEDULES_KEY);
+        list.push({ name, days, start, end, mode, syncGrundfos });
+        saveJsonList(SAVED_SCHEDULES_KEY, list);
+        renderSavedSchedulePresets();
+        showToast(`✅ Orario "${name}" salvato!`);
+      } else {
+        const days = getSelectedScheduleDays();
+        const start = document.getElementById("cmdSchedStart").value;
+        const end = document.getElementById("cmdSchedEnd").value;
+        const schedMode = document.getElementById("cmdSchedMode").value;
+        const btTemp = Number(parseFloat(document.getElementById("cmdBticinoTemp").value).toFixed(1));
+        const btDur = parseInt(document.getElementById("cmdBticinoDuration").value, 10) || 180;
+        const params = {
+          profile_name: name,
+          autopilot_enabled: false,
+          pdc_mode: document.getElementById("cmdPdcModeSelect").value,
+          curve_slope: Number(parseFloat(document.getElementById("cmdSlopeInput").value).toFixed(1)),
+          curve_shift: parseInt(document.getElementById("cmdShiftInput").value, 10),
+          pdc_normal: parseInt(document.getElementById("cmdTempNormal").value, 10),
+          pdc_reduced: parseInt(document.getElementById("cmdTempReduced").value, 10),
+          pdc_dhw: parseInt(document.getElementById("cmdTempDhw").value, 10),
+          pdc_schedule: { days: days.length ? days : ["mon","tue","wed","thu","fri","sat","sun"], start, end, mode: schedMode, clear: false },
+          bticino_mode: btTemp <= 7.0 ? "hg" : "manual",
+          ...(btTemp > 7.0 ? { bticino_temp: btTemp, bticino_duration_minutes: btDur } : {}),
+        };
+        const list = loadJsonList(CUSTOM_PROFILES_KEY);
+        list.push({ name, params });
+        saveJsonList(CUSTOM_PROFILES_KEY, list);
+        renderCustomProfiles();
+        showToast(`✅ Profilo "${name}" salvato!`);
+      }
+      closeSaveProfileModal();
+    });
+  }
 }
 
 function bindCommandButtons() {
@@ -349,12 +737,15 @@ function bindCommandButtons() {
     });
   }
 
-  // Viessmann Schedule
+  // Viessmann Schedule (Visual 24h Planner + Optional Grundfos Interlock)
   const btnSched = document.getElementById("btnSendPdcSchedule");
   if (btnSched) {
     btnSched.addEventListener("click", () => {
-      const daysVal = document.getElementById("cmdSchedDays").value;
-      const days = getDaysListFromSelect(daysVal);
+      const days = getSelectedScheduleDays();
+      if (!days.length) {
+        showToast("⚠️ Seleziona almeno un giorno della settimana.");
+        return;
+      }
       const start = document.getElementById("cmdSchedStart").value;
       const end = document.getElementById("cmdSchedEnd").value;
       const mode = document.getElementById("cmdSchedMode").value;
@@ -362,25 +753,60 @@ function bindCommandButtons() {
         showToast("⚠️ L'orario di fine deve essere successivo all'inizio.");
         return;
       }
-      requestCommandConfirm(
-        "viessmann_schedule",
-        { days, start, end, mode, clear: false },
-        `Impostare fascia oraria PdC (${days.join(", ")}) dalle ${start} alle ${end} in modalità "${mode}"?`,
-        null
-      );
+      const syncGf = Boolean(document.getElementById("cmdSchedSyncGrundfos") && document.getElementById("cmdSchedSyncGrundfos").checked);
+      if (syncGf) {
+        const durMin = Math.max(60, Math.min(720, hhmmToMinutes(end) - hhmmToMinutes(start)));
+        const btTarget = Math.max(18.0, parseFloat(document.getElementById("cmdBticinoTemp").value) || 18.0);
+        requestCommandConfirm(
+          "apply_full_profile",
+          {
+            profile_name: `Fascia ${start}–${end} + Grundfos`,
+            pdc_mode: "dhwAndHeating",
+            pdc_schedule: { days, start, end, mode, clear: false },
+            bticino_mode: "manual",
+            bticino_temp: btTarget,
+            bticino_duration_minutes: durMin,
+          },
+          `Applicare fascia PdC (${days.join(", ")}) ${start}–${end} (${mode}) E attivare il consenso pompa BTicino (${btTarget.toFixed(1)} °C per ${durMin} min) per modulare senza tagli?`,
+          "all"
+        );
+      } else {
+        requestCommandConfirm(
+          "viessmann_schedule",
+          { days, start, end, mode, clear: false },
+          `Impostare fascia oraria PdC (${days.join(", ")}) dalle ${start} alle ${end} in modalità "${mode}"?`,
+          null
+        );
+      }
     });
   }
 
   const btnClearSched = document.getElementById("btnClearPdcSchedule");
   if (btnClearSched) {
     btnClearSched.addEventListener("click", () => {
-      const daysVal = document.getElementById("cmdSchedDays").value;
-      const days = getDaysListFromSelect(daysVal);
+      const days = getSelectedScheduleDays();
+      if (!days.length) {
+        showToast("⚠️ Seleziona almeno un giorno della settimana.");
+        return;
+      }
       requestCommandConfirm(
         "viessmann_schedule",
         { days, clear: true },
         `Svuotare le fasce orarie PdC per (${days.join(", ")}) lasciando il circuito in Standby?`,
         null
+      );
+    });
+  }
+
+  // Quick Grundfos Force Pump ON
+  const btnForcePump = document.getElementById("btnBtForcePumpOn");
+  if (btnForcePump) {
+    btnForcePump.addEventListener("click", () => {
+      requestCommandConfirm(
+        "bticino_setpoint",
+        { mode: "manual", temp: 20.0, duration_minutes: 240 },
+        "Forzare il consenso pompa Grundfos ACCESA (BTicino manuale 20.0 °C per 4 ore) affinché la PdC moduli liberamente?",
+        "bticino"
       );
     });
   }
@@ -583,6 +1009,7 @@ async function executeCommandAction({ command, params, dirtyKey, forceCloud }) {
   setReceiptBanner("pending", `⏳ Invio '${command}' a GitHub Actions (apply_command.yml)...`);
   try {
     const url = `https://api.github.com/repos/${state.repo}/actions/workflows/apply_command.yml/dispatches`;
+    trackClientGithubCall(1);
     const res = await fetch(url, {
       method: "POST",
       headers: {
@@ -637,6 +1064,7 @@ async function fetchDataJson(filename) {
       if (res.ok) return await res.json();
     } else if (state.githubToken) {
       const apiUrl = `https://api.github.com/repos/${state.repo}/contents/data/${filename}?ref=main&t=${Date.now()}`;
+      trackClientGithubCall(1);
       const res = await fetch(apiUrl, {
         headers: {
           "Authorization": `token ${state.githubToken}`,
@@ -659,6 +1087,12 @@ async function fetchLastCommandReceipt() {
   return fetchDataJson("last_command.json");
 }
 
+function clampInt(val, min, max, fallback) {
+  const n = parseInt(val, 10);
+  if (isNaN(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
 function readAutopilotFormValues() {
   return {
     t_min_c: parseFloat(document.getElementById("apTMin").value),
@@ -670,7 +1104,24 @@ function readAutopilotFormValues() {
     cop_window_start: document.getElementById("apWinStart").value || "11:00",
     cop_window_end: document.getElementById("apWinEnd").value || "16:00",
     dynamic_cron_enabled: Boolean(document.getElementById("apDynamicCron").checked),
+    cron_idle_minutes: clampInt(document.getElementById("apCronIdle")?.value, 1, 60, 15),
+    cron_armed_minutes: clampInt(document.getElementById("apCronArmed")?.value, 1, 30, 5),
+    cron_active_minutes: clampInt(document.getElementById("apCronActive")?.value, 1, 15, 2),
+    soft_curve_tuning_enabled: Boolean(document.getElementById("apSoftCurveTuning")?.checked),
   };
+}
+
+function updateCronQuotaPreview() {
+  const el = document.getElementById("apCronQuotaPreview");
+  if (!el) return;
+  const idleMin = clampInt(document.getElementById("apCronIdle")?.value, 1, 60, 15);
+  const actMin = clampInt(document.getElementById("apCronActive")?.value, 1, 15, 2);
+  const idleCalls24 = Math.round((1440 / idleMin) * 2);
+  const actCalls24 = Math.round((1440 / actMin) * 2);
+  const pctIdle = ((idleCalls24 / 1450) * 100).toFixed(0);
+  const warn = idleCalls24 > 1100;
+  el.textContent = `Stima polling Viessmann: ~${idleCalls24}/24h in IDLE (${pctIdle}% quota) · max ~${actCalls24}/24h se attivo h24 (limite 1.450/24h)`;
+  el.style.color = warn ? "#fbbf24" : "#bae6fd";
 }
 
 function bindAutopilotButtons() {
@@ -682,6 +1133,11 @@ function bindAutopilotButtons() {
     });
   }
 
+  for (const id of ["apCronIdle", "apCronArmed", "apCronActive"]) {
+    const inp = document.getElementById(id);
+    if (inp) inp.addEventListener("input", updateCronQuotaPreview);
+  }
+
   const btnAway = document.getElementById("btnActivateFullAutoAway");
   if (btnAway) {
     btnAway.addEventListener("click", () => {
@@ -691,7 +1147,7 @@ function bindAutopilotButtons() {
         return;
       }
       const promptMsg = cmdState.autopilotEnabled
-        ? `L'Autopilota è già attivo (${cmdState.autopilotState}). Ri-applicare i fail-safe hardware e i parametri attuali (fascia ${vals.cop_window_start}–${vals.cop_window_end}, avvio ≤ ${vals.t_min_c.toFixed(1)} °C)?`
+        ? `L'Autopilota è già attivo (${cmdState.autopilotState}). Ri-applicare i fail-safe hardware e i parametri attuali (fascia ${vals.cop_window_start}–${vals.cop_window_end}, polling ${vals.cron_idle_minutes}/${vals.cron_armed_minutes}/${vals.cron_active_minutes}m)?`
         : `Attivare CUSTODIA AUTOMATICA MONTAGNA (Full-Auto)?\nMetterà subito la PdC in Standby (fascia sicurezza ${vals.cop_window_start}–${vals.cop_window_end}), BTicino in Antigelo (7.0 °C) e gestirà automaticamente cicli lunghi se T casa scende sotto ${vals.t_min_c.toFixed(1)} °C.`;
       requestCommandConfirm("autopilot_activate_away", vals, promptMsg, null);
     });
@@ -724,31 +1180,7 @@ function bindAutopilotButtons() {
       requestCommandConfirm(
         "autopilot_configure",
         vals,
-        `Salvare i nuovi parametri dell'Autopilota (Avvio ${vals.t_min_c}°C → Stacco ${vals.t_max_c}°C, Emergenza ${vals.t_emergency_c}°C, ΔT LWT +${vals.target_lwt_delta_k}K)?`,
-        null
-      );
-    });
-  }
-
-  const btnTestCron = document.getElementById("btnTestCronjob");
-  if (btnTestCron) {
-    btnTestCron.addEventListener("click", () => {
-      requestCommandConfirm(
-        "cronjob_test",
-        { roundtrip_2m: false },
-        "Verificare in sola lettura su GitHub Actions che i secrets CRONJOB_API_KEY e CRONJOB_ID funzionino su cron-job.org? (Nessuna modifica a PdC, BTicino o orari.)",
-        null
-      );
-    });
-  }
-
-  const btnTestCron2m = document.getElementById("btnTestCronjobRoundtrip");
-  if (btnTestCron2m) {
-    btnTestCron2m.addEventListener("click", () => {
-      requestCommandConfirm(
-        "cronjob_test",
-        { roundtrip_2m: true },
-        "Eseguire il test completo di scrittura timer 2 min su cron-job.org?\nScriverà temporaneamente [0,2,4...58] (30 slot/ora), rileggerà per conferma e ripristinerà subito lo schedule precedente. Nessuna modifica a PdC o BTicino.",
+        `Salvare parametri Autopilota (Avvio ${vals.t_min_c}°C → Stacco ${vals.t_max_c}°C, Polling ${vals.cron_idle_minutes}/${vals.cron_armed_minutes}/${vals.cron_active_minutes}m${vals.soft_curve_tuning_enabled ? ", Self-Tuning Soft ON" : ""})?`,
         null
       );
     });
@@ -772,10 +1204,15 @@ async function refreshAutopilotStatus() {
   if (!st) st = await fetchDataJson("autopilot_state.json");
   if (cfg || st) {
     renderAutopilotUI(cfg || {}, st || {});
+  } else {
+    renderApiQuotaMonitor();
   }
 }
 
 function renderAutopilotUI(cfg, st) {
+  cmdState.lastAutopilotConfig = cfg;
+  cmdState.lastAutopilotState = st;
+
   const enabled = Boolean(cfg.enabled);
   const stateCode = enabled ? (st.state || "IDLE") : "DISABLED";
   cmdState.autopilotEnabled = enabled;
@@ -866,6 +1303,9 @@ function renderAutopilotUI(cfg, st) {
       apDrainMin: cfg.puffer_drain_minutes,
       apWinStart: cfg.cop_window_start,
       apWinEnd: cfg.cop_window_end,
+      apCronIdle: cfg.cron_idle_minutes,
+      apCronArmed: cfg.cron_armed_minutes,
+      apCronActive: cfg.cron_active_minutes,
     };
     for (const [elId, val] of Object.entries(mapVals)) {
       const el = document.getElementById(elId);
@@ -873,8 +1313,190 @@ function renderAutopilotUI(cfg, st) {
     }
     const chk = document.getElementById("apDynamicCron");
     if (chk && cfg.dynamic_cron_enabled != null) chk.checked = Boolean(cfg.dynamic_cron_enabled);
+    const chkSoft = document.getElementById("apSoftCurveTuning");
+    if (chkSoft && cfg.soft_curve_tuning_enabled != null) chkSoft.checked = Boolean(cfg.soft_curve_tuning_enabled);
+    updateCronQuotaPreview();
   }
+
+  renderApiQuotaMonitor();
 }
+
+function computeApiQuotaSummary() {
+  const nowMs = Date.now();
+  const cutoff24 = nowMs - 24 * 3600 * 1000;
+  const cutoff1h = nowMs - 3600 * 1000;
+  const cutoff10m = nowMs - 10 * 60 * 1000;
+
+  const samples = (typeof state !== "undefined" && Array.isArray(state.samples)) ? state.samples : [];
+  let sampleCount24 = 0;
+  let sampleCount1h = 0;
+  let sampleCount10m = 0;
+  const sampleTs24 = [];
+  for (const s of samples) {
+    if (!s || !s.timestamp_utc) continue;
+    const t = new Date(s.timestamp_utc).getTime();
+    if (isNaN(t)) continue;
+    if (t >= cutoff24) {
+      sampleCount24++;
+      sampleTs24.push(t);
+    }
+    if (t >= cutoff1h) sampleCount1h++;
+    if (t >= cutoff10m) sampleCount10m++;
+  }
+
+  const st = cmdState.lastAutopilotState || {};
+  const usage = (st && typeof st.api_usage === "object" && st.api_usage) ? st.api_usage : {};
+  const events = Array.isArray(usage.recent_events) ? usage.recent_events : [];
+
+  let evVReads24 = 0, evVWrites24 = 0, evBReads24 = 0, evBWrites24 = 0, evCronPatches24 = 0, evGhRuns24 = 0;
+  let evB1h = 0, evV10m = 0;
+  const trackedPollTs = [];
+
+  for (const ev of events) {
+    if (!ev || !ev.ts) continue;
+    const t = new Date(ev.ts).getTime();
+    if (isNaN(t) || t < cutoff24) continue;
+    const vr = Number(ev.vr || 0);
+    const vw = Number(ev.vw || 0);
+    const br = Number(ev.br || 0);
+    const bw = Number(ev.bw || 0);
+    const cp = Number(ev.cp || 0);
+    const gh = Number(ev.gh || 0);
+
+    evVReads24 += vr;
+    evVWrites24 += vw;
+    evBReads24 += br;
+    evBWrites24 += bw;
+    evCronPatches24 += cp;
+    evGhRuns24 += gh;
+    if (ev.lbl === "telemetry_poll") trackedPollTs.push(t);
+    if (t >= cutoff1h) evB1h += (br + bw);
+    if (t >= cutoff10m) evV10m += (vr + vw);
+  }
+
+  // Reconcile historical samples taken before backend event tracking was deployed
+  let untracked24 = 0;
+  let untracked1h = 0;
+  let untracked10m = 0;
+  for (const ts of sampleTs24) {
+    const matched = trackedPollTs.some(pt => Math.abs(pt - ts) <= 120000);
+    if (!matched) {
+      untracked24++;
+      if (ts >= cutoff1h) untracked1h++;
+      if (ts >= cutoff10m) untracked10m++;
+    }
+  }
+
+  const vReads24 = evVReads24 + untracked24 * 2;
+  const vWrites24 = evVWrites24;
+  const vTotal24 = vReads24 + vWrites24;
+  const v10m = evV10m + untracked10m * 2;
+
+  const bReads24 = evBReads24 + untracked24 * 2;
+  const bWrites24 = evBWrites24;
+  const bTotal1h = evB1h + untracked1h * 2;
+
+  const cronTriggers24 = sampleCount24;
+  const cronPatches24 = evCronPatches24;
+  const ghRuns24 = Math.max(evGhRuns24 + untracked24, sampleCount24);
+
+  let ghClient1h = 0;
+  let ghClient24 = 0;
+  try {
+    const rawCalls = JSON.parse(localStorage.getItem(GH_CLIENT_CALLS_KEY) || "[]");
+    for (const ts of rawCalls) {
+      if (typeof ts === "number" && ts >= cutoff24) {
+        ghClient24++;
+        if (ts >= cutoff1h) ghClient1h++;
+      }
+    }
+  } catch (e) {}
+
+  const curCronMin = Number(st.current_cron_interval_min || (cmdState.lastAutopilotConfig && cmdState.lastAutopilotConfig.cron_idle_minutes) || 5);
+  const projectedV24 = Math.round((1440 / Math.max(1, curCronMin)) * 2);
+
+  return {
+    vReads24, vWrites24, vTotal24, vLimit24: 1450, v10m, vLimit10m: 120,
+    bReads24, bWrites24, bTotal1h, bLimit1h: 500,
+    cronTriggers24, cronLimit24: 1440, cronPatches24, cronPatchLimit24: 100,
+    ghClient1h, ghClient24, ghLimit1h: 5000, ghRuns24,
+    curCronMin, projectedV24,
+  };
+}
+
+function buildQuotaBarColor(pct) {
+  if (pct >= 80) return "#ef4444";
+  if (pct >= 50) return "#f59e0b";
+  return "#10b981";
+}
+
+function renderApiQuotaMonitor() {
+  const q = computeApiQuotaSummary();
+  const vPct = Math.min(100, (q.vTotal24 / q.vLimit24) * 100);
+  const bPct = Math.min(100, (q.bTotal1h / q.bLimit1h) * 100);
+  const cPct = Math.min(100, (q.cronTriggers24 / q.cronLimit24) * 100);
+  const gPct = Math.min(100, (q.ghClient1h / q.ghLimit1h) * 100);
+
+  const cards = [
+    {
+      name: "Viessmann ViCare (24h)",
+      val: `${q.vTotal24} / ${q.vLimit24}`,
+      pct: vPct,
+      left: `Letture: ${q.vReads24} · Scritture: ${q.vWrites24}`,
+      right: `10m: ${q.v10m}/${q.vLimit10m} · Proj: ~${q.projectedV24}/24h`,
+    },
+    {
+      name: "BTicino / Netatmo (1h)",
+      val: `${q.bTotal1h} / ${q.bLimit1h}`,
+      pct: bPct,
+      left: `24h Letture: ${q.bReads24} · Scritture: ${q.bWrites24}`,
+      right: `${bPct.toFixed(1)}% usato ora`,
+    },
+    {
+      name: "cron-job.org (24h)",
+      val: `${q.cronTriggers24} / ${q.cronLimit24}`,
+      pct: cPct,
+      left: `Trigger: ${q.cronTriggers24} · PATCH API: ${q.cronPatches24}/${q.cronPatchLimit24}`,
+      right: `Freq: ${q.curCronMin} min`,
+    },
+    {
+      name: "GitHub REST & Actions",
+      val: `${q.ghClient1h} / ${q.ghLimit1h} (1h)`,
+      pct: gPct,
+      left: `Client 24h: ${q.ghClient24} · Runner 24h: ${q.ghRuns24}`,
+      right: "Repo pubblico: min ∞",
+    },
+  ];
+
+  const html = cards.map(c => `
+    <div class="api-quota-item">
+      <div class="api-quota-head">
+        <span>${c.name}</span>
+        <span class="api-quota-val" style="color:${buildQuotaBarColor(c.pct)}">${c.val} (${c.pct.toFixed(0)}%)</span>
+      </div>
+      <div class="api-quota-bar-bg">
+        <div class="api-quota-bar-fill" style="width:${Math.max(2, c.pct).toFixed(1)}%; background:${buildQuotaBarColor(c.pct)};"></div>
+      </div>
+      <div class="api-quota-sub">
+        <span>${c.left}</span>
+        <span>${c.right}</span>
+      </div>
+    </div>
+  `).join("");
+
+  const compactBody = document.getElementById("apiQuotaCompactBody");
+  const detailedBody = document.getElementById("apiQuotaDetailedBody");
+  if (compactBody) compactBody.innerHTML = html;
+  if (detailedBody) detailedBody.innerHTML = html;
+
+  const badgeText = `Viessmann ${vPct.toFixed(0)}% · Cron ${q.curCronMin}m`;
+  const b1 = document.getElementById("apiQuotaBadgeCompact");
+  const b2 = document.getElementById("apiQuotaBadgeDetailed");
+  if (b1) b1.textContent = badgeText;
+  if (b2) b2.textContent = badgeText;
+}
+
+window.renderApiQuotaMonitor = renderApiQuotaMonitor;
 
 async function pollCommandReceipt(sinceMs) {
   for (let attempt = 0; attempt < 11; attempt++) {

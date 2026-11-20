@@ -52,6 +52,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "cron_idle_minutes": 15,
     "cron_armed_minutes": 5,
     "cron_active_minutes": 2,
+    "soft_curve_tuning_enabled": False,
+    "soft_curve_max_shift_delta_k": 2,
+    "soft_curve_cooldown_minutes": 60,
 }
 
 DEFAULT_STATE: dict[str, Any] = {
@@ -70,6 +73,18 @@ DEFAULT_STATE: dict[str, Any] = {
     "current_cron_interval_min": 5,
     "defrost_detected_today": 0,
     "heating_rod_delta_s": 0,
+    "soft_curve_trim_k": 0,
+    "soft_curve_last_trim_utc": None,
+    "api_usage": {
+        "date_utc": None,
+        "viessmann_reads": 0,
+        "viessmann_writes": 0,
+        "bticino_reads": 0,
+        "bticino_writes": 0,
+        "cronjob_patches": 0,
+        "github_runs": 0,
+        "recent_events": [],
+    },
 }
 
 
@@ -110,6 +125,88 @@ def load_state() -> dict[str, Any]:
                 st.update(loaded)
         except Exception as e:
             logger.warning("Errore lettura autopilot_state.json: %s", e)
+    return st
+
+
+def _default_api_usage(today_str: Optional[str] = None) -> dict[str, Any]:
+    return {
+        "date_utc": today_str or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "viessmann_reads": 0,
+        "viessmann_writes": 0,
+        "bticino_reads": 0,
+        "bticino_writes": 0,
+        "cronjob_patches": 0,
+        "github_runs": 0,
+        "recent_events": [],
+    }
+
+
+def record_api_usage(
+    v_reads: int = 0,
+    v_writes: int = 0,
+    b_reads: int = 0,
+    b_writes: int = 0,
+    cron_patches: int = 0,
+    gh_runs: int = 0,
+    event_label: Optional[str] = None,
+    state_dict: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """
+    Tracks cumulative daily & rolling-24h API reads/writes across Viessmann,
+    BTicino/Netatmo, cron-job.org and GitHub Actions inside autopilot_state.json.
+    """
+    own_state = state_dict is None
+    st = state_dict if state_dict is not None else load_state()
+    now_utc = datetime.now(timezone.utc)
+    today_utc = now_utc.strftime("%Y-%m-%d")
+
+    usage = st.get("api_usage")
+    if not isinstance(usage, dict):
+        usage = _default_api_usage(today_utc)
+    elif usage.get("date_utc") != today_utc:
+        prev_events = usage.get("recent_events") if isinstance(usage.get("recent_events"), list) else []
+        usage = _default_api_usage(today_utc)
+        usage["recent_events"] = prev_events
+
+    usage["viessmann_reads"] = int(usage.get("viessmann_reads") or 0) + int(v_reads)
+    usage["viessmann_writes"] = int(usage.get("viessmann_writes") or 0) + int(v_writes)
+    usage["bticino_reads"] = int(usage.get("bticino_reads") or 0) + int(b_reads)
+    usage["bticino_writes"] = int(usage.get("bticino_writes") or 0) + int(b_writes)
+    usage["cronjob_patches"] = int(usage.get("cronjob_patches") or 0) + int(cron_patches)
+    usage["github_runs"] = int(usage.get("github_runs") or 0) + int(gh_runs)
+
+    cutoff_24h = now_utc - timedelta(hours=24)
+    cleaned_events: list[dict[str, Any]] = []
+    for ev in usage.get("recent_events") or []:
+        if not isinstance(ev, dict):
+            continue
+        dt = _parse_iso(ev.get("ts"))
+        if dt is not None and dt >= cutoff_24h:
+            cleaned_events.append(ev)
+
+    if any((v_reads, v_writes, b_reads, b_writes, cron_patches, gh_runs)):
+        evt: dict[str, Any] = {"ts": now_utc.isoformat(), "lbl": event_label or "api"}
+        if v_reads:
+            evt["vr"] = int(v_reads)
+        if v_writes:
+            evt["vw"] = int(v_writes)
+        if b_reads:
+            evt["br"] = int(b_reads)
+        if b_writes:
+            evt["bw"] = int(b_writes)
+        if cron_patches:
+            evt["cp"] = int(cron_patches)
+        if gh_runs:
+            evt["gh"] = int(gh_runs)
+        cleaned_events.append(evt)
+
+    if len(cleaned_events) > 1600:
+        cleaned_events = cleaned_events[-1600:]
+    usage["recent_events"] = cleaned_events
+    st["api_usage"] = usage
+
+    if own_state:
+        return save_state(st)
     return st
 
 
@@ -233,8 +330,13 @@ def update_cronjob_frequency(interval_min: int) -> tuple[bool, str]:
     if not api_key or not job_id:
         return False, "CRONJOB_API_KEY o CRONJOB_ID non configurati nei secrets."
 
-    step = max(1, min(30, int(interval_min)))
-    minutes = [-1] if step == 1 else list(range(0, 60, step))
+    step = max(1, min(60, int(interval_min)))
+    if step == 1:
+        minutes = [-1]
+    elif step >= 60:
+        minutes = [0]
+    else:
+        minutes = list(range(0, 60, step))
     url = f"https://api.cron-job.org/jobs/{job_id}"
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -538,6 +640,7 @@ def run_autopilot_tick(latest_sample: dict[str, Any] | Any, dry_run: bool = Fals
         if (frost_status == "on" or comp_active == 1) and buf_temp is not None and float(buf_temp) >= float(cfg["antifrost_pdc_assist_buffer_c"]) and gf_active == 0:
             if not dry_run:
                 ok, msg = _apply_antifrost_assist_grundfos(cfg)
+                record_api_usage(b_reads=1, b_writes=1, event_label="ap_antifrost_assist", state_dict=st)
                 st["last_action_utc"] = now_iso
                 st["last_action_reason"] = f"Assist antigelo PdC (Puffer {buf_temp}°C): Grundfos aperta 30 min ({msg})"
             else:
@@ -577,11 +680,22 @@ def run_autopilot_tick(latest_sample: dict[str, Any] | Any, dry_run: bool = Fals
                 trigger_why = "Emergenza Gelo" if is_emergency else ("Crollo Rapido Notturno" if is_steep_drop else "Finestra Alto COP")
                 if not dry_run:
                     ok, msg = _apply_start_heating(cfg, pdc_setpoint, now_local, is_emergency=(is_emergency or is_steep_drop))
+                    emerg_flag = bool(is_emergency or is_steep_drop)
+                    record_api_usage(
+                        v_reads=6 if emerg_flag else 4,
+                        v_writes=4 if emerg_flag else 3,
+                        b_reads=1,
+                        b_writes=1,
+                        event_label="ap_start_heating",
+                        state_dict=st,
+                    )
                     if ok:
                         st["state"] = "HEATING_SYNC"
                         st["state_since_utc"] = now_iso
                         st["cycle_started_utc"] = now_iso
-                        st["cycle_is_emergency"] = bool(is_emergency or is_steep_drop)
+                        st["cycle_is_emergency"] = emerg_flag
+                        st["soft_curve_trim_k"] = 0
+                        st["soft_curve_last_trim_utc"] = None
                         st["last_action_utc"] = now_iso
                         st["last_action_reason"] = f"Avvio ciclo ({trigger_why}): Target LWT {target_lwt}°C (T_set={pdc_setpoint}°C). {msg}"
                     else:
@@ -591,6 +705,7 @@ def run_autopilot_tick(latest_sample: dict[str, Any] | Any, dry_run: bool = Fals
                     st["state_since_utc"] = now_iso
                     st["cycle_started_utc"] = now_iso
                     st["cycle_is_emergency"] = bool(is_emergency or is_steep_drop)
+                    st["soft_curve_trim_k"] = 0
                     st["last_action_reason"] = f"[DRY-RUN] Avvio ({trigger_why}) LWT={target_lwt}°C"
 
     elif cur_state == "HEATING_SYNC":
@@ -603,8 +718,47 @@ def run_autopilot_tick(latest_sample: dict[str, Any] | Any, dry_run: bool = Fals
             b_conn = BTicinoConnector()
             rem_min = max(30, int(cfg["max_cycle_minutes"] - elapsed_min) + int(cfg["puffer_drain_minutes"]))
             b_conn.set_thermostat_setpoint(float(cfg["bticino_force_on_temp_c"]), mode="manual", duration_minutes=rem_min)
+            record_api_usage(b_reads=1, b_writes=1, event_label="ap_reassert_grundfos", state_dict=st)
 
-        stop_target = t_in_f >= float(cfg["t_max_c"])
+        # Optional Soft Curve Self-Tuning (reduces PdC setpoint -1 K instead of cutting Grundfos)
+        soft_trimmed_now = False
+        if cfg.get("soft_curve_tuning_enabled") and elapsed_min >= 15:
+            cur_trim = int(st.get("soft_curve_trim_k") or 0)
+            max_trim = int(cfg.get("soft_curve_max_shift_delta_k") or 2)
+            last_trim_dt = _parse_iso(st.get("soft_curve_last_trim_utc"))
+            cooldown_min = float(cfg.get("soft_curve_cooldown_minutes") or 60)
+            cooldown_ok = last_trim_dt is None or ((now_utc - last_trim_dt).total_seconds() / 60.0) >= cooldown_min
+            overshoot_risk = (slope_c_h > 0.30 and t_in_f >= float(cfg["t_min_c"]) + 0.4) or (t_in_f >= float(cfg["t_max_c"]) - 0.1)
+            if overshoot_risk and cooldown_ok and abs(cur_trim - 1) <= max_trim and pdc_setpoint > 10:
+                new_sp = max(10, pdc_setpoint - 1)
+                new_lwt = compute_wo1c_lwt(float(oat), float(new_sp), float(curve_slope), float(curve_shift))
+                if not dry_run:
+                    v_conn = ViessmannConnector()
+                    v_conn.connect()
+                    ok_r, _ = v_conn.set_reduced_temperature(float(new_sp))
+                    ok_n, _ = v_conn.set_normal_temperature(float(new_sp))
+                    record_api_usage(v_reads=3, v_writes=2, event_label="ap_soft_curve_trim", state_dict=st)
+                    if ok_r or ok_n:
+                        st["soft_curve_trim_k"] = cur_trim - 1
+                        st["soft_curve_last_trim_utc"] = now_iso
+                        st["calculated_pdc_setpoint_c"] = new_sp
+                        st["calculated_target_lwt_c"] = new_lwt
+                        st["last_action_utc"] = now_iso
+                        st["last_action_reason"] = f"Self-tuning soft curva (-1K -> T_set={new_sp}°C, LWT={new_lwt}°C) per modulare dolce senza tagliare Grundfos."
+                        soft_trimmed_now = True
+                else:
+                    st["soft_curve_trim_k"] = cur_trim - 1
+                    st["soft_curve_last_trim_utc"] = now_iso
+                    st["calculated_pdc_setpoint_c"] = new_sp
+                    st["calculated_target_lwt_c"] = new_lwt
+                    st["last_action_reason"] = f"[DRY-RUN] Soft trim -1K -> T_set={new_sp}°C (LWT={new_lwt}°C)"
+                    soft_trimmed_now = True
+
+        stop_target = (t_in_f >= float(cfg["t_max_c"])) and not soft_trimmed_now
+        if cfg.get("soft_curve_tuning_enabled") and t_in_f < float(cfg["t_max_c"]) + 0.2:
+            if abs(int(st.get("soft_curve_trim_k") or 0)) < int(cfg.get("soft_curve_max_shift_delta_k") or 2):
+                # Allow trimmed cycle a brief soft-modulation window before cutoff up to T_max + 0.2 C
+                stop_target = False
         stop_max_dur = elapsed_min >= float(cfg["max_cycle_minutes"])
         stop_window = (not is_emerg_cycle) and _is_past_cop_window_end(now_local, cfg)
 
@@ -612,6 +766,7 @@ def run_autopilot_tick(latest_sample: dict[str, Any] | Any, dry_run: bool = Fals
             why = "Target raggiunto" if stop_target else ("Durata max raggiunta" if stop_max_dur else "Fine finestra COP")
             if not dry_run:
                 ok, msg = _apply_stop_pdc_keep_drain(cfg)
+                record_api_usage(v_reads=2, v_writes=1, b_reads=1, b_writes=1, event_label="ap_stop_pdc_drain", state_dict=st)
                 st["last_action_utc"] = now_iso
                 st["last_action_reason"] = f"Stop PdC ({why}), avvio scarico puffer {cfg['puffer_drain_minutes']} min. {msg}"
             else:
@@ -628,6 +783,7 @@ def run_autopilot_tick(latest_sample: dict[str, Any] | Any, dry_run: bool = Fals
             why = f"Puffer scarico ({buf_temp}°C)" if buf_cold else f"Timeout scarico ({drain_min:.0f} min)"
             if not dry_run:
                 ok, msg = _apply_full_idle_shutdown(cfg)
+                record_api_usage(v_reads=6, v_writes=4, b_reads=1, b_writes=1, event_label="ap_idle_shutdown", state_dict=st)
                 st["last_action_utc"] = now_iso
                 st["last_action_reason"] = f"Ciclo completato ({why}) -> ritorno in IDLE. {msg}"
             else:
@@ -638,6 +794,8 @@ def run_autopilot_tick(latest_sample: dict[str, Any] | Any, dry_run: bool = Fals
             st["cycle_started_utc"] = None
             st["drain_started_utc"] = None
             st["cycle_is_emergency"] = False
+            st["soft_curve_trim_k"] = 0
+            st["soft_curve_last_trim_utc"] = None
 
     # ---------------- DYNAMIC CRON FREQUENCY ----------------
     next_state = st["state"]
@@ -651,6 +809,7 @@ def run_autopilot_tick(latest_sample: dict[str, Any] | Any, dry_run: bool = Fals
     if cfg.get("dynamic_cron_enabled") and st.get("current_cron_interval_min") != desired_cron:
         if not dry_run:
             ok_cron, msg_cron = update_cronjob_frequency(desired_cron)
+            record_api_usage(cron_patches=1, event_label="ap_cron_adapt", state_dict=st)
             if ok_cron:
                 st["current_cron_interval_min"] = desired_cron
             logger.info("Adattamento frequenza cron (%s): %s", next_state, msg_cron)
