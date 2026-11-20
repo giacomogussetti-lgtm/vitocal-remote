@@ -1,7 +1,9 @@
 {
-  "timestamp_utc": "2026-11-20T01:11:45.673862+00:00",
-  "command": "autopilot_configure",
+  "timestamp_utc": "2026-11-20T01:12:29.673093+00:00",
+  "command": "autopilot_activate_away",
   "params": {
+    "enabled": true,
+    "mode": "away_antifrost",
     "t_min_c": 7.5,
     "t_max_c": 8.8,
     "t_emergency_c": 6.8,
@@ -17,13 +19,13 @@
     "cop_window_end": "16:00"
   },
   "success": true,
-  "message": "cron-job.org aggiornato a ogni 5 min | Autopilota disattivato manualmente dalla PWA.",
+  "message": "Programmazione PdC aggiornata (mon, tue, wed, thu, fri, sat, sun: 11:00–16:00 (reduced)). | Temperatura Bollitore ACS impostata e verificata con successo: 10 °C | Modalità PdC impostata e verificata: standby | Modalità BTicino aggiornata su 'hg' | Assenza Montagna Full-Auto ATTIVATA (T_min=7.5°C, Standby+Antigelo).",
   "sample_logged": true,
   "api_calls": {
-    "v_reads": 0,
-    "v_writes": 0,
-    "b_reads": 0,
-    "b_writes": 0,
+    "v_reads": 5,
+    "v_writes": 3,
+    "b_reads": 1,
+    "b_writes": 1,
     "cron_patches": 1
   }
 }
