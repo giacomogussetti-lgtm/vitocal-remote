@@ -597,7 +597,14 @@ function renderDetailedSondeList(s) {
     { label: "Programma Operativo PdC", val: (s.active_program || "standby").toUpperCase(), unit: "", color: "#a78bfa" },
     { label: "Fase Compressore / Defrost", val: (s.compressor_phase || "off").toUpperCase(), unit: "", color: String(s.compressor_phase || "").includes("defrost") ? "#38bdf8" : "#cbd5e1" },
     { label: "Antigelo Hardware WO1C", val: (s.frost_protection_status || "off").toUpperCase(), unit: "", color: s.frost_protection_status === "on" ? "#f59e0b" : "#94a3b8" },
-    { label: "Resistenza Elettrica (S1 / S2)", val: (s.heating_rod_level1_s != null || s.heating_rod_level2_s != null) ? `${(Number(s.heating_rod_level1_s || 0) / 3600).toFixed(1)}h / ${(Number(s.heating_rod_level2_s || 0) / 3600).toFixed(1)}h` : "--", unit: "", color: "#fb7185" },
+    {
+      label: "Resistenza Backup (Oggi / Tot S1·S2)",
+      val: (s.heating_rod_level1_s != null || s.heating_rod_level2_s != null)
+        ? `Oggi: ${typeof computeRodTodayMinutes === "function" ? computeRodTodayMinutes(state.samples) : 0}m | ${(Number(s.heating_rod_level1_s || 0) / 3600).toFixed(1)}h / ${(Number(s.heating_rod_level2_s || 0) / 3600).toFixed(1)}h`
+        : "--",
+      unit: "",
+      color: "#fb7185"
+    },
   ];
 
   container.innerHTML = items.map(item => `

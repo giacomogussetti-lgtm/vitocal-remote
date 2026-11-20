@@ -243,6 +243,44 @@ main {
   margin-top: 2px;
 }
 
+.synoptic-kpi-drawer {
+  margin-top: 6px;
+}
+
+.synoptic-kpi-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 9px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.synoptic-kpi-summary::-webkit-details-marker {
+  display: none;
+}
+
+.synoptic-kpi-arrow {
+  font-size: 0.82rem;
+  transition: transform 0.2s;
+}
+
+.synoptic-kpi-drawer[open] .synoptic-kpi-summary {
+  border-color: rgba(56, 189, 248, 0.45);
+  color: var(--accent-cyan);
+}
+
+.synoptic-kpi-drawer[open] .synoptic-kpi-arrow {
+  transform: rotate(180deg);
+}
+
 @media (max-width: 640px) {
   .synoptic-kpi-grid {
     grid-template-columns: repeat(3, 1fr);

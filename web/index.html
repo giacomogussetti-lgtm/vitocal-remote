@@ -47,48 +47,54 @@
   <main>
     <!-- TAB 1: SINOTTICO SCADA & STATO LIVE -->
     <section id="tab-synoptic" class="tab-content active">
-      <!-- Quick Metric Cards -->
-      <div class="cards-grid synoptic-kpi-grid">
-        <div class="status-card">
-          <span class="card-label">T Esterna OAT</span>
-          <span class="card-value" id="cardOat" style="color: #38bdf8;">--</span>
-          <span class="card-sub">Sonda Climatica</span>
-        </div>
-        <div class="status-card">
-          <span class="card-label">Puffer 200L</span>
-          <span class="card-value" id="cardBuffer" style="color: #f59e0b;">--</span>
-          <span class="card-sub">Accumulo Inerziale</span>
-        </div>
-        <div class="status-card">
-          <span class="card-label">Mandata PdC</span>
-          <span class="card-value" id="cardSupply" style="color: #ef4444;">--</span>
-          <span class="card-sub">Circuito Primario</span>
-        </div>
-        <div class="status-card">
-          <span class="card-label">Corridoio</span>
-          <span class="card-value" id="cardIndoor" style="color: #10b981;">--</span>
-          <span class="card-sub">BTicino Smarther</span>
-        </div>
-        <div class="status-card">
-          <span class="card-label">Setpoint</span>
-          <span class="card-value" id="cardSetpoint" style="color: #eab308;">--</span>
-          <span class="card-sub">Temperatura Target</span>
-        </div>
-        <div class="status-card">
-          <span class="card-label">Compressore</span>
-          <span class="card-value" id="cardComp" style="color: #94a3b8;">--</span>
-          <span class="card-sub">Modulazione Inverter</span>
-        </div>
-      </div>
-
-      <!-- Autopilot Quick Status Banner (Click to open Commands) -->
-      <div id="autopilotSynopticBanner" class="pump-banner inactive" style="cursor: pointer; margin-top: 6px; padding: 8px 12px; font-size: 0.76rem;" title="Tocca per gestire Autopilota">
+      <!-- Autopilot Quick Status Banner (Top) -->
+      <div id="autopilotSynopticBanner" class="pump-banner inactive" style="cursor: pointer; margin-top: 2px; padding: 8px 12px; font-size: 0.76rem;" title="Tocca per gestire Autopilota">
         <span id="autopilotSynopticText">🤖 AUTOPILOTA: DISATTIVATO (Tocca per attivare)</span>
         <span style="font-size: 0.85rem;">›</span>
       </div>
 
+      <!-- Collapsible Quick Metric Cards (Hidden by default) -->
+      <details class="synoptic-kpi-drawer" id="synopticKpiDrawer">
+        <summary class="synoptic-kpi-summary">
+          <span>📊 Letture Rapide (OAT, Puffer, Mandata, Casa, Setpoint, PdC)</span>
+          <span class="synoptic-kpi-arrow">▾</span>
+        </summary>
+        <div class="cards-grid synoptic-kpi-grid" style="margin-top: 6px;">
+          <div class="status-card">
+            <span class="card-label">T Esterna OAT</span>
+            <span class="card-value" id="cardOat" style="color: #38bdf8;">--</span>
+            <span class="card-sub">Sonda Climatica</span>
+          </div>
+          <div class="status-card">
+            <span class="card-label">Puffer 200L</span>
+            <span class="card-value" id="cardBuffer" style="color: #f59e0b;">--</span>
+            <span class="card-sub">Accumulo Inerziale</span>
+          </div>
+          <div class="status-card">
+            <span class="card-label">Mandata PdC</span>
+            <span class="card-value" id="cardSupply" style="color: #ef4444;">--</span>
+            <span class="card-sub">Circuito Primario</span>
+          </div>
+          <div class="status-card">
+            <span class="card-label">Corridoio</span>
+            <span class="card-value" id="cardIndoor" style="color: #10b981;">--</span>
+            <span class="card-sub">BTicino Smarther</span>
+          </div>
+          <div class="status-card">
+            <span class="card-label">Setpoint</span>
+            <span class="card-value" id="cardSetpoint" style="color: #eab308;">--</span>
+            <span class="card-sub">Temperatura Target</span>
+          </div>
+          <div class="status-card">
+            <span class="card-label">Compressore</span>
+            <span class="card-value" id="cardComp" style="color: #94a3b8;">--</span>
+            <span class="card-sub">Modulazione Inverter</span>
+          </div>
+        </div>
+      </details>
+
       <!-- Industrial SCADA Schematic SVG Canvas -->
-      <div class="synoptic-wrapper" style="margin-top: 10px;">
+      <div class="synoptic-wrapper" style="margin-top: 8px;">
         <div class="synoptic-toolbar">
           <span id="synopticToolbarTitle">SINOTTICO IDRAULICO IMPIANTO</span>
           <span id="synopticOrientationBadge" style="color: var(--accent-cyan); font-weight: 600;">SCHEMA ATTIVO</span>

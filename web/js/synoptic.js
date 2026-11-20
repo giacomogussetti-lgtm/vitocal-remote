@@ -97,13 +97,18 @@ function extractSynopticMetrics(d) {
   const rod2h = rod2s != null ? (rod2s / 3600.0).toFixed(1) : "--";
   const rodHoursStr = (rod1s != null || rod2s != null) ? `${rod1h}h / ${rod2h}h` : "--";
   let rodActive = false;
-  if (typeof state !== "undefined" && Array.isArray(state.samples) && state.samples.length >= 2) {
-    const prev = state.samples[state.samples.length - 2];
+  const samplesList = (typeof state !== "undefined" && Array.isArray(state.samples)) ? state.samples : [];
+  if (samplesList.length >= 2) {
+    const prev = samplesList[samplesList.length - 2];
     if (prev) {
       if (rod1s != null && prev.heating_rod_level1_s != null && rod1s > Number(prev.heating_rod_level1_s)) rodActive = true;
       if (rod2s != null && prev.heating_rod_level2_s != null && rod2s > Number(prev.heating_rod_level2_s)) rodActive = true;
     }
   }
+  const rodTodayMin = computeRodTodayMinutes(samplesList);
+  const rodStatusCompact = rodActive
+    ? "⚡ ON"
+    : (rodTodayMin > 0 ? `OGGI ${rodTodayMin}m` : "OFF · 0m");
 
   let pufferTopColor = "#1e3a5f";
   if (bufNum != null) {
@@ -150,13 +155,34 @@ function extractSynopticMetrics(d) {
     deltaAirStr: deltaAir != null ? `${deltaAir >= 0 ? "+" : ""}${deltaAir.toFixed(1)} °C` : "--",
     deltaTargetStr: deltaTarget != null ? `${deltaTarget >= 0 ? "+" : ""}${deltaTarget.toFixed(1)} °C` : "--",
     rodActive,
+    rodTodayMin,
     rodHoursStr,
+    rodStatusCompact,
     rodStatusShort: rodActive ? `⚡ ON (${rodHoursStr})` : `OFF (${rodHoursStr})`,
-    rodColor: rodActive ? "#fb7185" : "#94a3b8",
-    rodBorder: rodActive ? "#ef4444" : "#334155",
+    rodColor: rodActive ? "#fb7185" : (rodTodayMin > 0 ? "#fbbf24" : "#94a3b8"),
+    rodBorder: rodActive ? "#ef4444" : (rodTodayMin > 0 ? "#f59e0b" : "#334155"),
     pufferTopColor,
   };
 }
+
+function computeRodTodayMinutes(samples) {
+  if (!Array.isArray(samples) || !samples.length) return 0;
+  const todayKey = new Date().toDateString();
+  const vals = [];
+  for (let i = 0; i < samples.length; i++) {
+    const s = samples[i];
+    if (!s || !s.timestamp_utc) continue;
+    if (s.heating_rod_level1_s == null && s.heating_rod_level2_s == null) continue;
+    const d = new Date(s.timestamp_utc);
+    if (!isNaN(d.getTime()) && d.toDateString() === todayKey) {
+      vals.push(Number(s.heating_rod_level1_s || 0) + Number(s.heating_rod_level2_s || 0));
+    }
+  }
+  if (vals.length < 2) return 0;
+  const deltaS = Math.max(0, vals[vals.length - 1] - vals[0]);
+  return Math.round(deltaS / 60);
+}
+window.computeRodTodayMinutes = computeRodTodayMinutes;
 
 function buildSharedSvgDefs(m) {
   return `
@@ -298,14 +324,13 @@ function renderSynopticPortrait(m) {
       <text x="48" y="29" fill="${m.primPumpActive ? '#34d399' : '#94a3b8'}" font-size="11.5" font-weight="800" text-anchor="middle">${m.primPumpText}</text>
     </g>
 
-    <g transform="translate(174, 292)">
-      <rect x="0" y="0" width="72" height="36" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1" />
-      <text x="36" y="13" fill="#94a3b8" font-size="7.5" font-weight="700" text-anchor="middle">ΔT PRIM.</text>
-      <text x="36" y="29" fill="#f8fafc" font-size="11" font-weight="700" text-anchor="middle">${m.deltaPrimStr}</text>
+    <g transform="translate(174, 304)">
+      <rect x="0" y="0" width="72" height="34" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1" />
+      <text x="36" y="12" fill="#94a3b8" font-size="7.2" font-weight="700" text-anchor="middle">ΔT PRIM.</text>
+      <text x="36" y="27" fill="#f8fafc" font-size="10.8" font-weight="700" text-anchor="middle">${m.deltaPrimStr}</text>
     </g>
 
-    <line x1="125" y1="376" x2="152" y2="376" stroke="${m.rodBorder}" stroke-width="1.3" stroke-dasharray="3,2" />
-    ${svgBackupHeaterBlock(152, 340, 122, 54, m)}
+    ${svgBackupHeaterBlock(174, 344, 72, 28, m)}
 
     <g transform="translate(312, 326)">
       <rect x="0" y="0" width="96" height="36" rx="6" fill="#161f30" stroke="#3b82f6" stroke-width="1.3" />
@@ -450,13 +475,13 @@ function renderSynopticLandscape(m) {
     <text x="485" y="206" fill="#94a3b8" font-size="9" font-weight="700" text-anchor="middle">Circolatore PdC P1</text>
     <text x="485" y="221" fill="${m.primPumpActive ? '#34d399' : '#64748b'}" font-size="10.5" font-weight="800" text-anchor="middle">${m.primPumpText}</text>
 
-    <g transform="translate(442, 246)">
-      <rect x="0" y="0" width="86" height="38" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1" />
-      <text x="43" y="14" fill="#94a3b8" font-size="8" font-weight="700" text-anchor="middle">ΔT PRIMARIO</text>
-      <text x="43" y="30" fill="#f8fafc" font-size="11.5" font-weight="700" text-anchor="middle">${m.deltaPrimStr}</text>
+    <g transform="translate(442, 258)">
+      <rect x="0" y="0" width="86" height="36" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1" />
+      <text x="43" y="13" fill="#94a3b8" font-size="7.8" font-weight="700" text-anchor="middle">ΔT PRIMARIO</text>
+      <text x="43" y="29" fill="#f8fafc" font-size="11.2" font-weight="700" text-anchor="middle">${m.deltaPrimStr}</text>
     </g>
 
-    ${svgBackupHeaterBlock(416, 304, 138, 58, m)}
+    ${svgBackupHeaterBlock(442, 302, 86, 30, m)}
 
     <g transform="translate(425, 464)">
       <rect x="0" y="0" width="120" height="36" rx="6" fill="#161f30" stroke="#3b82f6" stroke-width="1.4" />
@@ -668,16 +693,12 @@ function svgArrow(x, y, dx, dy, color) {
 }
 
 function svgBackupHeaterBlock(x, y, w, h, m) {
-  const cx = x + w / 2;
-  const coilCol = m.rodActive ? "#ef4444" : "#64748b";
   const bg = m.rodActive ? "#2a1219" : "#0f172a";
   return `
     <g transform="translate(${x}, ${y})">
-      <rect x="0" y="0" width="${w}" height="${h}" rx="7" fill="${bg}" stroke="${m.rodBorder}" stroke-width="${m.rodActive ? 1.7 : 1.1}" />
-      <text x="${w / 2}" y="13" fill="#94a3b8" font-size="7.4" font-weight="700" text-anchor="middle">RESISTENZA BACKUP</text>
-      <path d="M 14 27 L 22 21 L 28 33 L 34 21 L 40 33 L 46 21 L 52 27" fill="none" stroke="${coilCol}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-      <text x="${w - 8}" y="30" fill="${m.rodActive ? '#fbbf24' : '#94a3b8'}" font-size="8.2" font-weight="800" text-anchor="end">S1/S2</text>
-      <text x="${w / 2}" y="${h - 7}" fill="${m.rodColor}" font-size="9.2" font-weight="800" text-anchor="middle">${m.rodStatusShort}</text>
+      <rect x="0" y="0" width="${w}" height="${h}" rx="6" fill="${bg}" stroke="${m.rodBorder}" stroke-width="${m.rodActive ? 1.5 : 1}" />
+      <text x="${w / 2}" y="11" fill="#94a3b8" font-size="6.8" font-weight="700" text-anchor="middle">RESIST. S1/S2</text>
+      <text x="${w / 2}" y="${h - 5}" fill="${m.rodColor}" font-size="8.6" font-weight="800" text-anchor="middle">${m.rodStatusCompact}</text>
     </g>
   `;
 }
