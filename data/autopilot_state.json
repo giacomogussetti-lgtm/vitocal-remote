@@ -18,15 +18,29 @@
   "soft_curve_last_trim_utc": null,
   "api_usage": {
     "date_utc": "2026-11-20",
-    "viessmann_reads": 2,
+    "viessmann_reads": 4,
     "viessmann_writes": 0,
-    "bticino_reads": 2,
-    "bticino_writes": 0,
+    "bticino_reads": 5,
+    "bticino_writes": 1,
     "cronjob_patches": 0,
-    "github_runs": 1,
+    "github_runs": 3,
     "recent_events": [
       {
         "ts": "2026-11-20T01:01:40.933375+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-20T01:09:23.229576+00:00",
+        "lbl": "cmd:bticino_setpoint",
+        "br": 1,
+        "bw": 1,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-20T01:09:29.633888+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
