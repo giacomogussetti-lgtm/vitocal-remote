@@ -138,6 +138,14 @@
           </div>
         </div>
 
+        <div id="channelSearchDrawer" class="channel-search-drawer">
+          <div class="channel-search-bar">
+            <input type="search" id="inputChannelSearch" class="form-input" placeholder="Cerca canale (es. delta, gas, potenza, resistenza, cop)...">
+            <button type="button" class="btn-mini-tool" id="btnClearChannelSearch" title="Chiudi ricerca canali" aria-label="Chiudi ricerca canali">✕</button>
+          </div>
+          <div id="channelSearchResults" class="channel-search-results"></div>
+        </div>
+
         <div class="chart-meta-strip">
           <div class="activity-legend" id="activityLegendButtons">
             <button type="button" class="activity-legend-btn active" data-band="1"><i class="band-swatch swatch-pdc"></i>Solo PdC</button>
@@ -159,14 +167,6 @@
 
         <div class="chart-canvas-box">
           <canvas id="telemetryChartCanvas"></canvas>
-        </div>
-
-        <div id="channelSearchDrawer" class="channel-search-drawer">
-          <div class="channel-search-bar">
-            <input type="search" id="inputChannelSearch" class="form-input" placeholder="Cerca canale (es. delta, gas, potenza, resistenza, cop)...">
-            <button type="button" class="btn-mini-tool" id="btnClearChannelSearch" title="Pulisci ricerca">✕</button>
-          </div>
-          <div id="channelSearchResults" class="channel-search-results"></div>
         </div>
 
         <div class="chart-channels" id="channelPillsContainer">

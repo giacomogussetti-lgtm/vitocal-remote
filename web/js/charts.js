@@ -890,7 +890,7 @@ function initChartControls() {
   const presetWrap = document.getElementById("chartPresetButtons");
   if (presetWrap && presetWrap.dataset.bound !== "1") {
     presetWrap.dataset.bound = "1";
-    presetWrap.querySelectorAll(".btn-preset-chip").forEach(btn => {
+    presetWrap.querySelectorAll(".btn-preset-chip[data-preset]").forEach(btn => {
       btn.addEventListener("click", () => {
         applyChartPreset(btn.dataset.preset);
       });
@@ -941,17 +941,22 @@ function syncPresetFromActiveChannels() {
 function updatePresetButtonsUI() {
   const presetWrap = document.getElementById("chartPresetButtons");
   if (!presetWrap) return;
-  presetWrap.querySelectorAll(".btn-preset-chip").forEach(btn => {
+  presetWrap.querySelectorAll(".btn-preset-chip[data-preset]").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.preset === activePresetKey);
   });
 }
 
 function updateModeButtonUI() {
   const modeBtn = document.getElementById("btnChartModeToggle");
-  if (!modeBtn) return;
   const isPan = chartInteractionMode === "pan";
-  modeBtn.textContent = isPan ? "✋ Sposta" : "👆 Leggi";
-  modeBtn.classList.toggle("active", isPan);
+  if (modeBtn) {
+    modeBtn.textContent = isPan ? "✋ Sposta" : "👆 Leggi";
+    modeBtn.classList.toggle("active", isPan);
+  }
+  const canvas = document.getElementById("telemetryChartCanvas");
+  if (canvas) {
+    canvas.style.cursor = isPan ? "grab" : "crosshair";
+  }
 }
 
 function updateResetButtonUI() {
@@ -1084,22 +1089,31 @@ function updateChartData(samples) {
 
   const chronoAll = parseSamplesChrono(currentSamples);
   const fullBounds = getFullXBounds(chronoAll, activeTimeframeHours);
-  const chronoFiltered = filterChronoByBounds(chronoAll, fullBounds);
+  const panLimits = getPanLimits(chronoAll, activeTimeframeHours);
 
-  const states = classifyActivityStates(chronoFiltered);
-  telemetryChart._activityChrono = chronoFiltered;
+  const states = classifyActivityStates(chronoAll);
+  telemetryChart._activityChrono = chronoAll;
   telemetryChart._activityStates = states;
-  telemetryChart._activityRuns = buildActivityRuns(states, chronoFiltered);
-  telemetryChart._compRuns = buildCompressorOnRuns(states, chronoFiltered);
-  telemetryChart._setpointCutoffs = detectSetpointCutoffEvents(chronoFiltered, states);
-  telemetryChart._defrostEvents = detectDefrostEvents(chronoFiltered);
-  telemetryChart.data.datasets = getDatasets(chronoFiltered);
+  telemetryChart._activityRuns = buildActivityRuns(states, chronoAll);
+  telemetryChart._compRuns = buildCompressorOnRuns(states, chronoAll);
+  telemetryChart._setpointCutoffs = detectSetpointCutoffEvents(chronoAll, states);
+  telemetryChart._defrostEvents = detectDefrostEvents(chronoAll);
+  telemetryChart.data.datasets = getDatasets(chronoAll);
 
-  if (xZoomRange && fullBounds.min !== undefined && fullBounds.max !== undefined) {
-    const fullSpan = Math.max(MIN_X_SPAN_MS, fullBounds.max - fullBounds.min);
-    const curSpan = clamp(xZoomRange.max - xZoomRange.min, Math.min(MIN_X_SPAN_MS, fullSpan), fullSpan);
-    const minVal = clamp(xZoomRange.min, fullBounds.min, fullBounds.max - curSpan);
+  if (xZoomRange && panLimits.min !== undefined && panLimits.max !== undefined) {
+    const panSpan = Math.max(MIN_X_SPAN_MS, panLimits.max - panLimits.min);
+    const curSpan = clamp(xZoomRange.max - xZoomRange.min, Math.min(MIN_X_SPAN_MS, panSpan), panSpan);
+    const minVal = clamp(xZoomRange.min, panLimits.min, panLimits.max - curSpan);
     xZoomRange = { min: minVal, max: minVal + curSpan };
+
+    if ((!yAutoFrozen.yTemp || !yAutoFrozen.yOther) && fullBounds.min !== undefined && fullBounds.max !== undefined) {
+      telemetryChart.options.scales.x.min = fullBounds.min;
+      telemetryChart.options.scales.x.max = fullBounds.max;
+      applyYScaleOptions(telemetryChart);
+      telemetryChart.update("none");
+      freezeAutoYIfNeeded();
+    }
+
     telemetryChart.options.scales.x.min = xZoomRange.min;
     telemetryChart.options.scales.x.max = xZoomRange.max;
   } else if (fullBounds.min !== undefined && fullBounds.max !== undefined) {
@@ -1112,7 +1126,7 @@ function updateChartData(samples) {
 
   applyYScaleOptions(telemetryChart);
   updateResetButtonUI();
-  telemetryChart.update();
+  telemetryChart.update("none");
   updateLegendValues(chronoAll.length ? chronoAll[chronoAll.length - 1].sample : null);
   renderChannelSearchResults();
   updateVisibleWindowStats();
@@ -1146,6 +1160,22 @@ function getFullXBounds(chronoAll, hours) {
   const latestMs = Math.max(Date.now(), lastTs);
   const cutoff = latestMs - hours * 60 * 60 * 1000;
   return { min: cutoff, max: latestMs };
+}
+
+function getPanLimits(chronoAll, hours) {
+  if (!chronoAll || chronoAll.length === 0) {
+    return { min: undefined, max: undefined };
+  }
+  const full = getFullXBounds(chronoAll, hours);
+  const firstTs = chronoAll[0].ts;
+  const lastTs = chronoAll[chronoAll.length - 1].ts;
+  if (full.min === undefined || full.max === undefined) {
+    return { min: firstTs, max: lastTs };
+  }
+  return {
+    min: Math.min(firstTs, full.min),
+    max: Math.max(lastTs, full.max),
+  };
 }
 
 function filterChronoByBounds(chronoAll, bounds) {
@@ -1297,12 +1327,11 @@ function buildChart() {
 
   const chronoAll = parseSamplesChrono(currentSamples);
   const bounds = getFullXBounds(chronoAll, activeTimeframeHours);
-  const chronoFiltered = filterChronoByBounds(chronoAll, bounds);
-  const states = classifyActivityStates(chronoFiltered);
-  const runs = buildActivityRuns(states, chronoFiltered);
-  const compRuns = buildCompressorOnRuns(states, chronoFiltered);
-  const cutoffs = detectSetpointCutoffEvents(chronoFiltered, states);
-  const defrosts = detectDefrostEvents(chronoFiltered);
+  const states = classifyActivityStates(chronoAll);
+  const runs = buildActivityRuns(states, chronoAll);
+  const compRuns = buildCompressorOnRuns(states, chronoAll);
+  const cutoffs = detectSetpointCutoffEvents(chronoAll, states);
+  const defrosts = detectDefrostEvents(chronoAll);
 
   if (telemetryChart) {
     telemetryChart.destroy();
@@ -1313,7 +1342,7 @@ function buildChart() {
     type: "line",
     plugins: [activityBandsPlugin, telemetryAnnotationsPlugin],
     data: {
-      datasets: getDatasets(chronoFiltered),
+      datasets: getDatasets(chronoAll),
     },
     options: {
       responsive: true,
@@ -1467,7 +1496,7 @@ function buildChart() {
     },
   });
 
-  telemetryChart._activityChrono = chronoFiltered;
+  telemetryChart._activityChrono = chronoAll;
   telemetryChart._activityStates = states;
   telemetryChart._activityRuns = runs;
   telemetryChart._compRuns = compRuns;
@@ -1496,6 +1525,7 @@ function attachChartInteractions(canvas) {
   let isMouseDragging = false;
   let mouseDragState = null;
   let lastTouchTapAt = 0;
+  let justFinishedMouseDragAt = 0;
 
   function getRelativePoint(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
@@ -1505,30 +1535,40 @@ function attachChartInteractions(canvas) {
   function getActiveBounds() {
     const chrono = parseSamplesChrono(currentSamples);
     const full = getFullXBounds(chrono, activeTimeframeHours);
+    const panLimits = getPanLimits(chrono, activeTimeframeHours);
     const xScale = telemetryChart && telemetryChart.scales && telemetryChart.scales.x;
     const curMin = (xScale && typeof xScale.min === "number") ? xScale.min : full.min;
     const curMax = (xScale && typeof xScale.max === "number") ? xScale.max : full.max;
-    return { full, curMin, curMax };
+    return { full, panLimits, curMin, curMax };
   }
 
   function applyXRange(reqMin, reqMax) {
     if (!telemetryChart) return;
     const chrono = parseSamplesChrono(currentSamples);
     const full = getFullXBounds(chrono, activeTimeframeHours);
-    if (full.min === undefined || full.max === undefined || full.max <= full.min) return;
+    const panLimits = getPanLimits(chrono, activeTimeframeHours);
+    if (panLimits.min === undefined || panLimits.max === undefined || panLimits.max <= panLimits.min) return;
 
-    const fullSpan = full.max - full.min;
-    const minSpan = Math.min(MIN_X_SPAN_MS, fullSpan);
-    const targetSpan = clamp(reqMax - reqMin, minSpan, fullSpan);
+    const panSpan = panLimits.max - panLimits.min;
+    const fullSpan = (full.min !== undefined && full.max !== undefined) ? (full.max - full.min) : panSpan;
+    const minSpan = Math.min(MIN_X_SPAN_MS, panSpan);
+    const targetSpan = clamp(reqMax - reqMin, minSpan, panSpan);
+    const clampedMin = clamp(reqMin, panLimits.min, panLimits.max - targetSpan);
+    const clampedMax = clampedMin + targetSpan;
 
-    if (targetSpan >= fullSpan * 0.995) {
+    const tol = Math.max(15000, fullSpan * 0.002);
+    const matchesDefaultFull = (full.min !== undefined && full.max !== undefined)
+      && Math.abs(targetSpan - fullSpan) <= tol
+      && Math.abs(clampedMin - full.min) <= tol;
+    const coversAllAtZeroTf = (activeTimeframeHours <= 0 && targetSpan >= panSpan * 0.995);
+
+    if (coversAllAtZeroTf || matchesDefaultFull) {
       xZoomRange = null;
       yAutoFrozen = { yTemp: null, yOther: null };
       telemetryChart.options.scales.x.min = full.min;
       telemetryChart.options.scales.x.max = full.max;
     } else {
-      const clampedMin = clamp(reqMin, full.min, full.max - targetSpan);
-      xZoomRange = { min: clampedMin, max: clampedMin + targetSpan };
+      xZoomRange = { min: clampedMin, max: clampedMax };
       telemetryChart.options.scales.x.min = xZoomRange.min;
       telemetryChart.options.scales.x.max = xZoomRange.max;
     }
@@ -1578,7 +1618,9 @@ function attachChartInteractions(canvas) {
     }
 
     if (e.touches.length === 1) {
-      if (suppressSingleTouchUntilRelease) return;
+      suppressSingleTouchUntilRelease = false;
+      isPinching = false;
+      pinchState = null;
       const pt = getRelativePoint(e.touches[0].clientX, e.touches[0].clientY);
       tapCandidate = { x: pt.x, y: pt.y, time: Date.now(), moved: false };
 
@@ -1606,8 +1648,8 @@ function attachChartInteractions(canvas) {
       const curMidX = (p1.x + p2.x) / 2;
 
       const startSpan = pinchState.startMax - pinchState.startMin;
-      const { full } = getActiveBounds();
-      const fullSpan = (full.max !== undefined && full.min !== undefined) ? (full.max - full.min) : startSpan;
+      const { panLimits } = getActiveBounds();
+      const fullSpan = (panLimits.max !== undefined && panLimits.min !== undefined) ? (panLimits.max - panLimits.min) : startSpan;
       const newSpan = clamp(startSpan * (pinchState.startDist / curDist), Math.min(MIN_X_SPAN_MS, fullSpan), fullSpan);
       const anchorTs = pinchState.startMin + pinchState.startFrac * startSpan;
       const curFrac = clamp((curMidX - area.left) / plotW, 0, 1);
@@ -1690,10 +1732,10 @@ function attachChartInteractions(canvas) {
     e.preventDefault();
 
     freezeAutoYIfNeeded();
-    const { full, curMin, curMax } = getActiveBounds();
-    if (curMin === undefined || curMax === undefined || full.min === undefined) return;
+    const { panLimits, curMin, curMax } = getActiveBounds();
+    if (curMin === undefined || curMax === undefined || panLimits.min === undefined) return;
 
-    const fullSpan = full.max - full.min;
+    const fullSpan = panLimits.max - panLimits.min;
     const curSpan = curMax - curMin;
     const factor = e.deltaY > 0 ? 1.2 : 0.83;
     const newSpan = clamp(curSpan * factor, Math.min(MIN_X_SPAN_MS, fullSpan), fullSpan);
@@ -1703,18 +1745,29 @@ function attachChartInteractions(canvas) {
     applyXRange(newMin, newMin + newSpan);
   }, { passive: false });
 
-  // Desktop mouse drag X-pan (when in Pan mode or holding Shift)
+  // Desktop mouse drag X-pan (always available on left drag; in Read mode activates after 4px)
   canvas.addEventListener("mousedown", (e) => {
-    if (!telemetryChart || !telemetryChart.chartArea) return;
-    if (chartInteractionMode !== "pan" && !e.shiftKey) return;
+    if (e.button !== 0 || !telemetryChart || !telemetryChart.chartArea) return;
     const pt = getRelativePoint(e.clientX, e.clientY);
     const area = telemetryChart.chartArea;
     if (pt.x < area.left || pt.x > area.right) return;
     const { curMin, curMax } = getActiveBounds();
     if (curMin === undefined || curMax === undefined) return;
+    e.preventDefault();
+    const immediatePan = chartInteractionMode === "pan" || e.shiftKey;
     isMouseDragging = true;
-    freezeAutoYIfNeeded();
-    mouseDragState = { startX: pt.x, startMin: curMin, startMax: curMax };
+    mouseDragState = {
+      startX: pt.x,
+      startMin: curMin,
+      startMax: curMax,
+      moved: immediatePan,
+      frozenY: false,
+    };
+    if (immediatePan) {
+      freezeAutoYIfNeeded();
+      mouseDragState.frozenY = true;
+      canvas.style.cursor = "grabbing";
+    }
   });
 
   window.addEventListener("mousemove", (e) => {
@@ -1722,19 +1775,39 @@ function attachChartInteractions(canvas) {
     const area = telemetryChart.chartArea;
     const pt = getRelativePoint(e.clientX, e.clientY);
     const dx = pt.x - mouseDragState.startX;
+    if (!mouseDragState.moved) {
+      if (Math.abs(dx) <= 4) return;
+      mouseDragState.moved = true;
+      setTooltipTempEnabled(false);
+      canvas.style.cursor = "grabbing";
+      if (!mouseDragState.frozenY) {
+        freezeAutoYIfNeeded();
+        mouseDragState.frozenY = true;
+      }
+    }
     const span = mouseDragState.startMax - mouseDragState.startMin;
     const shiftMs = -(dx / Math.max(1, area.right - area.left)) * span;
     applyXRange(mouseDragState.startMin + shiftMs, mouseDragState.startMax + shiftMs);
   });
 
   window.addEventListener("mouseup", () => {
+    if (!isMouseDragging) return;
+    if (mouseDragState && mouseDragState.moved) {
+      justFinishedMouseDragAt = Date.now();
+    }
     isMouseDragging = false;
     mouseDragState = null;
+    setTooltipTempEnabled(true);
+    canvas.style.cursor = chartInteractionMode === "pan" ? "grab" : "crosshair";
+    if (telemetryChart && chartInteractionMode === "read") {
+      telemetryChart.update("none");
+    }
   });
 
   // Desktop click on left/right Y-axis zones
   canvas.addEventListener("click", (e) => {
     if (Date.now() - lastTouchTapAt < 600) return;
+    if (Date.now() - justFinishedMouseDragAt < 300) return;
     if (!telemetryChart || !telemetryChart.chartArea) return;
     const pt = getRelativePoint(e.clientX, e.clientY);
     const area = telemetryChart.chartArea;
@@ -1980,6 +2053,24 @@ function updateExtraChannelsBadge() {
   btn.classList.toggle("has-extras", extraCount > 0);
 }
 
+function closeChannelSearchDrawer() {
+  const toggleBtn = document.getElementById("btnToggleChannelSearch");
+  const drawer = document.getElementById("channelSearchDrawer");
+  const input = document.getElementById("inputChannelSearch");
+  if (drawer) drawer.classList.remove("open");
+  if (toggleBtn) toggleBtn.classList.remove("active");
+  if (input) {
+    input.value = "";
+    input.blur();
+  }
+  renderChannelSearchResults();
+  if (telemetryChart) {
+    requestAnimationFrame(() => {
+      if (telemetryChart) telemetryChart.resize();
+    });
+  }
+}
+
 function initChannelSearchDrawer() {
   const toggleBtn = document.getElementById("btnToggleChannelSearch");
   const drawer = document.getElementById("channelSearchDrawer");
@@ -1991,10 +2082,17 @@ function initChannelSearchDrawer() {
     toggleBtn.addEventListener("click", () => {
       if (!drawer) return;
       const open = drawer.classList.toggle("open");
-      toggleBtn.classList.toggle("active", open);
       if (open) {
+        toggleBtn.classList.add("active");
         renderChannelSearchResults();
-        if (input) setTimeout(() => input.focus(), 40);
+        if (input) setTimeout(() => input.focus({ preventScroll: true }), 40);
+        if (telemetryChart) {
+          requestAnimationFrame(() => {
+            if (telemetryChart) telemetryChart.resize();
+          });
+        }
+      } else {
+        closeChannelSearchDrawer();
       }
     });
   }
@@ -2002,16 +2100,18 @@ function initChannelSearchDrawer() {
   if (input && input.dataset.bound !== "1") {
     input.dataset.bound = "1";
     input.addEventListener("input", renderChannelSearchResults);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeChannelSearchDrawer();
+      }
+    });
   }
 
   if (clearBtn && clearBtn.dataset.bound !== "1") {
     clearBtn.dataset.bound = "1";
     clearBtn.addEventListener("click", () => {
-      if (input) {
-        input.value = "";
-        input.focus();
-      }
-      renderChannelSearchResults();
+      closeChannelSearchDrawer();
     });
   }
 
