@@ -5,10 +5,10 @@
   "cycle_started_utc": null,
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-21T01:01:12.908703+00:00",
+  "last_eval_utc": "2026-11-21T01:16:05.008960+00:00",
   "last_action_utc": "2026-11-20T01:12:25.163996+00:00",
   "last_action_reason": "Standby OK: T=7.7°C > 7.5°C (pendenza -0.04°C/h).",
-  "indoor_slope_c_per_h": -0.044,
+  "indoor_slope_c_per_h": -0.038,
   "calculated_target_lwt_c": 25.7,
   "calculated_pdc_setpoint_c": 15,
   "current_cron_interval_min": 15,
@@ -18,84 +18,13 @@
   "soft_curve_last_trim_utc": null,
   "api_usage": {
     "date_utc": "2026-11-21",
-    "viessmann_reads": 10,
+    "viessmann_reads": 12,
     "viessmann_writes": 0,
-    "bticino_reads": 10,
+    "bticino_reads": 12,
     "bticino_writes": 0,
     "cronjob_patches": 0,
-    "github_runs": 5,
+    "github_runs": 6,
     "recent_events": [
-      {
-        "ts": "2026-11-20T01:01:40.933375+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-20T01:09:23.229576+00:00",
-        "lbl": "cmd:bticino_setpoint",
-        "br": 1,
-        "bw": 1,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-20T01:09:29.633888+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-20T01:10:45.914527+00:00",
-        "lbl": "cmd:autopilot_configure",
-        "cp": 1,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-20T01:10:52.392951+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-20T01:11:39.481644+00:00",
-        "lbl": "cmd:autopilot_configure",
-        "cp": 1,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-20T01:11:45.673464+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-20T01:12:25.630782+00:00",
-        "lbl": "cmd:autopilot_activate_away",
-        "vr": 5,
-        "vw": 3,
-        "br": 1,
-        "bw": 1,
-        "cp": 1,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-20T01:12:29.670536+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-20T01:15:54.034846+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-20T01:31:21.236617+00:00",
         "lbl": "telemetry_poll",
@@ -756,6 +685,13 @@
       },
       {
         "ts": "2026-11-21T01:01:12.907724+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-21T01:16:05.007445+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
