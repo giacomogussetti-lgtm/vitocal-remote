@@ -676,6 +676,7 @@ def run_autopilot_tick(
     curve_slope = sample.get("heating_curve_slope") if sample.get("heating_curve_slope") is not None else 0.6
     curve_shift = sample.get("heating_curve_shift") if sample.get("heating_curve_shift") is not None else 0.0
     buf_temp = sample.get("buffer_temp_c")
+    ewt_temp = sample.get("pdc_return_temp_c")
     gf_active = sample.get("grundfos_pump_active")
     comp_active = sample.get("compressor_active")
     comp_mod = sample.get("compressor_modulation_percent")
@@ -959,7 +960,11 @@ def run_autopilot_tick(
             min_safe_lwt = max(bphe_floor, t_in_f + min_dt_rad)
             candidate_sp = max(11, pdc_setpoint - 1)
             candidate_lwt = compute_wo1c_lwt(float(oat), float(candidate_sp), float(curve_slope), float(curve_shift))
-            hysteresis_safe = (buf_temp is None) or (float(buf_temp) <= candidate_lwt + 1.0)
+            # Dual WO1C full-buffer saturation guard (verified on Nov 21 & Nov 24 logs):
+            # WO1C trips switch-off (param 7209) when BOTH buffer top exceeds target AND return (EWT / bottom) reaches target.
+            buf_safe = (buf_temp is None) or (float(buf_temp) <= candidate_lwt + 1.0)
+            ewt_safe = (ewt_temp is None) or (float(ewt_temp) <= candidate_lwt - 0.8)
+            hysteresis_safe = buf_safe and ewt_safe
             floor_ok = candidate_lwt >= min_safe_lwt and candidate_sp < pdc_setpoint
 
             # Trigger A: Defrost Guard in humid cold air (breaks 88% <-> defrost resonance loop)
