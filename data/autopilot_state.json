@@ -5,10 +5,10 @@
   "cycle_started_utc": "2026-11-24T10:01:23.559165+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-24T12:16:37.641023+00:00",
+  "last_eval_utc": "2026-11-24T12:17:31.114335+00:00",
   "last_action_utc": "2026-11-24T10:01:23.559165+00:00",
   "last_action_reason": "Avvio ciclo (Finestra Alto COP): Target LWT 25.0°C (T_set=14°C). Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual) | Temperatura Ridotta impostata e verificata con successo: 14 °C | Modalità PdC impostata e verificata: dhwAndHeating",
-  "indoor_slope_c_per_h": 0.256,
+  "indoor_slope_c_per_h": 0.254,
   "calculated_target_lwt_c": 25.0,
   "calculated_pdc_setpoint_c": 14,
   "current_cron_interval_min": 1,
@@ -18,12 +18,12 @@
   "soft_curve_last_trim_utc": null,
   "api_usage": {
     "date_utc": "2026-11-24",
-    "viessmann_reads": 506,
+    "viessmann_reads": 508,
     "viessmann_writes": 3,
-    "bticino_reads": 507,
+    "bticino_reads": 509,
     "bticino_writes": 1,
     "cronjob_patches": 1,
-    "github_runs": 253,
+    "github_runs": 254,
     "recent_events": [
       {
         "ts": "2026-11-23T12:31:08.149933+00:00",
@@ -2322,6 +2322,13 @@
       },
       {
         "ts": "2026-11-24T12:16:37.638842+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-24T12:17:31.111582+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
