@@ -369,48 +369,103 @@ main {
   margin-top: 4px;
 }
 
-/* Charts View */
+/* Charts View — Pro Mobile-First Edge-to-Edge Layout */
 .chart-container-card {
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  padding: 10px 12px;
-  margin-bottom: 10px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
 }
 
 .chart-header {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 5px;
+  margin-bottom: 5px;
 }
 
-.chart-header-top {
+.chart-toolbar-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
 }
 
-.chart-title {
-  font-size: 0.92rem;
+.chart-controls-strip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 1px;
+}
+
+.chart-controls-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.strip-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(148, 163, 184, 0.25);
+  flex-shrink: 0;
+  margin: 0 1px;
+}
+
+.cycle-nav-pill {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.btn-cycle-step,
+.btn-cycle-jump {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.68rem;
   font-weight: 700;
+  cursor: pointer;
+  padding: 4px 6px;
+  line-height: 1.1;
+  transition: background 0.15s, color 0.15s;
+}
+
+.btn-cycle-jump {
   color: var(--accent-cyan);
+  border-left: 1px solid rgba(51, 65, 85, 0.65);
+  border-right: 1px solid rgba(51, 65, 85, 0.65);
+  padding: 4px 7px;
+}
+
+.btn-cycle-step:active,
+.btn-cycle-jump:active {
+  background: rgba(56, 189, 248, 0.2);
+  color: var(--text-main);
 }
 
 .chart-tools-minimal {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .btn-mini-tool {
   background: var(--bg-subtle);
   border: 1px solid var(--border-color);
   color: var(--text-muted);
-  padding: 4px 8px;
+  padding: 4px 7px;
   border-radius: 8px;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
@@ -425,12 +480,13 @@ main {
 
 .chart-filters {
   display: flex;
-  gap: 5px;
+  gap: 4px;
   flex-wrap: nowrap;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  padding-bottom: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .chart-filters::-webkit-scrollbar {
@@ -441,9 +497,10 @@ main {
   background: var(--bg-subtle);
   border: 1px solid var(--border-color);
   color: var(--text-muted);
-  padding: 4px 9px;
+  padding: 3px 7px;
   border-radius: 6px;
-  font-size: 0.74rem;
+  font-size: 0.7rem;
+  font-weight: 600;
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -455,21 +512,13 @@ main {
   font-weight: 700;
 }
 
-.chart-meta-strip {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 6px;
-}
-
 .activity-legend {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.68rem;
+  gap: 4px;
+  font-size: 0.66rem;
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .activity-legend-btn {
@@ -479,11 +528,13 @@ main {
   background: var(--bg-subtle);
   border: 1px solid var(--border-color);
   color: var(--text-main);
-  padding: 2px 7px;
-  border-radius: 10px;
-  font-size: 0.66rem;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 0.64rem;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.2s;
 }
 
@@ -494,9 +545,9 @@ main {
 
 .band-swatch {
   display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
 }
 
 .swatch-pdc {
@@ -515,21 +566,22 @@ main {
 }
 
 .axis-pills {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
-  margin-left: auto;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .axis-pill {
   background: var(--bg-subtle);
   border: 1px solid var(--border-color);
   color: var(--text-muted);
-  padding: 2px 7px;
-  border-radius: 10px;
-  font-size: 0.66rem;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 0.64rem;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .axis-pill.locked {
@@ -538,11 +590,87 @@ main {
   background: rgba(245, 158, 11, 0.14);
 }
 
+/* Fixed TradingView-style Scrubbing HUD (zero occlusion over curves) */
+.chart-scrub-hud {
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  border-radius: 8px;
+  background: rgba(12, 22, 39, 0.96);
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.chart-scrub-hud.active {
+  display: flex;
+}
+
+.scrub-hud-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.7rem;
+  min-width: 0;
+}
+
+.scrub-hud-time {
+  color: var(--accent-cyan);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.scrub-hud-state {
+  color: var(--text-main);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
+}
+
+.scrub-hud-close {
+  background: rgba(51, 65, 85, 0.6);
+  border: none;
+  color: var(--text-main);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 0.68rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scrub-hud-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  font-size: 0.65rem;
+  color: #cbd5e1;
+  font-variant-numeric: tabular-nums;
+}
+
+.scrub-hud-meta::-webkit-scrollbar {
+  display: none;
+}
+
+.scrub-hud-meta span {
+  white-space: nowrap;
+}
+
 .chart-canvas-box {
   position: relative;
   width: 100%;
-  height: clamp(320px, 50vh, 560px);
-  height: clamp(320px, 50dvh, 560px);
+  height: clamp(320px, 55vh, 580px);
+  height: clamp(320px, 55dvh, 580px);
 }
 
 #telemetryChartCanvas {
@@ -550,6 +678,49 @@ main {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* Mobile Portrait Edge-to-Edge Chart Optimization (+40..100px horizontal, +100px vertical) */
+@media (max-width: 640px) {
+  #tab-charts {
+    margin: -10px -12px 0 -12px;
+  }
+  #tab-charts .chart-container-card {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    padding: 6px 4px 10px 4px;
+    margin-bottom: 0;
+    background: var(--bg-main);
+  }
+  #tab-charts .chart-header,
+  #tab-charts .chart-window-stats,
+  #tab-charts .chart-scrub-hud,
+  #tab-charts .channel-search-drawer,
+  #tab-charts .chart-channels {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  #tab-charts .chart-window-stats {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 4px 8px;
+    margin: 0 4px 4px 4px;
+    gap: 10px;
+  }
+  #tab-charts .chart-window-stats::-webkit-scrollbar {
+    display: none;
+  }
+  #tab-charts .chart-scrub-hud {
+    margin: 0 4px 4px 4px;
+    padding: 4px 8px;
+  }
+  #tab-charts .chart-canvas-box {
+    height: clamp(300px, 56dvh, 540px);
+  }
 }
 
 @media (orientation: landscape) and (max-height: 540px) {
@@ -584,52 +755,55 @@ main {
   .landscape-nav-fab {
     display: flex;
     position: fixed;
-    top: 6px;
-    right: 6px;
+    top: 4px;
+    right: 4px;
     z-index: 1300;
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     align-items: center;
     justify-content: center;
-    background: rgba(15, 23, 42, 0.84);
+    background: rgba(15, 23, 42, 0.86);
     border: 1px solid rgba(56, 189, 248, 0.5);
     color: var(--accent-cyan);
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 700;
     cursor: pointer;
     backdrop-filter: blur(6px);
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
   }
   main {
-    padding: 4px 6px 8px 6px;
+    padding: 2px 4px 6px 4px;
+  }
+  #tab-charts {
+    margin: 0;
   }
   .chart-container-card {
-    padding: 6px 8px;
-    margin-bottom: 6px;
+    padding: 4px 4px;
+    margin-bottom: 4px;
+    border-radius: 6px;
   }
   .chart-header {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 4px 8px;
-    margin-bottom: 4px;
-  }
-  .chart-header-top {
-    width: 100%;
-    padding-right: 36px;
-  }
-  .chart-meta-strip {
-    margin-bottom: 4px;
-    gap: 4px;
+    gap: 3px;
+    margin-bottom: 3px;
+    padding-right: 34px;
   }
   .chart-window-stats {
-    padding: 3px 8px;
-    margin-bottom: 4px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 2px 6px;
+    margin-bottom: 3px;
+    font-size: 0.64rem;
+  }
+  .chart-window-stats::-webkit-scrollbar {
+    display: none;
   }
   .chart-canvas-box {
-    height: clamp(200px, calc(100dvh - 110px), 360px);
+    height: clamp(220px, calc(100dvh - 88px), 380px);
+  }
+  .legend-chips-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -645,24 +819,19 @@ main {
 
 /* Chart View Presets & Visible-Window KPIs */
 .chart-presets-row {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.chart-presets-row::-webkit-scrollbar {
-  display: none;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .btn-preset-chip {
   background: rgba(15, 23, 42, 0.9);
   border: 1px solid var(--border-color);
   color: var(--text-muted);
-  padding: 3px 8px;
-  border-radius: 8px;
-  font-size: 0.68rem;
+  padding: 2px 7px;
+  border-radius: 7px;
+  font-size: 0.66rem;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -680,14 +849,15 @@ main {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 12px;
-  padding: 5px 8px;
-  margin-bottom: 6px;
+  gap: 5px 10px;
+  padding: 4px 8px;
+  margin-bottom: 4px;
   border-radius: 8px;
   background: rgba(15, 23, 42, 0.85);
   border: 1px solid rgba(51, 65, 85, 0.75);
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .chart-stat-item {
@@ -695,6 +865,7 @@ main {
   align-items: center;
   gap: 4px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .chart-stat-item strong {
@@ -706,21 +877,47 @@ main {
 .chart-channels {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.legend-toolbar-mini {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.64rem;
+  color: var(--text-dim);
+}
+
+.btn-legend-filter {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 2px 7px;
+  border-radius: 7px;
+  font-size: 0.64rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-legend-filter.active {
+  color: var(--accent-cyan);
+  border-color: rgba(56, 189, 248, 0.5);
+  background: rgba(56, 189, 248, 0.12);
 }
 
 .legend-group {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
 }
 
 .legend-group-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.65rem;
+  font-size: 0.63rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.45px;
@@ -737,19 +934,20 @@ main {
 .legend-chips-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 5px;
+  gap: 4px;
 }
 
-@media (max-width: 420px) {
+@media (max-width: 480px) {
   .legend-chips-grid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
   }
 }
 
 .legend-chip {
-  font-size: 0.68rem;
-  padding: 5px 7px;
-  border-radius: 8px;
+  font-size: 0.67rem;
+  padding: 4px 6px;
+  border-radius: 7px;
   cursor: pointer;
   border: 1px solid rgba(51, 65, 85, 0.7);
   background: rgba(15, 23, 42, 0.72);
@@ -757,8 +955,8 @@ main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
-  transition: all 0.18s;
+  gap: 5px;
+  transition: all 0.16s;
   min-width: 0;
   text-align: left;
 }
@@ -769,8 +967,16 @@ main {
   background: rgba(22, 31, 48, 0.96);
 }
 
+.legend-chip.is-scrubbing.active {
+  box-shadow: 0 0 0 1px var(--chip-color, var(--accent-cyan));
+}
+
 .legend-chip:not(.active) {
-  opacity: 0.48;
+  opacity: 0.45;
+}
+
+.legend-val {
+  font-variant-numeric: tabular-nums;
 }
 
 .legend-chip-left {

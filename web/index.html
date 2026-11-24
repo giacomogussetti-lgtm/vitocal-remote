@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
   <!-- CSS Stylesheet -->
-  <link rel="stylesheet" href="css/styles.css?v=15">
+  <link rel="stylesheet" href="css/styles.css?v=16">
 
   <!-- Chart.js & Continuous Time Date Adapter (Offline First & PWA Ready) -->
   <script src="js/chart.min.js"></script>
@@ -109,60 +109,75 @@
     <section id="tab-charts" class="tab-content">
       <div class="chart-container-card">
         <div class="chart-header">
-          <div class="chart-header-top">
-            <div class="chart-title label-with-help">
-              <span>📊 Telemetria Temporale</span>
-              <button type="button" class="help-info-btn" data-help-key="chart_axes_zoom" aria-label="Aiuto grafici">i</button>
+          <!-- Row 1: Timeframe + Cycle Navigation & Quick Tools (compact 1-line) -->
+          <div class="chart-toolbar-row">
+            <div class="chart-filters" id="chartTimeframeButtons">
+              <button type="button" class="btn-filter" data-hours="6">6h</button>
+              <button type="button" class="btn-filter active" data-hours="24">24h</button>
+              <button type="button" class="btn-filter" data-hours="72">3gg</button>
+              <button type="button" class="btn-filter" data-hours="168">7gg</button>
+              <button type="button" class="btn-filter" data-hours="720">30gg</button>
+              <button type="button" class="btn-filter" data-hours="2160">3M</button>
+              <button type="button" class="btn-filter" data-hours="0">Tutti</button>
             </div>
             <div class="chart-tools-minimal">
-              <button type="button" class="btn-mini-tool" id="btnJumpLastCycle" title="Centra zoom sull'ultimo ciclo compressore">⏭️ Ciclo</button>
-              <button type="button" class="btn-mini-tool" id="btnResetChartZoom" style="display: none;" title="Ripristina zoom asse X">↺ Reset</button>
-              <button type="button" class="btn-mini-tool" id="btnChartModeToggle" title="Gesto 1 dito: Leggi valori o Sposta asse X">👆 Leggi</button>
+              <div class="cycle-nav-pill" title="Scorri tra tutti i cicli compressore registrati">
+                <button type="button" class="btn-cycle-step" id="btnPrevCycle" aria-label="Ciclo precedente">◀</button>
+                <button type="button" class="btn-cycle-jump" id="btnJumpLastCycle">Ciclo</button>
+                <button type="button" class="btn-cycle-step" id="btnNextCycle" aria-label="Ciclo successivo">▶</button>
+              </div>
+              <button type="button" class="btn-mini-tool" id="btnResetChartZoom" style="display: none;" title="Ripristina zoom asse X">↺</button>
+              <button type="button" class="btn-mini-tool" id="btnChartModeToggle" title="1 dito: Pan (tieni premuto = mirino) oppure Mirino diretto">✋ Pan</button>
+              <button type="button" class="help-info-btn" data-help-key="chart_axes_zoom" aria-label="Aiuto grafici">i</button>
             </div>
           </div>
-          <div class="chart-filters" id="chartTimeframeButtons">
-            <button type="button" class="btn-filter" data-hours="6">6h</button>
-            <button type="button" class="btn-filter active" data-hours="24">24h</button>
-            <button type="button" class="btn-filter" data-hours="72">3gg</button>
-            <button type="button" class="btn-filter" data-hours="168">7gg</button>
-            <button type="button" class="btn-filter" data-hours="720">30gg</button>
-            <button type="button" class="btn-filter" data-hours="2160">3M</button>
-            <button type="button" class="btn-filter" data-hours="0">Tutti</button>
-          </div>
-          <div class="chart-presets-row" id="chartPresetButtons">
-            <button type="button" class="btn-preset-chip active" data-preset="thermo">🔥 Termo</button>
-            <button type="button" class="btn-preset-chip" data-preset="inverter">⚙️ Inverter</button>
-            <button type="button" class="btn-preset-chip" data-preset="home">🏠 Casa</button>
-            <button type="button" class="btn-preset-chip" data-preset="all">📋 Tutto</button>
-            <button type="button" class="btn-preset-chip btn-channel-search-chip" id="btnToggleChannelSearch" title="Cerca e aggiungi altri canali al grafico">🔍 + Canali</button>
+
+          <!-- Row 2: Unified horizontal scrollable strip: Presets + Search + Y Scales + Activity Bands -->
+          <div class="chart-controls-strip">
+            <div class="chart-presets-row" id="chartPresetButtons">
+              <button type="button" class="btn-preset-chip active" data-preset="thermo">🔥 Termo</button>
+              <button type="button" class="btn-preset-chip" data-preset="inverter">⚙️ Inverter</button>
+              <button type="button" class="btn-preset-chip" data-preset="home">🏠 Casa</button>
+              <button type="button" class="btn-preset-chip" data-preset="all">📋 Tutto</button>
+              <button type="button" class="btn-preset-chip btn-channel-search-chip" id="btnToggleChannelSearch" title="Cerca e aggiungi altri canali al grafico">🔍 + Canali</button>
+            </div>
+            <span class="strip-divider" aria-hidden="true"></span>
+            <div class="axis-pills">
+              <button type="button" class="axis-pill" id="btnScaleYTemp" title="Tocca per fissare scala °C">°C: Auto</button>
+              <button type="button" class="axis-pill" id="btnScaleYOther" title="Tocca per fissare scala %/bar">%: Auto</button>
+            </div>
+            <span class="strip-divider" aria-hidden="true"></span>
+            <div class="activity-legend" id="activityLegendButtons">
+              <button type="button" class="activity-legend-btn active" data-band="1"><i class="band-swatch swatch-pdc"></i>PdC</button>
+              <button type="button" class="activity-legend-btn active" data-band="2"><i class="band-swatch swatch-gf"></i>GF</button>
+              <button type="button" class="activity-legend-btn active" data-band="3"><i class="band-swatch swatch-both"></i>PdC+GF</button>
+              <button type="button" class="activity-legend-btn active" id="btnToggleSetpointMarkers" title="Mostra/nascondi stop per raggiungimento setpoint"><i class="band-swatch swatch-stop-sp"></i>Stop SP</button>
+              <button type="button" class="help-info-btn" data-help-key="chart_bands" aria-label="Aiuto bande">i</button>
+            </div>
           </div>
         </div>
 
         <div id="channelSearchDrawer" class="channel-search-drawer">
           <div class="channel-search-bar">
-            <input type="search" id="inputChannelSearch" class="form-input" placeholder="Cerca canale (es. delta, gas, potenza, resistenza, cop)...">
+            <input type="search" id="inputChannelSearch" class="form-input" placeholder="Cerca canale (es. delta, gas, sottoraffreddamento, potenza, cop)...">
             <button type="button" class="btn-mini-tool" id="btnClearChannelSearch" title="Chiudi ricerca canali" aria-label="Chiudi ricerca canali">✕</button>
           </div>
           <div id="channelSearchResults" class="channel-search-results"></div>
         </div>
 
-        <div class="chart-meta-strip">
-          <div class="activity-legend" id="activityLegendButtons">
-            <button type="button" class="activity-legend-btn active" data-band="1"><i class="band-swatch swatch-pdc"></i>Solo PdC</button>
-            <button type="button" class="activity-legend-btn active" data-band="2"><i class="band-swatch swatch-gf"></i>Solo GF</button>
-            <button type="button" class="activity-legend-btn active" data-band="3"><i class="band-swatch swatch-both"></i>PdC + GF</button>
-            <button type="button" class="help-info-btn" data-help-key="chart_bands" aria-label="Aiuto bande">i</button>
-            <button type="button" class="activity-legend-btn active" id="btnToggleSetpointMarkers" title="Mostra/nascondi stop per raggiungimento setpoint"><i class="band-swatch swatch-stop-sp"></i>🎯 Stop SP</button>
-            <button type="button" class="help-info-btn" data-help-key="chart_setpoint_stop" aria-label="Aiuto stop setpoint">i</button>
-          </div>
-          <div class="axis-pills">
-            <button type="button" class="axis-pill" id="btnScaleYTemp" title="Tocca per fissare scala °C">°C: Auto</button>
-            <button type="button" class="axis-pill" id="btnScaleYOther" title="Tocca per fissare scala %/bar">%: Auto</button>
-          </div>
-        </div>
-
+        <!-- 1-line scrollable KPI ticker (never wraps into 3 tall lines on mobile) -->
         <div class="chart-window-stats" id="chartWindowStats">
           <span class="chart-stat-item">Caricamento statistiche finestra...</span>
+        </div>
+
+        <!-- Fixed TradingView-style Scrubbing HUD (appears when inspecting a point on touch, zero chart occlusion) -->
+        <div class="chart-scrub-hud" id="chartScrubHud" aria-live="polite">
+          <div class="scrub-hud-main">
+            <span class="scrub-hud-time" id="scrubHudTime">--/-- --:--</span>
+            <span class="scrub-hud-state" id="scrubHudState">--</span>
+            <button type="button" class="scrub-hud-close" id="btnCloseScrubHud" title="Chiudi mirino">✕</button>
+          </div>
+          <div class="scrub-hud-meta" id="scrubHudMeta"></div>
         </div>
 
         <div class="chart-canvas-box">
@@ -975,11 +990,11 @@
   <div id="toast"></div>
 
   <!-- Scripts -->
-  <script src="js/synoptic.js?v=15"></script>
-  <script src="js/charts.js?v=15"></script>
-  <script src="js/analytics.js?v=15"></script>
-  <script src="js/commands.js?v=15"></script>
-  <script src="js/help.js?v=15"></script>
-  <script src="js/app.js?v=15"></script>
+  <script src="js/synoptic.js?v=16"></script>
+  <script src="js/charts.js?v=16"></script>
+  <script src="js/analytics.js?v=16"></script>
+  <script src="js/commands.js?v=16"></script>
+  <script src="js/help.js?v=16"></script>
+  <script src="js/app.js?v=16"></script>
 </body>
 </html>

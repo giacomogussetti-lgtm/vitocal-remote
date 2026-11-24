@@ -186,10 +186,10 @@ const HELP_CATALOG = {
     tip: "Confronta il punto con la modulazione % e con la Grundfos: se stacca mentre la Grundfos è OFF, il puffer si è saturato subito."
   },
   chart_axes_zoom: {
-    title: "🔍 Gesti Touch, Zoom X & Scale Y Bloccate",
-    what: "1 dito legge i valori istantanei (oppure sposta se premi '✋ Sposta'); 2 dita fanno pinch zoom e scorrimento esclusivamente lungo l'asse X del tempo.",
-    impact: "Durante lo zoom orizzontale gli assi verticali restano congelati (niente salti fastidiosi). Tocca direttamente i numeri sull'asse sinistro/destro (o le pillole °C / %) per fissare min/max personalizzati.",
-    tip: "Usa '⏭️ Ciclo' per centrare con un tap l'ultimo ciclo compressore registrato."
+    title: "🔍 Gesti Touch Smart (Stile TradingView)",
+    what: "Su smartphone: trascina con 1 dito per spostare nel tempo, tocca o tieni premuto (180 ms) per agganciare il mirino magnetico con barra HUD fissa (senza coprire le curve!), fai doppio-tap per Zoom 2× / Reset e usa 2 dita per pinch zoom X.",
+    impact: "Gli assi Y restano bloccati durante zoom/pan in X e l'asse destro si nasconde automaticamente se non usato (più spazio alle curve). Tocca direttamente i numeri sugli assi o le pillole °C / % per fissare la scala.",
+    tip: "Usa ◀ Ciclo ▶ in alto per saltare rapidamente tra tutti i cicli del compressore (es. 24/11 ↔ 21/11)!"
   },
   analytics_score: {
     title: "🎯 Qualità Modulazione & Sicurezza Gelo",

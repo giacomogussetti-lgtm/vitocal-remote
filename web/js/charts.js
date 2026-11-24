@@ -16,13 +16,20 @@ let currentSamples = [];
 let activeTimeframeHours = 24;
 let activePresetKey = "thermo";
 
-let chartInteractionMode = "read"; // "read" (1-finger tooltip) | "pan" (1-finger X drag)
+function isCompactChartViewport() {
+  return typeof window !== "undefined" && window.innerWidth < 768;
+}
+
+let chartInteractionMode = isCompactChartViewport() ? "pan" : "read"; // "pan" (1F pan + tap/long-press scrub) | "read" (1F direct scrub)
 let xZoomRange = null; // { min, max } when zoomed/panned in X
 let yAutoFrozen = { yTemp: null, yOther: null };
 let activeModalAxis = null;
 let visibleActivityBands = { 1: true, 2: true, 3: true };
 let showSetpointMarkers = true;
 let soloBackupActive = null;
+let activeCycleNavIndex = -1;
+let legendOnlyActive = false;
+let isScrubHudOpen = false;
 
 const MIN_X_SPAN_MS = 15 * 60 * 1000;
 const Y_SCALE_STORAGE_KEY = "vitocal_y_scales";
@@ -1002,16 +1009,18 @@ function initChartControls() {
       chartInteractionMode = (chartInteractionMode === "read") ? "pan" : "read";
       updateModeButtonUI();
       if (telemetryChart) {
-        telemetryChart.options.plugins.tooltip.enabled = (chartInteractionMode === "read");
+        telemetryChart.options.plugins.tooltip.enabled = (!isCompactChartViewport() && chartInteractionMode === "read");
         if (chartInteractionMode === "pan") {
-          telemetryChart._activeHoverX = null;
-          telemetryChart.setActiveElements([]);
-          if (telemetryChart.tooltip) telemetryChart.tooltip.setActiveElements([], { x: 0, y: 0 });
+          clearScrubSelection();
         }
         telemetryChart.update("none");
       }
       if (typeof showToast === "function") {
-        showToast(chartInteractionMode === "pan" ? "✋ 1 dito sposta in X • 2 dita pinch zoom" : "👆 1 dito legge i valori • 2 dita zoom/sposta X");
+        showToast(
+          chartInteractionMode === "pan"
+            ? "✋ Pan: trascina 1 dito • Tap/tieni premuto = Mirino • 2×Tap = Zoom"
+            : "🧲 Mirino diretto: scorri 1 dito per leggere • 2 dita = Zoom/Pan"
+        );
       }
     });
   }
@@ -1019,7 +1028,25 @@ function initChartControls() {
   const jumpBtn = document.getElementById("btnJumpLastCycle");
   if (jumpBtn && jumpBtn.dataset.bound !== "1") {
     jumpBtn.dataset.bound = "1";
-    jumpBtn.addEventListener("click", jumpToLastCycle);
+    jumpBtn.addEventListener("click", () => jumpToCycle("last"));
+  }
+
+  const prevCycBtn = document.getElementById("btnPrevCycle");
+  if (prevCycBtn && prevCycBtn.dataset.bound !== "1") {
+    prevCycBtn.dataset.bound = "1";
+    prevCycBtn.addEventListener("click", () => jumpToCycle(-1));
+  }
+
+  const nextCycBtn = document.getElementById("btnNextCycle");
+  if (nextCycBtn && nextCycBtn.dataset.bound !== "1") {
+    nextCycBtn.dataset.bound = "1";
+    nextCycBtn.addEventListener("click", () => jumpToCycle(1));
+  }
+
+  const closeHudBtn = document.getElementById("btnCloseScrubHud");
+  if (closeHudBtn && closeHudBtn.dataset.bound !== "1") {
+    closeHudBtn.dataset.bound = "1";
+    closeHudBtn.addEventListener("click", () => clearScrubSelection());
   }
 
   const resetBtn = document.getElementById("btnResetChartZoom");
@@ -1125,8 +1152,8 @@ function updateModeButtonUI() {
   const modeBtn = document.getElementById("btnChartModeToggle");
   const isPan = chartInteractionMode === "pan";
   if (modeBtn) {
-    modeBtn.textContent = isPan ? "✋ Sposta" : "👆 Leggi";
-    modeBtn.classList.toggle("active", isPan);
+    modeBtn.textContent = isPan ? "✋ Pan" : "🧲 Mirino";
+    modeBtn.classList.toggle("active", !isPan);
   }
   const canvas = document.getElementById("telemetryChartCanvas");
   if (canvas) {
@@ -1160,7 +1187,7 @@ function formatCompactNum(n) {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
-function jumpToLastCycle() {
+function jumpToCycle(directionOrLast = "last") {
   const chronoAll = parseSamplesChrono(currentSamples);
   if (!chronoAll.length) return;
   const allStates = classifyActivityStates(chronoAll);
@@ -1170,9 +1197,15 @@ function jumpToLastCycle() {
     return;
   }
 
-  const lastRun = compRuns[compRuns.length - 1];
-  const reqMin = lastRun.startTs - 20 * 60 * 1000;
-  const reqMax = lastRun.endTs + 45 * 60 * 1000;
+  if (directionOrLast === "last" || activeCycleNavIndex < 0 || activeCycleNavIndex >= compRuns.length) {
+    activeCycleNavIndex = compRuns.length - 1;
+  } else if (typeof directionOrLast === "number") {
+    activeCycleNavIndex = clamp(activeCycleNavIndex + directionOrLast, 0, compRuns.length - 1);
+  }
+
+  const targetRun = compRuns[activeCycleNavIndex];
+  const reqMin = targetRun.startTs - 20 * 60 * 1000;
+  const reqMax = targetRun.endTs + 45 * 60 * 1000;
 
   let fullBounds = getFullXBounds(chronoAll, activeTimeframeHours);
   if (fullBounds.min !== undefined && reqMin < fullBounds.min) {
@@ -1191,8 +1224,102 @@ function jumpToLastCycle() {
   telemetryChart.update("none");
   updateVisibleWindowStats();
   if (typeof showToast === "function") {
-    showToast(`⏭️ Centrato sull'ultimo ciclo (${formatDurationCompact(lastRun.durationMin)})`);
+    const d = new Date(targetRun.startTs);
+    const dayStr = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+    showToast(`⏭️ Ciclo ${activeCycleNavIndex + 1}/${compRuns.length} (${dayStr} · ${formatDurationCompact(targetRun.durationMin)})`);
   }
+}
+
+function jumpToLastCycle() {
+  jumpToCycle("last");
+}
+
+function renderScrubHud(entry) {
+  const hud = document.getElementById("chartScrubHud");
+  if (!hud || !entry || !entry.sample || !telemetryChart) return;
+  const s = entry.sample;
+  const targetTs = entry.ts;
+
+  const d = new Date(targetTs);
+  const tsStr = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+
+  let stateTxt = "⏸ Standby";
+  let blockTxt = "";
+  const st = findClosestByTs(telemetryChart._activityStates, targetTs);
+  if (st) {
+    const info = ACTIVITY_STYLES[st.state];
+    const runsList = telemetryChart._activityRuns || [];
+    const hitRun = runsList.find(r => targetTs >= r.segStart && targetTs <= r.segEnd);
+    const durTxt = hitRun ? ` (${formatDurationCompact(hitRun.durationMin)})` : "";
+    stateTxt = (info ? info.text.replace("Stato: ", "") : "⏸ Standby") + durTxt;
+    if (hitRun && (hitRun.state === 1 || hitRun.state === 3) && hitRun.thermalKwh > 0) {
+      blockTxt = `🔥 ~${hitRun.thermalKwh.toFixed(1)} kWhₜ (${hitRun.avgThermalKw.toFixed(1)} kWₜ)`;
+    }
+  }
+
+  const metaParts = [];
+  if (blockTxt) metaParts.push(`<span style="color:#fde047;">${blockTxt}</span>`);
+  if (s.pdc_supply_temp_c != null && s.pdc_return_temp_c != null) {
+    const dtPrim = (Number(s.pdc_supply_temp_c) - Number(s.pdc_return_temp_c)).toFixed(1);
+    const p1Txt = s.primary_pump_rotation_percent != null ? ` · P1 ${Math.round(Number(s.primary_pump_rotation_percent))}%` : "";
+    metaParts.push(`<span>ΔTp ${Number(dtPrim) >= 0 ? "+" : ""}${dtPrim}K${p1Txt}</span>`);
+  }
+  if (s.pdc_supply_temp_c != null && s.buffer_temp_c != null) {
+    const dtSb = (Number(s.pdc_supply_temp_c) - Number(s.buffer_temp_c)).toFixed(1);
+    metaParts.push(`<span>ΔLWT−Buf ${Number(dtSb) >= 0 ? "+" : ""}${dtSb}K</span>`);
+  }
+  if (s.indoor_temp_bticino_c != null) {
+    const gfTxt = s.grundfos_pump_active === 1 ? "GF ON" : "GF OFF";
+    metaParts.push(`<span>🏠 ${Number(s.indoor_temp_bticino_c).toFixed(1)}°C (${gfTxt})</span>`);
+  }
+  const phase = String(s.compressor_phase || "").toLowerCase();
+  if (phase.includes("defrost")) {
+    metaParts.push('<span style="color:#38bdf8;font-weight:700;">❄️ DEFROST</span>');
+  }
+  const nearbyCutoff = (telemetryChart._setpointCutoffs || []).find(ev => Math.abs(ev.ts - targetTs) <= 10 * 60 * 1000);
+  if (nearbyCutoff) {
+    metaParts.push(`<span style="color:#fca5a5;font-weight:700;">🎯 Stop SP ${nearbyCutoff.peakSup.toFixed(1)}°</span>`);
+  }
+
+  const timeEl = document.getElementById("scrubHudTime");
+  const stEl = document.getElementById("scrubHudState");
+  const metaEl = document.getElementById("scrubHudMeta");
+  if (timeEl) timeEl.textContent = tsStr;
+  if (stEl) stEl.textContent = stateTxt;
+  if (metaEl) metaEl.innerHTML = metaParts.join("");
+
+  hud.classList.add("active");
+  isScrubHudOpen = true;
+  document.querySelectorAll(".legend-chip").forEach(el => el.classList.add("is-scrubbing"));
+  updateLegendValues(s);
+}
+
+function clearScrubSelection() {
+  const hud = document.getElementById("chartScrubHud");
+  if (hud) hud.classList.remove("active");
+  isScrubHudOpen = false;
+  document.querySelectorAll(".legend-chip").forEach(el => el.classList.remove("is-scrubbing"));
+  if (telemetryChart) {
+    telemetryChart._activeHoverX = null;
+    telemetryChart.setActiveElements([]);
+    if (telemetryChart.tooltip) telemetryChart.tooltip.setActiveElements([], { x: 0, y: 0 });
+    telemetryChart.update("none");
+  }
+  const chronoAll = parseSamplesChrono(currentSamples);
+  updateLegendValues(chronoAll.length ? chronoAll[chronoAll.length - 1].sample : null);
+}
+
+function scrubChartAtClientX(clientX) {
+  if (!telemetryChart || !telemetryChart.chartArea || !telemetryChart.scales || !telemetryChart.scales.x) return;
+  const rect = telemetryChart.canvas.getBoundingClientRect();
+  const relX = clamp(clientX - rect.left, telemetryChart.chartArea.left, telemetryChart.chartArea.right);
+  const ts = telemetryChart.scales.x.getValueForPixel(relX);
+  const entry = findClosestByTs(telemetryChart._activityChrono, ts);
+  if (!entry) return;
+  const snappedPx = telemetryChart.scales.x.getPixelForValue(entry.ts);
+  telemetryChart._activeHoverX = clamp(snappedPx, telemetryChart.chartArea.left, telemetryChart.chartArea.right);
+  telemetryChart.update("none");
+  renderScrubHud(entry);
 }
 
 function resetChartXZoom() {
@@ -1216,6 +1343,20 @@ function resetChartXZoom() {
 
 function applyYScaleOptions(chart) {
   if (!chart || !chart.options || !chart.options.scales) return;
+  const compact = isCompactChartViewport();
+  const hasRightChannel = CHANNEL_DEFS.some(c => c.active && c.yAxis === "yOther");
+  if (chart.options.scales.yOther) {
+    chart.options.scales.yOther.display = hasRightChannel;
+  }
+  if (chart.options.scales.yTemp && chart.options.scales.yTemp.title) {
+    chart.options.scales.yTemp.title.display = !compact;
+  }
+  if (chart.options.scales.yOther && chart.options.scales.yOther.title) {
+    chart.options.scales.yOther.title.display = !compact && hasRightChannel;
+  }
+  const btnOther = document.getElementById("btnScaleYOther");
+  if (btnOther) btnOther.style.display = hasRightChannel ? "inline-flex" : "none";
+
   for (const axisId of ["yTemp", "yOther"]) {
     const scaleOpt = chart.options.scales[axisId];
     if (!scaleOpt) continue;
@@ -1511,6 +1652,8 @@ function buildChart() {
   }
 
   const ctx = canvas.getContext("2d");
+  const compact = isCompactChartViewport();
+  const hasRightChannel = CHANNEL_DEFS.some(c => c.active && c.yAxis === "yOther");
   telemetryChart = new Chart(ctx, {
     type: "line",
     plugins: [activityBandsPlugin, telemetryAnnotationsPlugin],
@@ -1521,6 +1664,9 @@ function buildChart() {
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
+      layout: {
+        padding: { left: 0, right: compact ? 2 : 4, top: 2, bottom: 0 },
+      },
       interaction: {
         mode: "nearest",
         axis: "x",
@@ -1531,7 +1677,7 @@ function buildChart() {
           display: false,
         },
         tooltip: {
-          enabled: chartInteractionMode === "read",
+          enabled: !compact && chartInteractionMode === "read",
           backgroundColor: "rgba(15, 23, 42, 0.96)",
           titleColor: "#38bdf8",
           bodyColor: "#f8fafc",
@@ -1654,16 +1800,17 @@ function buildChart() {
           type: "linear",
           position: "left",
           grace: "14%",
-          title: { display: true, text: "°C", color: "#94a3b8", font: { size: 10 } },
-          grid: { color: "rgba(51, 65, 85, 0.4)" },
-          ticks: { color: "#cbd5e1", font: { size: 10 } },
+          title: { display: !compact, text: "°C", color: "#94a3b8", font: { size: 10 } },
+          grid: { color: "rgba(51, 65, 85, 0.38)" },
+          ticks: { color: "#cbd5e1", font: { size: compact ? 9.5 : 10 }, padding: compact ? 2 : 4, maxTicksLimit: compact ? 6 : 8 },
         },
         yOther: {
           type: "linear",
           position: "right",
-          title: { display: true, text: "% / bar", color: "#94a3b8", font: { size: 10 } },
+          display: hasRightChannel,
+          title: { display: !compact && hasRightChannel, text: "% / bar", color: "#94a3b8", font: { size: 10 } },
           grid: { drawOnChartArea: false },
-          ticks: { color: "#cbd5e1", font: { size: 10 } },
+          ticks: { color: "#cbd5e1", font: { size: compact ? 9.5 : 10 }, padding: compact ? 2 : 4, maxTicksLimit: compact ? 6 : 8 },
         },
       },
     },
@@ -1693,12 +1840,22 @@ function attachChartInteractions(canvas) {
   let pinchState = null;
   let isPanning1F = false;
   let pan1State = null;
+  let isScrubbing1F = false;
+  let longPressTimer = null;
   let tapCandidate = null;
+  let lastPlotTap = { time: 0, x: 0, y: 0 };
   let suppressSingleTouchUntilRelease = false;
   let isMouseDragging = false;
   let mouseDragState = null;
   let lastTouchTapAt = 0;
   let justFinishedMouseDragAt = 0;
+
+  function cancelLongPress() {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+  }
 
   function getRelativePoint(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
@@ -1754,7 +1911,7 @@ function attachChartInteractions(canvas) {
 
   function setTooltipTempEnabled(enabled) {
     if (!telemetryChart) return;
-    telemetryChart.options.plugins.tooltip.enabled = enabled && (chartInteractionMode === "read");
+    telemetryChart.options.plugins.tooltip.enabled = enabled && !isCompactChartViewport() && (chartInteractionMode === "read");
     if (!enabled) {
       telemetryChart._activeHoverX = null;
       telemetryChart.setActiveElements([]);
@@ -1765,11 +1922,13 @@ function attachChartInteractions(canvas) {
   canvas.addEventListener("touchstart", (e) => {
     if (!telemetryChart || !telemetryChart.chartArea) return;
     const area = telemetryChart.chartArea;
+    cancelLongPress();
 
     if (e.touches.length === 2) {
       e.preventDefault();
       isPinching = true;
       isPanning1F = false;
+      isScrubbing1F = false;
       tapCandidate = null;
       setTooltipTempEnabled(false);
       freezeAutoYIfNeeded();
@@ -1793,17 +1952,34 @@ function attachChartInteractions(canvas) {
     if (e.touches.length === 1) {
       suppressSingleTouchUntilRelease = false;
       isPinching = false;
+      isScrubbing1F = false;
       pinchState = null;
-      const pt = getRelativePoint(e.touches[0].clientX, e.touches[0].clientY);
-      tapCandidate = { x: pt.x, y: pt.y, time: Date.now(), moved: false };
+      const touch = e.touches[0];
+      const pt = getRelativePoint(touch.clientX, touch.clientY);
+      tapCandidate = { x: pt.x, y: pt.y, clientX: touch.clientX, time: Date.now(), moved: false };
 
-      if (chartInteractionMode === "pan" && pt.x >= area.left - 8 && pt.x <= area.right + 8) {
+      const inPlotX = pt.x >= area.left - 8 && pt.x <= area.right + 8;
+      if (chartInteractionMode === "read" && inPlotX) {
+        isScrubbing1F = true;
+        scrubChartAtClientX(touch.clientX);
+      } else if (chartInteractionMode === "pan" && inPlotX) {
         const { curMin, curMax } = getActiveBounds();
         if (curMin !== undefined && curMax !== undefined) {
           isPanning1F = true;
-          freezeAutoYIfNeeded();
-          pan1State = { startX: pt.x, startMin: curMin, startMax: curMax };
+          pan1State = { startX: pt.x, startMin: curMin, startMax: curMax, frozen: false };
         }
+        // TradingView-style Long Press (180 ms) engages magnetic crosshair scrubbing without switching modes!
+        longPressTimer = setTimeout(() => {
+          if (tapCandidate && !tapCandidate.moved && !isPinching) {
+            isPanning1F = false;
+            pan1State = null;
+            isScrubbing1F = true;
+            if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+              try { navigator.vibrate(12); } catch (_) {}
+            }
+            scrubChartAtClientX(tapCandidate.clientX);
+          }
+        }, 180);
       }
     }
   }, { passive: false });
@@ -1815,6 +1991,7 @@ function attachChartInteractions(canvas) {
 
     if (e.touches.length === 2 && isPinching && pinchState) {
       e.preventDefault();
+      cancelLongPress();
       const p1 = getRelativePoint(e.touches[0].clientX, e.touches[0].clientY);
       const p2 = getRelativePoint(e.touches[1].clientX, e.touches[1].clientY);
       const curDist = Math.max(20, Math.hypot(p2.x - p1.x, p2.y - p1.y));
@@ -1832,24 +2009,35 @@ function attachChartInteractions(canvas) {
     }
 
     if (e.touches.length === 1 && !suppressSingleTouchUntilRelease) {
-      const pt = getRelativePoint(e.touches[0].clientX, e.touches[0].clientY);
-      if (tapCandidate && Math.hypot(pt.x - tapCandidate.x, pt.y - tapCandidate.y) > 10) {
+      const touch = e.touches[0];
+      const pt = getRelativePoint(touch.clientX, touch.clientY);
+      if (tapCandidate && Math.hypot(pt.x - tapCandidate.x, pt.y - tapCandidate.y) > 8) {
         tapCandidate.moved = true;
+        cancelLongPress();
       }
 
-      if (chartInteractionMode === "pan" && isPanning1F && pan1State) {
+      if (isScrubbing1F) {
         e.preventDefault();
+        scrubChartAtClientX(touch.clientX);
+      } else if (chartInteractionMode === "pan" && isPanning1F && pan1State && tapCandidate && tapCandidate.moved) {
+        e.preventDefault();
+        if (!pan1State.frozen) {
+          freezeAutoYIfNeeded();
+          pan1State.frozen = true;
+        }
         const dx = pt.x - pan1State.startX;
         const span = pan1State.startMax - pan1State.startMin;
         const shiftMs = -(dx / plotW) * span;
         applyXRange(pan1State.startMin + shiftMs, pan1State.startMax + shiftMs);
       } else if (chartInteractionMode === "read" && tapCandidate && tapCandidate.x >= area.left && tapCandidate.x <= area.right) {
         e.preventDefault();
+        scrubChartAtClientX(touch.clientX);
       }
     }
   }, { passive: false });
 
   function handleTouchEnd(e) {
+    cancelLongPress();
     if (isPinching && e.touches.length < 2) {
       isPinching = false;
       pinchState = null;
@@ -1860,24 +2048,49 @@ function attachChartInteractions(canvas) {
 
     if (e.touches.length === 0) {
       setTooltipTempEnabled(true);
-      if (telemetryChart && chartInteractionMode === "read") {
+      if (telemetryChart && chartInteractionMode === "read" && !isCompactChartViewport()) {
         telemetryChart.update("none");
       }
 
       if (!suppressSingleTouchUntilRelease && tapCandidate && !tapCandidate.moved && (Date.now() - tapCandidate.time) < 350 && telemetryChart && telemetryChart.chartArea) {
         const area = telemetryChart.chartArea;
         if (tapCandidate.y >= area.top - 12 && tapCandidate.y <= area.bottom + 18) {
-          if (tapCandidate.x <= area.left + 14) {
+          if (tapCandidate.x <= area.left + 12) {
             lastTouchTapAt = Date.now();
             openYAxisModal("yTemp");
-          } else if (tapCandidate.x >= area.right - 14) {
+          } else if (tapCandidate.x >= area.right - 12 && telemetryChart.scales.yOther && telemetryChart.scales.yOther.width > 0) {
             lastTouchTapAt = Date.now();
             openYAxisModal("yOther");
+          } else if (tapCandidate.x > area.left + 12 && tapCandidate.x < area.right - 12) {
+            const nowMs = Date.now();
+            const isDoubleTap = (nowMs - lastPlotTap.time) < 300 && Math.hypot(tapCandidate.x - lastPlotTap.x, tapCandidate.y - lastPlotTap.y) < 36;
+            if (isDoubleTap) {
+              lastPlotTap = { time: 0, x: 0, y: 0 };
+              const { panLimits, curMin, curMax } = getActiveBounds();
+              if (curMin !== undefined && curMax !== undefined && panLimits.min !== undefined) {
+                const curSpan = curMax - curMin;
+                if (xZoomRange !== null && curSpan <= 3 * 3600 * 1000) {
+                  resetChartXZoom();
+                } else {
+                  freezeAutoYIfNeeded();
+                  const fullSpan = panLimits.max - panLimits.min;
+                  const newSpan = clamp(curSpan / 2.2, Math.min(MIN_X_SPAN_MS, fullSpan), fullSpan);
+                  const frac = clamp((tapCandidate.x - area.left) / Math.max(1, area.right - area.left), 0, 1);
+                  const anchorTs = curMin + frac * curSpan;
+                  applyXRange(anchorTs - frac * newSpan, anchorTs + (1 - frac) * newSpan);
+                }
+              }
+            } else {
+              lastPlotTap = { time: nowMs, x: tapCandidate.x, y: tapCandidate.y };
+              // Single tap on plot pins magnetic crosshair + HUD immediately!
+              scrubChartAtClientX(tapCandidate.clientX);
+            }
           }
         }
       }
 
       isPanning1F = false;
+      isScrubbing1F = false;
       pan1State = null;
       tapCandidate = null;
       suppressSingleTouchUntilRelease = false;
@@ -2131,14 +2344,26 @@ function renderChannelPills() {
   if (!container) return;
 
   const groups = [
-    { id: "temp", title: "🌡️ Temperature (°C / K)", hint: "Tap: on/off · 2×Tap: isola" },
-    { id: "system", title: "⚙️ Inverter, Circolatori, Pressioni & COP", hint: "" },
+    { id: "temp", title: "🌡️ Temperature (°C / K)" },
+    { id: "system", title: "⚙️ Inverter, Circolatori, Pressioni & COP" },
   ];
 
-  container.innerHTML = groups.map(grp => {
+  const activeTotal = CHANNEL_DEFS.filter(ch => ch.inLegend && ch.active).length;
+  const legendTotal = CHANNEL_DEFS.filter(ch => ch.inLegend).length;
+  const miniBarHtml = `
+    <div class="legend-toolbar-mini">
+      <span>Tap: on/off · 2×Tap: isola (${activeTotal}/${legendTotal} attivi)</span>
+      <button type="button" class="btn-legend-filter ${legendOnlyActive ? "active" : ""}" id="btnToggleLegendOnlyActive">
+        ${legendOnlyActive ? "👁️ Mostra tutti" : "🎯 Solo attivi"}
+      </button>
+    </div>
+  `;
+
+  const groupsHtml = groups.map(grp => {
     const items = CHANNEL_DEFS
       .map((ch, idx) => ({ ch, idx }))
-      .filter(({ ch }) => ch.group === grp.id && ch.inLegend);
+      .filter(({ ch }) => ch.group === grp.id && ch.inLegend && (!legendOnlyActive || ch.active));
+    if (!items.length) return "";
 
     const chipsHtml = items.map(({ ch, idx }) => {
       const styleClass = ch.borderDash ? (ch.borderDash[0] <= 3 ? "dotted" : "dashed") : "";
@@ -2146,7 +2371,7 @@ function renderChannelPills() {
         ? `<span class="legend-chip-remove" data-remove-idx="${idx}" title="Rimuovi dalla legenda">×</span>`
         : "";
       return `
-        <button type="button" class="legend-chip ${ch.active ? "active" : ""}" data-idx="${idx}" style="--chip-color: ${ch.color}">
+        <button type="button" class="legend-chip ${ch.active ? "active" : ""} ${isScrubHudOpen ? "is-scrubbing" : ""}" data-idx="${idx}" style="--chip-color: ${ch.color}">
           <span class="legend-chip-left">
             <span class="legend-line-swatch ${styleClass}"></span>
             <span class="legend-chip-label">${ch.label}</span>
@@ -2163,12 +2388,21 @@ function renderChannelPills() {
       <div class="legend-group">
         <div class="legend-group-header">
           <span>${grp.title}</span>
-          ${grp.hint ? `<span class="legend-hint-mini">${grp.hint}</span>` : ""}
         </div>
         <div class="legend-chips-grid">${chipsHtml}</div>
       </div>
     `;
   }).join("");
+
+  container.innerHTML = miniBarHtml + groupsHtml;
+
+  const filterBtn = document.getElementById("btnToggleLegendOnlyActive");
+  if (filterBtn) {
+    filterBtn.addEventListener("click", () => {
+      legendOnlyActive = !legendOnlyActive;
+      renderChannelPills();
+    });
+  }
 
   container.querySelectorAll(".legend-chip-remove").forEach(rm => {
     rm.addEventListener("click", (e) => {
