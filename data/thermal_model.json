@@ -1,0 +1,20 @@
+{
+  "updated_utc": "2026-11-24T22:20:01.930293+00:00",
+  "cycles_observed": 3,
+  "defrost_episodes_observed": 6,
+  "defrost_steady_observed": 5,
+  "standby_segments_observed": 3,
+  "oat_range_observed_c": [
+    3.7,
+    8.9
+  ],
+  "confidence_pct": 43,
+  "k_rad_kw_per_k": 0.372,
+  "inverter_min_mod_pct": 38.6,
+  "p_min_continuous_kw_ref": 4.54,
+  "defrost_lwt_drop_p90_k": 9.5,
+  "defrost_buf_drop_p90_k": 4.7,
+  "ua_building_c_24h_per_k": 0.159,
+  "alpha_heat_c_h_per_k": 0.0161,
+  "bphe_safe_outlet_min_c": 12.0
+}

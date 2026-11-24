@@ -300,6 +300,27 @@ def main() -> int:
         print("  [✓] Nessun ciclo breve rilevato sui cicli registrati.")
     if not cfg.get("enabled"):
         print("  [i] Autopilota attualmente DISATTIVATO (enabled=false). Attivabile dalla PWA con un tocco.")
+
+    # Self-converging physical model summary
+    try:
+        from scripts.thermal_model import fit_thermal_model, recommend_operating_targets
+        tm = fit_thermal_model([s for _, s in with_dt])
+        rec4 = recommend_operating_targets(tm, t_in=float(cfg.get("t_min_c") or 7.5), oat=4.0, cfg=cfg)
+        rec0 = recommend_operating_targets(tm, t_in=float(cfg.get("t_min_c") or 7.5), oat=0.0, cfg=cfg)
+        recm5 = recommend_operating_targets(tm, t_in=float(cfg.get("t_min_c") or 7.5), oat=-5.0, cfg=cfg)
+        print("\n--- MODELLO MATEMATICO AUTO-CONVERGENTE ---")
+        print(
+            f"  Cicli={tm['cycles_observed']} | Confidenza={tm['confidence_pct']}% "
+            f"| k_rad={tm['k_rad_kw_per_k']:.3f} kW/K | FloorInv={tm['inverter_min_mod_pct']:.1f}% (~{tm['p_min_continuous_kw_ref']:.2f} kW_t) "
+            f"| ΔBPHE_defrost=-{tm['defrost_lwt_drop_p90_k']:.1f}K | UA={tm['ua_building_c_24h_per_k']:.3f} (°C/24h)/K"
+        )
+        print(
+            f"  Target consigliato @ T_min: OAT +4°C->{rec4['recommended_target_lwt_c']}°C (~{rec4['pred_autonomy_hours']:.0f}h) "
+            f"| OAT 0°C->{rec0['recommended_target_lwt_c']}°C (~{rec0['pred_autonomy_hours']:.0f}h) "
+            f"| OAT -5°C->{recm5['recommended_target_lwt_c']}°C (~{recm5['pred_autonomy_hours']:.0f}h)"
+        )
+    except Exception:
+        pass
     print("=" * 78)
     return 0
 

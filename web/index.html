@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
   <!-- CSS Stylesheet -->
-  <link rel="stylesheet" href="css/styles.css?v=14">
+  <link rel="stylesheet" href="css/styles.css?v=15">
 
   <!-- Chart.js & Continuous Time Date Adapter (Offline First & PWA Ready) -->
   <script src="js/chart.min.js"></script>
@@ -238,7 +238,7 @@
             </div>
             <div class="cmd-inline-field">
               <label for="apMinLwt" class="label-with-help">Min Target Acqua (°C) <button type="button" class="help-info-btn" data-help-key="ap_lwt_bounds" aria-label="Spiegazione Min/Max Acqua">i</button></label>
-              <input type="number" id="apMinLwt" class="form-input" min="19.0" max="32.0" step="0.5" value="22.0">
+              <input type="number" id="apMinLwt" class="form-input" min="19.0" max="32.0" step="0.5" value="22.5">
             </div>
             <div class="cmd-inline-field">
               <label for="apMaxLwt" class="label-with-help">Max Target Acqua (°C) <button type="button" class="help-info-btn" data-help-key="ap_lwt_bounds" aria-label="Spiegazione Min/Max Acqua">i</button></label>
@@ -265,8 +265,28 @@
               <input type="number" id="apSoftStartStep" class="form-input" min="10" max="60" step="5" value="25">
             </div>
             <div class="cmd-inline-field">
+              <label for="apSoftStartMinLwt" class="label-with-help">Pavim. Soft-Start (°C) <button type="button" class="help-info-btn" data-help-key="ap_bphe_floors" aria-label="Spiegazione Pavimento Soft-Start">i</button></label>
+              <input type="number" id="apSoftStartMinLwt" class="form-input" min="18.0" max="27.0" step="0.2" value="21.8">
+            </div>
+            <div class="cmd-inline-field">
               <label for="apDefrostThresh" class="label-with-help">Soglia Defrost Guard <button type="button" class="help-info-btn" data-help-key="ap_defrost_guard" aria-label="Spiegazione Defrost Guard">i</button></label>
               <input type="number" id="apDefrostThresh" class="form-input" min="1" max="5" step="1" value="2">
+            </div>
+            <div class="cmd-inline-field">
+              <label for="apDefrostOatMax" class="label-with-help">OAT Max Defrost (°C) <button type="button" class="help-info-btn" data-help-key="ap_defrost_guard" aria-label="Spiegazione OAT Max Defrost">i</button></label>
+              <input type="number" id="apDefrostOatMax" class="form-input" min="0.0" max="10.0" step="0.5" value="5.5">
+            </div>
+            <div class="cmd-inline-field">
+              <label for="apDefrostMinSafeLwt" class="label-with-help">Pavim. BPHE Defrost (°C) <button type="button" class="help-info-btn" data-help-key="ap_bphe_floors" aria-label="Spiegazione Pavimento BPHE">i</button></label>
+              <input type="number" id="apDefrostMinSafeLwt" class="form-input" min="18.0" max="28.0" step="0.5" value="22.0">
+            </div>
+            <div class="cmd-inline-field">
+              <label for="apDefrostMinDeltaK" class="label-with-help">ΔT Min Anti-ON/OFF (K) <button type="button" class="help-info-btn" data-help-key="ap_bphe_floors" aria-label="Spiegazione DeltaT Min">i</button></label>
+              <input type="number" id="apDefrostMinDeltaK" class="form-input" min="10.0" max="18.0" step="0.5" value="13.5">
+            </div>
+            <div class="cmd-inline-field">
+              <label for="apInverterMinMod" class="label-with-help">Floor Inverter (%) <button type="button" class="help-info-btn" data-help-key="ap_inverter_floor" aria-label="Spiegazione Floor Inverter">i</button></label>
+              <input type="number" id="apInverterMinMod" class="form-input" min="20" max="55" step="1" value="38">
             </div>
             <div class="cmd-inline-field">
               <label for="apAntiSeizeDays" class="label-with-help">Anti-Grippaggio GF (gg) <button type="button" class="help-info-btn" data-help-key="ap_anti_seize" aria-label="Spiegazione Anti-Grippaggio">i</button></label>
@@ -293,7 +313,7 @@
               </div>
               <div class="cmd-inline-field">
                 <label for="apCronActive">Ciclo / Scarico (min)</label>
-                <input type="number" id="apCronActive" class="form-input" min="1" max="15" step="1" value="2">
+                <input type="number" id="apCronActive" class="form-input" min="1" max="15" step="1" value="1">
               </div>
             </div>
             <div class="cmd-quota-hint" id="apCronQuotaPreview">
@@ -303,7 +323,7 @@
 
           <div class="cmd-subbox" style="margin-top: 10px;">
             <div class="cmd-card-header" style="margin-bottom: 4px;">
-              <span class="cmd-sub-title">🧠 Protezioni Intelligenti Full-Auto v2</span>
+              <span class="cmd-sub-title">🧠 Protezioni Intelligenti &amp; Modello Matematico</span>
             </div>
             <label class="ap-checkbox-row" style="margin-top: 6px;">
               <input type="checkbox" id="apSoftStartEnabled" checked>
@@ -312,7 +332,7 @@
             </label>
             <label class="ap-checkbox-row" style="margin-top: 6px;">
               <input type="checkbox" id="apDefrostGuardEnabled" checked>
-              <span>Defrost Guard Anti-Brina (riduce −1°C se troppi defrost o OAT umida)</span>
+              <span>Defrost Guard Anti-Brina (riduce −1°C rispettando pavimento BPHE)</span>
               <button type="button" class="help-info-btn" data-help-key="ap_defrost_guard" aria-label="Spiegazione Defrost Guard">i</button>
             </label>
             <label class="ap-checkbox-row" style="margin-top: 6px;">
@@ -320,6 +340,19 @@
               <span>Self-Tuning Soft Curva anti-overshoot (con guardia isteresi Puffer)</span>
               <button type="button" class="help-info-btn" data-help-key="ap_soft_curve" aria-label="Spiegazione Self-Tuning Soft">i</button>
             </label>
+            <label class="ap-checkbox-row" style="margin-top: 6px;">
+              <input type="checkbox" id="apAdaptiveModelEnabled" checked>
+              <span>Aggiorna Modello Fisico Auto-Convergente a fine ciclo</span>
+              <button type="button" class="help-info-btn" data-help-key="ap_adaptive_model" aria-label="Spiegazione Modello Matematico">i</button>
+            </label>
+            <label class="ap-checkbox-row" style="margin-top: 6px;">
+              <input type="checkbox" id="apAdaptiveModelApply">
+              <span>Usa Target calcolato dal Modello Matematico (zero setpoint fissi)</span>
+              <button type="button" class="help-info-btn" data-help-key="ap_adaptive_model" aria-label="Spiegazione Applica Modello">i</button>
+            </label>
+            <div class="cmd-quota-hint" id="apThermalModelSummary" style="margin-top: 8px; line-height: 1.45;">
+              🧠 Modello Fisico: in caricamento dati storici...
+            </div>
           </div>
 
           <button type="button" class="btn-action btn-primary" id="btnSaveAutopilotConfig" style="margin-top: 10px;">💾 Salva Parametri Strategia</button>
@@ -942,11 +975,11 @@
   <div id="toast"></div>
 
   <!-- Scripts -->
-  <script src="js/synoptic.js?v=14"></script>
-  <script src="js/charts.js?v=14"></script>
-  <script src="js/analytics.js?v=14"></script>
-  <script src="js/commands.js?v=14"></script>
-  <script src="js/help.js?v=14"></script>
-  <script src="js/app.js?v=14"></script>
+  <script src="js/synoptic.js?v=15"></script>
+  <script src="js/charts.js?v=15"></script>
+  <script src="js/analytics.js?v=15"></script>
+  <script src="js/commands.js?v=15"></script>
+  <script src="js/help.js?v=15"></script>
+  <script src="js/app.js?v=15"></script>
 </body>
 </html>

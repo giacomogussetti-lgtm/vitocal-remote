@@ -54,13 +54,19 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "cron_active_minutes": 1,
     "soft_start_enabled": True,
     "soft_start_step_minutes": 25,
+    "soft_start_min_lwt_c": 21.8,
     "defrost_guard_enabled": True,
     "defrost_trim_threshold_count": 2,
     "defrost_guard_oat_max_c": 5.5,
+    "defrost_min_safe_lwt_c": 22.0,
+    "defrost_min_delta_k": 13.5,
+    "inverter_min_mod_pct": 38,
     "soft_curve_tuning_enabled": True,
     "soft_curve_max_shift_delta_k": 2,
     "soft_curve_cooldown_minutes": 45,
     "anti_seize_days": 4,
+    "adaptive_model_enabled": True,
+    "adaptive_model_apply_targets": False,
 }
 
 DEFAULT_STATE: dict[str, Any] = {
@@ -619,7 +625,19 @@ def _apply_anti_seize_grundfos(cfg: dict[str, Any], duration_minutes: int = 15) 
     )
 
 
-def _clamp_target_lwt(t_in: float, cfg: dict[str, Any]) -> float:
+def _clamp_target_lwt(t_in: float, cfg: dict[str, Any], oat: float = 4.0, model: Optional[dict[str, Any]] = None) -> float:
+    """
+    Computes target buffer LWT. When adaptive_model_apply_targets is enabled (and model is available),
+    uses the self-converging physical model instead of a fixed hardcoded T_in + delta_k offset,
+    always bounded by user [min_target_lwt_c, max_target_lwt_c].
+    """
+    if cfg.get("adaptive_model_apply_targets") and model:
+        try:
+            from scripts.thermal_model import recommend_operating_targets
+            rec = recommend_operating_targets(model, float(t_in), float(oat), cfg)
+            return float(rec["recommended_target_lwt_c"])
+        except Exception:
+            pass
     raw = float(t_in) + float(cfg["target_lwt_delta_k"])
     return round(max(float(cfg["min_target_lwt_c"]), min(float(cfg["max_target_lwt_c"]), raw)), 1)
 
@@ -676,6 +694,27 @@ def run_autopilot_tick(
     if isinstance(extra_diagnostics, dict) and extra_diagnostics.get("logbook_entries"):
         st["recent_wo1c_events"] = _decode_wo1c_logbook(extra_diagnostics.get("logbook_entries"))
 
+    # Load (or hydrate) self-converging physical model summary for target calculation & UI visibility
+    tm_model: Optional[dict[str, Any]] = None
+    if cfg.get("adaptive_model_enabled", True):
+        try:
+            from scripts.thermal_model import load_thermal_model, recommend_operating_targets
+            tm_model = load_thermal_model()
+            rec_now = recommend_operating_targets(tm_model, float(t_in) if t_in is not None else float(cfg["t_min_c"]), float(oat), cfg)
+            st["thermal_model"] = {
+                "cycles_observed": tm_model.get("cycles_observed", 0),
+                "confidence_pct": tm_model.get("confidence_pct", 15),
+                "k_rad_kw_per_k": tm_model.get("k_rad_kw_per_k"),
+                "inverter_min_mod_pct": tm_model.get("inverter_min_mod_pct"),
+                "defrost_lwt_drop_p90_k": tm_model.get("defrost_lwt_drop_p90_k"),
+                "ua_building_c_24h_per_k": tm_model.get("ua_building_c_24h_per_k"),
+                "recommended_target_lwt_c": rec_now.get("recommended_target_lwt_c"),
+                "pred_autonomy_hours": rec_now.get("pred_autonomy_hours"),
+                "updated_utc": tm_model.get("updated_utc"),
+            }
+        except Exception:
+            tm_model = None
+
     ref_tin = float(t_in) if t_in is not None else float(cfg["t_min_c"])
     if (
         cfg.get("enabled")
@@ -688,7 +727,7 @@ def run_autopilot_tick(
         pdc_setpoint = int(st["calculated_pdc_setpoint_c"])
         regime_sp = int(st.get("target_pdc_setpoint_c") or pdc_setpoint)
     else:
-        target_lwt = _clamp_target_lwt(ref_tin, cfg)
+        target_lwt = _clamp_target_lwt(ref_tin, cfg, oat=float(oat), model=tm_model)
         regime_sp = compute_inverse_setpoint_for_target_lwt(
             target_lwt_c=target_lwt,
             oat_c=float(oat),
@@ -784,16 +823,18 @@ def run_autopilot_tick(
                 start_sp = regime_sp
                 start_lwt = target_lwt
                 if cfg.get("soft_start_enabled", True) and buf_temp is not None and float(buf_temp) < target_lwt - 5.0:
-                    # Keep >= 21.8 C so even an early defrost retains safe BPHE thermal reserve (no heatingRod / freeze risk)
-                    soft_lwt_cap = max(21.8, min(target_lwt, float(buf_temp) + 10.5))
+                    # Configurable Soft-Start floor (default 21.8 C) ensures safe BPHE thermal reserve on early defrosts
+                    ss_floor = float(cfg.get("soft_start_min_lwt_c") or 21.8)
+                    oat_frost_lim = float(cfg.get("defrost_guard_oat_max_c") or 5.5)
+                    soft_lwt_cap = max(ss_floor, min(target_lwt, float(buf_temp) + 10.5))
                     soft_sp = compute_inverse_setpoint_for_target_lwt(
                         target_lwt_c=soft_lwt_cap,
                         oat_c=float(oat),
                         slope=float(curve_slope),
                         shift=float(curve_shift),
                     )
-                    # Start at most 1-2 C below regime_sp (never below 12 C in humid/cold air)
-                    max_drop = 1 if (regime_sp <= 13 and float(oat) <= 5.5) else 2
+                    # Start at most 1-2 C below regime_sp (never below floor in humid/cold air)
+                    max_drop = 1 if (regime_sp <= 13 and float(oat) <= oat_frost_lim) else 2
                     start_sp = max(12, max(regime_sp - max_drop, min(regime_sp, soft_sp)))
                     start_lwt = compute_wo1c_lwt(float(oat), float(start_sp), float(curve_slope), float(curve_shift))
 
@@ -910,10 +951,12 @@ def run_autopilot_tick(
             cooldown_min = float(cfg.get("soft_curve_cooldown_minutes") or 45)
             cooldown_ok = last_trim_dt is None or ((now_utc - last_trim_dt).total_seconds() / 60.0) >= cooldown_min
 
-            # Hydraulic & Defrost-BPHE safety floor: keep target LWT >= max(22.0, T_in + 13.5 K)
-            # Verified on Nov 24 defrosts: Buf >= 22 C keeps BPHE outlet LWT >= 13-14 C during reverse-cycle defrost
-            # (zero BPHE freeze risk, zero backup heatingRod activation) and stays above the 38% inverter min floor.
-            min_safe_lwt = max(22.0, t_in_f + 13.5)
+            # Configurable Hydraulic & Defrost-BPHE safety floor (no hardcoded magic numbers):
+            # Defaults (22.0 C / +13.5 K) keep BPHE outlet LWT >= 13-14 C during reverse-cycle defrost
+            # and stay above the measured inverter minimum continuous floor (~38%).
+            bphe_floor = float(cfg.get("defrost_min_safe_lwt_c") or 22.0)
+            min_dt_rad = float(cfg.get("defrost_min_delta_k") or 13.5)
+            min_safe_lwt = max(bphe_floor, t_in_f + min_dt_rad)
             candidate_sp = max(11, pdc_setpoint - 1)
             candidate_lwt = compute_wo1c_lwt(float(oat), float(candidate_sp), float(curve_slope), float(curve_shift))
             hysteresis_safe = (buf_temp is None) or (float(buf_temp) <= candidate_lwt + 1.0)
@@ -1013,6 +1056,25 @@ def run_autopilot_tick(
             st["cycle_defrost_episodes"] = 0
             st["prev_phase_was_defrost"] = False
             st["soft_start_last_step_utc"] = None
+            # Auto-recalibrate physical mathematical model at end of every completed heating cycle
+            if cfg.get("adaptive_model_enabled", True) and not dry_run:
+                try:
+                    from scripts.thermal_model import update_model_from_log, recommend_operating_targets
+                    new_m = update_model_from_log(write_file=True)
+                    rec_post = recommend_operating_targets(new_m, t_in_f, float(oat), cfg)
+                    st["thermal_model"] = {
+                        "cycles_observed": new_m.get("cycles_observed", 0),
+                        "confidence_pct": new_m.get("confidence_pct", 15),
+                        "k_rad_kw_per_k": new_m.get("k_rad_kw_per_k"),
+                        "inverter_min_mod_pct": new_m.get("inverter_min_mod_pct"),
+                        "defrost_lwt_drop_p90_k": new_m.get("defrost_lwt_drop_p90_k"),
+                        "ua_building_c_24h_per_k": new_m.get("ua_building_c_24h_per_k"),
+                        "recommended_target_lwt_c": rec_post.get("recommended_target_lwt_c"),
+                        "pred_autonomy_hours": rec_post.get("pred_autonomy_hours"),
+                        "updated_utc": new_m.get("updated_utc"),
+                    }
+                except Exception as me:
+                    logger.warning("Aggiornamento thermal_model fallito: %s", me)
 
     # ---------------- DYNAMIC CRON FREQUENCY ----------------
     next_state = st["state"]

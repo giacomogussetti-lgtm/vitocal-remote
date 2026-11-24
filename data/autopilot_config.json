@@ -23,11 +23,17 @@
   "cron_active_minutes": 1,
   "soft_start_enabled": true,
   "soft_start_step_minutes": 25,
+  "soft_start_min_lwt_c": 21.8,
   "defrost_guard_enabled": true,
   "defrost_trim_threshold_count": 2,
   "defrost_guard_oat_max_c": 5.5,
+  "defrost_min_safe_lwt_c": 22.0,
+  "defrost_min_delta_k": 13.5,
+  "inverter_min_mod_pct": 38,
   "soft_curve_tuning_enabled": true,
   "soft_curve_max_shift_delta_k": 2,
   "soft_curve_cooldown_minutes": 45,
-  "anti_seize_days": 4
+  "anti_seize_days": 4,
+  "adaptive_model_enabled": true,
+  "adaptive_model_apply_targets": false
 }

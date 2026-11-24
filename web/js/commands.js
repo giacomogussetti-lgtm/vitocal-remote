@@ -1099,7 +1099,7 @@ function readAutopilotFormValues() {
     t_max_c: parseFloat(document.getElementById("apTMax").value),
     t_emergency_c: parseFloat(document.getElementById("apTEmergency").value),
     target_lwt_delta_k: parseFloat(document.getElementById("apDeltaLwt").value),
-    min_target_lwt_c: parseFloat(document.getElementById("apMinLwt")?.value || "22.0"),
+    min_target_lwt_c: parseFloat(document.getElementById("apMinLwt")?.value || "22.5"),
     max_target_lwt_c: parseFloat(document.getElementById("apMaxLwt")?.value || "26.5"),
     max_cycle_minutes: parseInt(document.getElementById("apMaxCycle").value, 10),
     puffer_drain_minutes: parseInt(document.getElementById("apDrainMin").value, 10),
@@ -1107,14 +1107,21 @@ function readAutopilotFormValues() {
     cop_window_end: document.getElementById("apWinEnd").value || "16:00",
     soft_start_enabled: Boolean(document.getElementById("apSoftStartEnabled")?.checked),
     soft_start_step_minutes: clampInt(document.getElementById("apSoftStartStep")?.value, 10, 60, 25),
+    soft_start_min_lwt_c: parseFloat(document.getElementById("apSoftStartMinLwt")?.value || "21.8"),
     defrost_guard_enabled: Boolean(document.getElementById("apDefrostGuardEnabled")?.checked),
     defrost_trim_threshold_count: clampInt(document.getElementById("apDefrostThresh")?.value, 1, 5, 2),
+    defrost_guard_oat_max_c: parseFloat(document.getElementById("apDefrostOatMax")?.value || "5.5"),
+    defrost_min_safe_lwt_c: parseFloat(document.getElementById("apDefrostMinSafeLwt")?.value || "22.0"),
+    defrost_min_delta_k: parseFloat(document.getElementById("apDefrostMinDeltaK")?.value || "13.5"),
+    inverter_min_mod_pct: clampInt(document.getElementById("apInverterMinMod")?.value, 20, 55, 38),
     anti_seize_days: clampInt(document.getElementById("apAntiSeizeDays")?.value, 0, 30, 4),
     dynamic_cron_enabled: Boolean(document.getElementById("apDynamicCron").checked),
     cron_idle_minutes: clampInt(document.getElementById("apCronIdle")?.value, 1, 60, 15),
     cron_armed_minutes: clampInt(document.getElementById("apCronArmed")?.value, 1, 30, 5),
-    cron_active_minutes: clampInt(document.getElementById("apCronActive")?.value, 1, 15, 2),
+    cron_active_minutes: clampInt(document.getElementById("apCronActive")?.value, 1, 15, 1),
     soft_curve_tuning_enabled: Boolean(document.getElementById("apSoftCurveTuning")?.checked),
+    adaptive_model_enabled: Boolean(document.getElementById("apAdaptiveModelEnabled")?.checked),
+    adaptive_model_apply_targets: Boolean(document.getElementById("apAdaptiveModelApply")?.checked),
   };
 }
 
@@ -1209,6 +1216,10 @@ async function refreshAutopilotStatus() {
   }
   if (!cfg) cfg = await fetchDataJson("autopilot_config.json");
   if (!st) st = await fetchDataJson("autopilot_state.json");
+  if (!st || !st.thermal_model) {
+    const tm = await fetchDataJson("thermal_model.json");
+    if (tm) cmdState.lastThermalModel = tm;
+  }
   if (cfg || st) {
     renderAutopilotUI(cfg || {}, st || {});
   } else {
@@ -1313,7 +1324,12 @@ function renderAutopilotUI(cfg, st) {
       apWinStart: cfg.cop_window_start,
       apWinEnd: cfg.cop_window_end,
       apSoftStartStep: cfg.soft_start_step_minutes,
+      apSoftStartMinLwt: cfg.soft_start_min_lwt_c,
       apDefrostThresh: cfg.defrost_trim_threshold_count,
+      apDefrostOatMax: cfg.defrost_guard_oat_max_c,
+      apDefrostMinSafeLwt: cfg.defrost_min_safe_lwt_c,
+      apDefrostMinDeltaK: cfg.defrost_min_delta_k,
+      apInverterMinMod: cfg.inverter_min_mod_pct,
       apAntiSeizeDays: cfg.anti_seize_days,
       apCronIdle: cfg.cron_idle_minutes,
       apCronArmed: cfg.cron_armed_minutes,
@@ -1331,7 +1347,32 @@ function renderAutopilotUI(cfg, st) {
     if (chkDg && cfg.defrost_guard_enabled != null) chkDg.checked = Boolean(cfg.defrost_guard_enabled);
     const chkSoft = document.getElementById("apSoftCurveTuning");
     if (chkSoft && cfg.soft_curve_tuning_enabled != null) chkSoft.checked = Boolean(cfg.soft_curve_tuning_enabled);
+    const chkAm = document.getElementById("apAdaptiveModelEnabled");
+    if (chkAm && cfg.adaptive_model_enabled != null) chkAm.checked = Boolean(cfg.adaptive_model_enabled);
+    const chkAmApply = document.getElementById("apAdaptiveModelApply");
+    if (chkAmApply && cfg.adaptive_model_apply_targets != null) chkAmApply.checked = Boolean(cfg.adaptive_model_apply_targets);
     updateCronQuotaPreview();
+  }
+
+  // Render live converging physical model summary
+  const tmEl = document.getElementById("apThermalModelSummary");
+  if (tmEl) {
+    const tm = st.thermal_model || cmdState.lastThermalModel;
+    if (tm && tm.k_rad_kw_per_k != null) {
+      const conf = tm.confidence_pct != null ? `${tm.confidence_pct}%` : "--";
+      const cyc = tm.cycles_observed != null ? tm.cycles_observed : "--";
+      const krad = Number(tm.k_rad_kw_per_k).toFixed(3);
+      const flr = tm.inverter_min_mod_pct != null ? `${Number(tm.inverter_min_mod_pct).toFixed(0)}%` : "38%";
+      const dDef = tm.defrost_lwt_drop_p90_k != null ? `-${Number(tm.defrost_lwt_drop_p90_k).toFixed(1)}K` : "--";
+      const ua = tm.ua_building_c_24h_per_k != null ? Number(tm.ua_building_c_24h_per_k).toFixed(3) : "--";
+      const recT = tm.recommended_target_lwt_c != null ? `${Number(tm.recommended_target_lwt_c).toFixed(1)} °C` : "--";
+      const autH = tm.pred_autonomy_hours != null ? `~${Math.round(Number(tm.pred_autonomy_hours))}h` : "--";
+      const modeLbl = cfg.adaptive_model_apply_targets ? "ATTIVO (guida target)" : "OSSERVAZIONE (stima live)";
+      tmEl.textContent = `🧠 Modello [${modeLbl} · ${cyc} cicli · conf. ${conf}]: k_rad=${krad} kW/K · Floor=${flr} · ΔBPHE Defrost=${dDef} · UA=${ua} · Target stimato=${recT} (autonomia ${autH})`;
+      tmEl.style.color = cfg.adaptive_model_apply_targets ? "#6ee7b7" : "#bae6fd";
+    } else {
+      tmEl.textContent = "🧠 Modello Fisico: k_rad≈0.344 kW/K · Floor≈38% · ΔBPHE≈-9.8K · in convergenza sui prossimi cicli.";
+    }
   }
 
   // Refresh Synoptic & Sonde so Real Water Target / Real Room Target & WO1C logbook reflect live Autopilot config/state

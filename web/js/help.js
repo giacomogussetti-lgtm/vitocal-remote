@@ -59,6 +59,24 @@ const HELP_CATALOG = {
     impact: "Protegge il rotore bagnato della pompa nelle mezze stagioni miti senza sprecare cicli ogni singola mattina in inverno (quando già gira per ore nei cicli di riscaldamento).",
     tip: "4 giorni (0 = disattivo) è il compromesso ideale tra protezione meccanica e zero sprechi."
   },
+  ap_bphe_floors: {
+    title: "🛡️ Pavimenti Sicurezza BPHE, Soft-Start & Anti-ON/OFF",
+    what: "Soglie minime fisiche configurabili (mai hardcoded): Pavimento BPHE Defrost (22.0 °C) protegge lo scambiatore durante l'inversione di sbrinamento; Pavimento Soft-Start (21.8 °C) limita il gradino d'avvio a freddo; ΔT Min Anti-ON/OFF (+13.5 K) impedisce al Target di scendere sotto la capacità minima di assorbimento del pavimento.",
+    impact: "Sui dati reali del 24/11 ogni sbrinamento fa scendere LWT di 8–10 K: mantenere il puffer ≥ 22.0 °C garantisce LWT ≥ 13–14 °C in defrost (zero errori antigelo BPHE, zero resistenza elettrica S1/S2) e mantiene il compressore sopra il suo pavimento continuo (38%).",
+    tip: "Lascia 22.0 °C / 21.8 °C / 13.5 K come base sicura; il Modello Fisico li affinerà man mano che raccogliamo cicli più freddi."
+  },
+  ap_inverter_floor: {
+    title: "⚙️ Floor Inverter Rilevato (%)",
+    what: "Percentuale minima reale di modulazione continua osservata sul compressore Vitocal 111-S (38% su 556 campioni attivi).",
+    impact: "Serve al Modello Matematico e alle diagnostiche per non chiedere mai al radiante meno calore di quanto la macchina riesca a erogare al minimo (evitando stacchi secchi per isteresi).",
+    tip: "Se in giornate miti osservi la macchina modulare stabilmente più in basso, il modello aggiornerà automaticamente questo valore."
+  },
+  ap_adaptive_model: {
+    title: "🧠 Modello Matematico Auto-Convergente",
+    what: "Identifica dai log reali 4 parametri fisici dell'impianto con convergenza Bayesiana (k_rad del pavimento, floor inverter, caduta termica BPHE in defrost e dispersione UA dell'edificio) eliminando i setpoint fissi hardcoded.",
+    impact: "In 'Osservazione' si ricalibra a fine ciclo e mostra la stima di target e autonomia; abilitando 'Usa Target dal Modello', guida direttamente il Target Acqua (sempre entro i limiti Min/Max scelti da te) adattandosi automaticamente all'arrivo del gelo invernale.",
+    tip: "Consigliato in Osservazione sui primi 3–4 cicli per verificare la convergenza, poi attivabile in pieno controllo."
+  },
   ap_max_cycle: {
     title: "⏱️ Durata Max Ciclo (min)",
     what: "Durata massima di funzionamento continuo del compressore in un singolo ciclo di riscaldamento.",

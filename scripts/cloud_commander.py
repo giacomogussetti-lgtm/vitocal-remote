@@ -242,8 +242,12 @@ def _validate_autopilot_params(params: dict[str, Any], force_enable: bool = Fals
         "cron_armed_minutes": (1, 30, int),
         "cron_active_minutes": (1, 15, int),
         "soft_start_step_minutes": (10, 60, int),
+        "soft_start_min_lwt_c": (18.0, 27.0, float),
         "defrost_trim_threshold_count": (1, 5, int),
         "defrost_guard_oat_max_c": (0.0, 10.0, float),
+        "defrost_min_safe_lwt_c": (18.0, 28.0, float),
+        "defrost_min_delta_k": (10.0, 18.0, float),
+        "inverter_min_mod_pct": (20, 55, int),
         "soft_curve_max_shift_delta_k": (1, 4, int),
         "soft_curve_cooldown_minutes": (15, 180, int),
         "anti_seize_days": (0, 30, int),
@@ -263,6 +267,10 @@ def _validate_autopilot_params(params: dict[str, Any], force_enable: bool = Fals
         clean["defrost_guard_enabled"] = bool(params["defrost_guard_enabled"])
     if "soft_curve_tuning_enabled" in params:
         clean["soft_curve_tuning_enabled"] = bool(params["soft_curve_tuning_enabled"])
+    if "adaptive_model_enabled" in params:
+        clean["adaptive_model_enabled"] = bool(params["adaptive_model_enabled"])
+    if "adaptive_model_apply_targets" in params:
+        clean["adaptive_model_apply_targets"] = bool(params["adaptive_model_apply_targets"])
 
     for tkey in ("cop_window_start", "cop_window_end"):
         if params.get(tkey) is not None:
