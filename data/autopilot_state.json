@@ -5,12 +5,12 @@
   "cycle_started_utc": null,
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-24T15:27:28.128903+00:00",
+  "last_eval_utc": "2026-11-24T15:31:19.474213+00:00",
   "last_action_utc": "2026-11-24T15:27:28.128903+00:00",
-  "last_action_reason": "Ciclo completato (Timeout scarico (26 min)) -> ritorno in IDLE. Modalità BTicino aggiornata su 'hg' | Modalità PdC impostata e verificata: standby",
-  "indoor_slope_c_per_h": 0.225,
-  "calculated_target_lwt_c": 25.0,
-  "calculated_pdc_setpoint_c": 14,
+  "last_action_reason": "Standby OK: T=8.2°C > 7.5°C (pendenza +0.22°C/h).",
+  "indoor_slope_c_per_h": 0.224,
+  "calculated_target_lwt_c": 26.2,
+  "calculated_pdc_setpoint_c": 15,
   "current_cron_interval_min": 15,
   "defrost_detected_today": 9,
   "heating_rod_delta_s": 0,
@@ -18,20 +18,13 @@
   "soft_curve_last_trim_utc": null,
   "api_usage": {
     "date_utc": "2026-11-24",
-    "viessmann_reads": 886,
+    "viessmann_reads": 888,
     "viessmann_writes": 8,
-    "bticino_reads": 885,
+    "bticino_reads": 887,
     "bticino_writes": 7,
     "cronjob_patches": 2,
-    "github_runs": 439,
+    "github_runs": 440,
     "recent_events": [
-      {
-        "ts": "2026-11-23T15:31:11.181554+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-23T15:45:55.717781+00:00",
         "lbl": "telemetry_poll",
@@ -3589,6 +3582,13 @@
         "ts": "2026-11-24T15:27:37.639063+00:00",
         "lbl": "ap_cron_adapt",
         "cp": 1
+      },
+      {
+        "ts": "2026-11-24T15:31:19.471061+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
       }
     ]
   }
