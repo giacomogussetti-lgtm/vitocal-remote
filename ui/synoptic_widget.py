@@ -229,12 +229,39 @@ class SynopticCanvas(QWidget):
         self._draw_badge(
             painter,
             puffer_rect.center().x() - 65,
-            puffer_rect.center().y() - 30,
+            puffer_rect.center().y() - 68,
             130,
             56,
             "Sonda Accumulo 200L",
             f"{puffer_temp} °C",
             "#f59e0b",
+        )
+
+        # Real Water Target (WO1C Puffer Target LWT)
+        tgt_water = self.data.get("target_supply_temp_c")
+        ap_cfg = {}
+        ap_st = {}
+        try:
+            from scripts.autopilot import load_config as _ap_cfg, load_state as _ap_st
+            ap_cfg = _ap_cfg()
+            ap_st = _ap_st()
+        except Exception:
+            pass
+        if tgt_water is not None:
+            tgt_water_txt = f"{float(tgt_water):.1f} °C"
+        elif ap_cfg.get("enabled") and ap_st.get("calculated_target_lwt_c") is not None:
+            tgt_water_txt = f"~{float(ap_st['calculated_target_lwt_c']):.1f} °C"
+        else:
+            tgt_water_txt = "Standby"
+        self._draw_badge(
+            painter,
+            puffer_rect.center().x() - 65,
+            puffer_rect.center().y() + 2,
+            130,
+            56,
+            "Target Acqua (Puffer)",
+            tgt_water_txt,
+            "#e879f9",
         )
 
         # Technical notes at the bottom of the puffer
@@ -310,12 +337,21 @@ class SynopticCanvas(QWidget):
         t_bw = (thermo_box.width() / 2.0) - 18
         t_bh = 52
 
-        # Badges
+        # Badges (Real Room Target instead of dummy BTicino relay override setpoint)
+        if ap_cfg.get("enabled"):
+            t_min_ap = float(ap_cfg.get("t_min_c", 7.5))
+            t_max_ap = float(ap_cfg.get("t_max_c", 8.8))
+            real_room_target_txt = f"{t_min_ap:.1f}–{t_max_ap:.1f} °C"
+            regia_txt = f"AUTO ({ap_st.get('state', 'IDLE')})"
+        else:
+            real_room_target_txt = f"{setpoint} °C"
+            regia_txt = f"{bt_mode}".capitalize()
+
         self._draw_badge(painter, t_col1_x, thermo_box.top() + 44, t_bw, t_bh, "Temperatura Ambiente", f"{in_temp} °C", "#10b981")
         self._draw_badge(painter, t_col2_x, thermo_box.top() + 44, t_bw, t_bh, "Umidità Relativa", f"{hum} %", "#60a5fa")
 
-        self._draw_badge(painter, t_col1_x, thermo_box.top() + 106, t_bw, t_bh, "Setpoint Impostato", f"{setpoint} °C", "#eab308")
-        self._draw_badge(painter, t_col2_x, thermo_box.top() + 106, t_bw, t_bh, "Modalità Operativa", f"{bt_mode}".capitalize(), "#c084fc")
+        self._draw_badge(painter, t_col1_x, thermo_box.top() + 106, t_bw, t_bh, "Target Casa Reale", real_room_target_txt, "#fde047")
+        self._draw_badge(painter, t_col2_x, thermo_box.top() + 106, t_bw, t_bh, "Regia Attiva", regia_txt, "#c084fc")
 
         # Full-width Relay Status Card
         consenso_active = pump_active

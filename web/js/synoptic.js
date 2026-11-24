@@ -89,7 +89,47 @@ function extractSynopticMetrics(d) {
 
   const deltaPrim = (supNum != null && retNum != null) ? (supNum - retNum) : null;
   const deltaAir = (inNum != null && oatNum != null) ? (inNum - oatNum) : null;
-  const deltaTarget = (inNum != null && spNum != null) ? (inNum - spNum) : null;
+
+  // Real target water (Puffer/LWT WO1C) and real room target (Autopilot band vs manual)
+  const apCfg = (typeof cmdState !== "undefined" && cmdState.lastAutopilotConfig) ? cmdState.lastAutopilotConfig : null;
+  const apSt = (typeof cmdState !== "undefined" && cmdState.lastAutopilotState) ? cmdState.lastAutopilotState : null;
+  const apEnabled = Boolean(apCfg && apCfg.enabled);
+  const apStateCode = apEnabled ? String((apSt && apSt.state) || "IDLE") : "MANUAL";
+
+  const progLower = (d.active_program || "standby").toLowerCase();
+  const liveWaterTarget = (typeof computeVitocalTargetLwt === "function") ? computeVitocalTargetLwt(d, false) : null;
+  const autoWaterTarget = (apSt && apSt.calculated_target_lwt_c != null) ? Number(apSt.calculated_target_lwt_c) : null;
+  const curveStandbyWater = (typeof computeVitocalTargetLwt === "function") ? computeVitocalTargetLwt(d, true) : null;
+
+  let targetWaterVal = "--";
+  let targetWaterSub = "Curva PdC";
+  if (liveWaterTarget != null && progLower !== "standby") {
+    targetWaterVal = `${liveWaterTarget.toFixed(1)} °C`;
+    targetWaterSub = "Target Attivo (Puffer)";
+  } else if (apEnabled && autoWaterTarget != null) {
+    targetWaterVal = `~${autoWaterTarget.toFixed(1)} °C`;
+    targetWaterSub = "Auto (al prox. avvio)";
+  } else if (curveStandbyWater != null) {
+    targetWaterVal = `~${curveStandbyWater.toFixed(1)} °C`;
+    targetWaterSub = "Curva (in Standby)";
+  }
+
+  let targetRoomReal = fmt(spNum, "°C");
+  let targetRoomSub = "Manuale BTicino";
+  let deltaTarget = (inNum != null && spNum != null) ? (inNum - spNum) : null;
+  if (apEnabled && apCfg) {
+    const tMin = Number(apCfg.t_min_c != null ? apCfg.t_min_c : 7.5);
+    const tMax = Number(apCfg.t_max_c != null ? apCfg.t_max_c : 8.8);
+    if (apStateCode === "HEATING_SYNC") {
+      targetRoomReal = `→ ${tMax.toFixed(1)} °C`;
+      targetRoomSub = `Full-Auto (Avvio ${tMin.toFixed(1)}°)`;
+      deltaTarget = inNum != null ? (inNum - tMax) : null;
+    } else {
+      targetRoomReal = `${tMin.toFixed(1)}–${tMax.toFixed(1)} °C`;
+      targetRoomSub = `Full-Auto (${apStateCode})`;
+      deltaTarget = inNum != null ? (inNum - tMin) : null;
+    }
+  }
 
   const rod1s = d.heating_rod_level1_s != null ? Number(d.heating_rod_level1_s) : null;
   const rod2s = d.heating_rod_level2_s != null ? Number(d.heating_rod_level2_s) : null;
@@ -126,6 +166,11 @@ function extractSynopticMetrics(d) {
     buffer: fmt(bufNum, "°C"),
     indoor: fmt(inNum, "°C"),
     setpoint: fmt(spNum, "°C"),
+    targetWaterVal,
+    targetWaterSub,
+    targetRoomReal,
+    targetRoomSub,
+    apStateBadge: apEnabled ? `AUTO (${apStateCode})` : "MANUALE",
     humidity: fmt(d.humidity_percent, "%", 0),
     compActive,
     compMod: `${compModNum.toFixed(0)} %`,
@@ -340,11 +385,15 @@ function renderSynopticPortrait(m) {
 
     <!-- 4. PUFFER INERZIALE 200 L -->
     <rect x="66" y="404" width="288" height="104" rx="26" fill="url(#pufferGrad)" stroke="#f59e0b" stroke-width="2.4" />
-    <text x="210" y="425" fill="#f59e0b" font-size="12" font-weight="800" text-anchor="middle">PUFFER INERZIALE 200 L</text>
-    <text x="210" y="439" fill="#94a3b8" font-size="8.5" text-anchor="middle">Disaccoppiatore Idraulico Primario / Secondario</text>
-    <rect x="120" y="448" width="180" height="48" rx="8" fill="#0f172a" stroke="#f59e0b" stroke-width="1.3" />
-    <text x="210" y="464" fill="#94a3b8" font-size="8" font-weight="700" text-anchor="middle">🌡️ SONDA ACCUMULO SUPERIORE</text>
-    <text x="210" y="487" fill="#fbbf24" font-size="17" font-weight="800" text-anchor="middle">${m.buffer}</text>
+    <text x="210" y="424" fill="#f59e0b" font-size="11.5" font-weight="800" text-anchor="middle">PUFFER INERZIALE 200 L (Sensore Regolaz. WO1C)</text>
+    <rect x="82" y="434" width="124" height="62" rx="8" fill="#0f172a" stroke="#f59e0b" stroke-width="1.3" />
+    <text x="144" y="450" fill="#94a3b8" font-size="7.6" font-weight="700" text-anchor="middle">🌡️ PUFFER REALE</text>
+    <text x="144" y="476" fill="#fbbf24" font-size="16" font-weight="800" text-anchor="middle">${m.buffer}</text>
+    <text x="144" y="490" fill="#64748b" font-size="6.8" text-anchor="middle">Accumulo superiore</text>
+    <rect x="214" y="434" width="124" height="62" rx="8" fill="#0f172a" stroke="#e879f9" stroke-width="1.3" />
+    <text x="276" y="450" fill="#e879f9" font-size="7.6" font-weight="700" text-anchor="middle">🎯 TARGET ACQUA</text>
+    <text x="276" y="476" fill="#f0abfc" font-size="15.5" font-weight="800" text-anchor="middle">${m.targetWaterVal}</text>
+    <text x="276" y="490" fill="#94a3b8" font-size="6.8" text-anchor="middle">${m.targetWaterSub}</text>
 
     <!-- 5. CIRCUITO SECONDARIO VERTICALE (Puffer <-> Casetta + Grundfos) -->
     <!-- Supply runs Puffer(125,508) -> Grundfos(125,550) -> bend at y=584 -> x=50 -> floor slab y=792 -->
@@ -393,20 +442,17 @@ function renderSynopticPortrait(m) {
     <rect x="34" y="674" width="352" height="166" rx="8" fill="#131c2e" stroke="#10b981" stroke-width="2" />
 
     <!-- Wall-Mounted BTicino Smarther Thermostat & Indoor Air Card -->
-    <rect x="64" y="684" width="292" height="88" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1.2" />
-    ${svgThermostatWallIcon(78, 698)}
-    <text x="118" y="700" fill="#38bdf8" font-size="9" font-weight="800">TERMOSTATO BTICINO (Corridoio)</text>
-    <text x="118" y="722" fill="#10b981" font-size="19" font-weight="800">${m.indoor}</text>
-    <text x="195" y="721" fill="#94a3b8" font-size="9" font-weight="600">Aria Interna</text>
+    <rect x="52" y="684" width="316" height="88" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1.2" />
+    ${svgThermostatWallIcon(64, 698)}
+    <text x="102" y="700" fill="#38bdf8" font-size="8.8" font-weight="800">ARIA CASA (Corridoio · ${m.apStateBadge})</text>
+    <text x="102" y="722" fill="#10b981" font-size="19" font-weight="800">${m.indoor}</text>
+    <text x="180" y="721" fill="#94a3b8" font-size="8.6" font-weight="600">UR ${m.humidity}</text>
 
-    <text x="80" y="745" fill="#94a3b8" font-size="8.5" font-weight="700">SETPOINT:</text>
-    <text x="132" y="745" fill="#eab308" font-size="11.5" font-weight="800">${m.setpoint}</text>
+    <text x="64" y="745" fill="#94a3b8" font-size="8.2" font-weight="700">🎯 TARGET CASA:</text>
+    <text x="148" y="745" fill="#fde047" font-size="11.2" font-weight="800">${m.targetRoomReal}</text>
 
-    <text x="188" y="745" fill="#94a3b8" font-size="8.5" font-weight="700">UMIDITÀ:</text>
-    <text x="234" y="745" fill="#60a5fa" font-size="11.5" font-weight="800">${m.humidity}</text>
-
-    <text x="284" y="745" fill="#94a3b8" font-size="8.5" font-weight="700">ΔT:</text>
-    <text x="303" y="745" fill="#e2e8f0" font-size="10.5" font-weight="700">${m.deltaTargetStr}</text>
+    <text x="250" y="745" fill="#94a3b8" font-size="8.2" font-weight="700">MARGINE:</text>
+    <text x="302" y="745" fill="#e2e8f0" font-size="10.5" font-weight="700">${m.deltaTargetStr}</text>
 
     <text x="210" y="764" fill="${m.pumpActive ? '#6ee7b7' : '#64748b'}" font-size="8.5" font-weight="700" text-anchor="middle">
       ${m.pumpActive ? "🔥 Rilancio attivo dal Puffer al massetto radiante" : "⏸ Rilancio spento — Puffer disaccoppiato dalla casa"}
@@ -527,9 +573,14 @@ function renderSynopticLandscape(m) {
     <text x="645" y="138" fill="#f59e0b" font-size="13" font-weight="800" text-anchor="middle">PUFFER 200 L</text>
     <text x="645" y="155" fill="#94a3b8" font-size="9" text-anchor="middle">(Disaccoppiatore)</text>
 
-    <rect x="582" y="266" width="126" height="62" rx="8" fill="#0f172a" stroke="#f59e0b" stroke-width="1.3" />
-    <text x="645" y="286" fill="#94a3b8" font-size="8" font-weight="700" text-anchor="middle">SONDA ACCUMULO</text>
-    <text x="645" y="314" fill="#fbbf24" font-size="17" font-weight="800" text-anchor="middle">${m.buffer}</text>
+    <rect x="582" y="218" width="126" height="62" rx="8" fill="#0f172a" stroke="#f59e0b" stroke-width="1.3" />
+    <text x="645" y="238" fill="#94a3b8" font-size="8" font-weight="700" text-anchor="middle">SONDA ACCUMULO</text>
+    <text x="645" y="266" fill="#fbbf24" font-size="17" font-weight="800" text-anchor="middle">${m.buffer}</text>
+
+    <rect x="582" y="294" width="126" height="66" rx="8" fill="#0f172a" stroke="#e879f9" stroke-width="1.3" />
+    <text x="645" y="313" fill="#e879f9" font-size="7.8" font-weight="700" text-anchor="middle">🎯 TARGET ACQUA</text>
+    <text x="645" y="339" fill="#f0abfc" font-size="15.5" font-weight="800" text-anchor="middle">${m.targetWaterVal}</text>
+    <text x="645" y="353" fill="#94a3b8" font-size="6.8" text-anchor="middle">${m.targetWaterSub}</text>
 
     <text x="645" y="484" fill="#64748b" font-size="8.5" text-anchor="middle">Disaccoppiatore Idraulico</text>
     <text x="645" y="498" fill="#64748b" font-size="8.5" text-anchor="middle">Primario / Secondario</text>
@@ -571,8 +622,8 @@ function renderSynopticLandscape(m) {
 
     ${svgBadge(936, 202, 132, 50, "Aria Interna", m.indoor, "#10b981")}
     ${svgBadge(1078, 202, 132, 50, "Umidità Relativa", m.humidity, "#60a5fa")}
-    ${svgBadge(936, 260, 132, 50, "Setpoint Target", m.setpoint, "#eab308")}
-    ${svgBadge(1078, 260, 132, 50, "Modalità", m.thermostatMode, "#c084fc")}
+    ${svgBadge(936, 260, 132, 50, "Target Casa Reale", m.targetRoomReal, "#fde047")}
+    ${svgBadge(1078, 260, 132, 50, "Regia Attiva", m.apStateBadge, "#c084fc")}
 
     <!-- Relay Banner inside house -->
     <rect x="936" y="320" width="274" height="50" rx="8" fill="#161f30" stroke="${m.pumpActive ? '#10b981' : '#334155'}" stroke-width="1.3" />

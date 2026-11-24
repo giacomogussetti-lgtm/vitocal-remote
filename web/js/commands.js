@@ -1099,10 +1099,17 @@ function readAutopilotFormValues() {
     t_max_c: parseFloat(document.getElementById("apTMax").value),
     t_emergency_c: parseFloat(document.getElementById("apTEmergency").value),
     target_lwt_delta_k: parseFloat(document.getElementById("apDeltaLwt").value),
+    min_target_lwt_c: parseFloat(document.getElementById("apMinLwt")?.value || "22.0"),
+    max_target_lwt_c: parseFloat(document.getElementById("apMaxLwt")?.value || "26.5"),
     max_cycle_minutes: parseInt(document.getElementById("apMaxCycle").value, 10),
     puffer_drain_minutes: parseInt(document.getElementById("apDrainMin").value, 10),
     cop_window_start: document.getElementById("apWinStart").value || "11:00",
     cop_window_end: document.getElementById("apWinEnd").value || "16:00",
+    soft_start_enabled: Boolean(document.getElementById("apSoftStartEnabled")?.checked),
+    soft_start_step_minutes: clampInt(document.getElementById("apSoftStartStep")?.value, 10, 60, 25),
+    defrost_guard_enabled: Boolean(document.getElementById("apDefrostGuardEnabled")?.checked),
+    defrost_trim_threshold_count: clampInt(document.getElementById("apDefrostThresh")?.value, 1, 5, 2),
+    anti_seize_days: clampInt(document.getElementById("apAntiSeizeDays")?.value, 0, 30, 4),
     dynamic_cron_enabled: Boolean(document.getElementById("apDynamicCron").checked),
     cron_idle_minutes: clampInt(document.getElementById("apCronIdle")?.value, 1, 60, 15),
     cron_armed_minutes: clampInt(document.getElementById("apCronArmed")?.value, 1, 30, 5),
@@ -1299,10 +1306,15 @@ function renderAutopilotUI(cfg, st) {
       apTMax: cfg.t_max_c,
       apTEmergency: cfg.t_emergency_c,
       apDeltaLwt: cfg.target_lwt_delta_k,
+      apMinLwt: cfg.min_target_lwt_c,
+      apMaxLwt: cfg.max_target_lwt_c,
       apMaxCycle: cfg.max_cycle_minutes,
       apDrainMin: cfg.puffer_drain_minutes,
       apWinStart: cfg.cop_window_start,
       apWinEnd: cfg.cop_window_end,
+      apSoftStartStep: cfg.soft_start_step_minutes,
+      apDefrostThresh: cfg.defrost_trim_threshold_count,
+      apAntiSeizeDays: cfg.anti_seize_days,
       apCronIdle: cfg.cron_idle_minutes,
       apCronArmed: cfg.cron_armed_minutes,
       apCronActive: cfg.cron_active_minutes,
@@ -1313,11 +1325,21 @@ function renderAutopilotUI(cfg, st) {
     }
     const chk = document.getElementById("apDynamicCron");
     if (chk && cfg.dynamic_cron_enabled != null) chk.checked = Boolean(cfg.dynamic_cron_enabled);
+    const chkSs = document.getElementById("apSoftStartEnabled");
+    if (chkSs && cfg.soft_start_enabled != null) chkSs.checked = Boolean(cfg.soft_start_enabled);
+    const chkDg = document.getElementById("apDefrostGuardEnabled");
+    if (chkDg && cfg.defrost_guard_enabled != null) chkDg.checked = Boolean(cfg.defrost_guard_enabled);
     const chkSoft = document.getElementById("apSoftCurveTuning");
     if (chkSoft && cfg.soft_curve_tuning_enabled != null) chkSoft.checked = Boolean(cfg.soft_curve_tuning_enabled);
     updateCronQuotaPreview();
   }
 
+  // Refresh Synoptic & Sonde so Real Water Target / Real Room Target & WO1C logbook reflect live Autopilot config/state
+  if (typeof state !== "undefined" && state.latestSample) {
+    if (typeof renderSynoptic === "function") renderSynoptic(state.latestSample);
+    if (typeof updateSynopticQuickCards === "function") updateSynopticQuickCards(state.latestSample);
+    if (typeof renderDetailedSondeList === "function") renderDetailedSondeList(state.latestSample);
+  }
   renderApiQuotaMonitor();
 }
 

@@ -30,10 +30,34 @@ const HELP_CATALOG = {
     tip: "Tienila almeno 1.5–2 °C sopra la soglia critica dei tubi (6.5–6.8 °C è un paracadute molto sicuro)."
   },
   ap_delta_lwt: {
-    title: "🎯 Salto LWT ΔT (K)",
-    what: "Differenza di temperatura aggiunta all'aria di casa per calcolare la mandata target della pompa di calore all'inizio del ciclo: Target LWT = clamp(T_in + ΔT, 25.0, 28.5 °C).",
-    impact: "Più è alto il ΔT, più calda è l'acqua spinta nel pavimento (più kW resi, ma leggermente meno COP). Più è basso, più la PdC lavora in bassa temperatura ad altissimo rendimento.",
-    tip: "+18 K con casa a 7.5 °C punta a ~25.5 °C di mandata: ideale per modulare dolce sul radiante senza saturare il puffer."
+    title: "🎯 Salto Acqua ΔT (K) su Puffer",
+    what: "Differenza aggiunta alla temperatura casa per calcolare l'obiettivo acqua sulla Sonda Puffer 200L (su cui regola la WO1C): Target Acqua = clamp(T_in + ΔT, Min, Max).",
+    impact: "Sui log reali (k_radiante ≈ 0.34 kW/K), +15.5 K porta il puffer a ~22.5–23.5 °C (mandata ~24 °C): il pavimento assorbe ~4.8 kWₜ continui facendo modulare la 11 kW dolce al 35–55% con pochissimi defrost.",
+    tip: "15.0–16.0 K è lo sweet spot: più basso rischierebbe di avvicinare la potenza minima (~3.5 kWₜ); oltre 18 K alza la modulazione e moltiplica la brina a OAT 2–5 °C."
+  },
+  ap_lwt_bounds: {
+    title: "🌡️ Limiti Min / Max Target Acqua (°C)",
+    what: "Pavimento e soffitto di sicurezza per il Target Acqua (Puffer) calcolato dall'Autopilota.",
+    impact: "Min = 22.0 °C garantisce sempre un salto sufficiente sul radiante per evitare cicli ON/OFF brevi; Max = 26.5 °C evita sovratemperature inutili a basso COP.",
+    tip: "Mantieni 22.0–26.5 °C in custodia invernale; alza solo se vuoi riscaldare casa rapidamente prima di un arrivo."
+  },
+  ap_soft_start: {
+    title: "🚀 Rampa Soft-Start Anti-Overshoot",
+    what: "All'avvio a freddo (puffer a ~11 °C), parte 1–2 °C sotto il setpoint finale e sale di +1 °C ogni N minuti (o quando il puffer raggiunge il gradino).",
+    impact: "Evita che la WO1C veda un errore iniziale di +14 K saturando l'integrale PI all'88% (causa dell'overshoot a 28.8 °C del 21/11 e della brina precoce al minuto 7 del 24/11).",
+    tip: "Con passo 25 min, l'avvio resta dolce al 45–60% e raggiunge il regime senza picchi."
+  },
+  ap_defrost_guard: {
+    title: "❄️ Defrost Guard Anti-Brina",
+    what: "Monitora gli episodi di sbrinamento del ciclo attivo e la depressione evaporatore (OAT − T_aspirazione) quando l'aria esterna è nella fascia umida ≤ 5.5 °C.",
+    impact: "Se rileva troppi defrost (≥ soglia) o evaporatore ghiacciato ad alta modulazione, riduce il setpoint PdC di −1 °C (solo quando Puffer ≤ nuovo target + 1 K, così da non provocare stacchi isteretici WO1C!).",
+    tip: "Spezza il circolo vizioso 88% ↔ Defrost ogni 48 minuti, risparmiando fino al 20–25% di elettricità nelle giornate nebbiose."
+  },
+  ap_anti_seize: {
+    title: "💧 Anti-Grippaggio Smart Grundfos (Giorni)",
+    what: "Poiché in Full-Auto la modalità 'hg' del BTicino sovrascrive la programmazione giornaliera dell'app Home + Control, questo timer avvia la sola Grundfos per 15 min alle 12:00 se resta ferma per più di N giorni consecutivi.",
+    impact: "Protegge il rotore bagnato della pompa nelle mezze stagioni miti senza sprecare cicli ogni singola mattina in inverno (quando già gira per ore nei cicli di riscaldamento).",
+    tip: "4 giorni (0 = disattivo) è il compromesso ideale tra protezione meccanica e zero sprechi."
   },
   ap_max_cycle: {
     title: "⏱️ Durata Max Ciclo (min)",

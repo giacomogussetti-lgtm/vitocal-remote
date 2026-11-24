@@ -73,6 +73,13 @@ class DatabaseManager:
                 ("frost_protection_status", "TEXT"),
                 ("heating_rod_level1_s", "INTEGER"),
                 ("heating_rod_level2_s", "INTEGER"),
+                ("primary_supply_temp_c", "REAL"),
+                ("error_counter_d6", "INTEGER"),
+                ("load_class_1_h", "REAL"),
+                ("load_class_2_h", "REAL"),
+                ("load_class_3_h", "REAL"),
+                ("load_class_4_h", "REAL"),
+                ("load_class_5_h", "REAL"),
             ]
             cursor.execute("PRAGMA table_info(telemetry_samples);")
             existing_cols = {row["name"] for row in cursor.fetchall()}

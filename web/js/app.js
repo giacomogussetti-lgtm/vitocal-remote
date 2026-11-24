@@ -243,6 +243,10 @@ function updateAnalyticsUI(hours) {
   const elDailyProj = document.getElementById("kpiDailyProjected");
   const elElecKwh = document.getElementById("kpiElecKwh");
   const elAvgKw = document.getElementById("kpiAvgKw");
+  const elThermalNet = document.getElementById("kpiThermalNetKwh");
+  const elRealCop = document.getElementById("kpiRealNetCop");
+  const elDefSum = document.getElementById("kpiDefrostSummary");
+  const elLedger = document.getElementById("dailyConsumptionLedger");
 
   if (elStarts) elStarts.textContent = res.totalStarts;
   if (elDuty) elDuty.textContent = `Duty Cycle: ${res.dutyCyclePct}%`;
@@ -252,8 +256,39 @@ function updateAnalyticsUI(hours) {
   if (elStandbyHours) elStandbyHours.textContent = `Standby: ${res.standbyHours}h`;
   if (elCostEur) elCostEur.innerHTML = `${res.estimatedCostEur.toFixed(2)} <small style="font-size: 0.8rem;">€</small>`;
   if (elDailyProj) elDailyProj.textContent = `Proiezione: ${res.projectedDailyCost.toFixed(2)} €/giorno`;
-  if (elElecKwh) elElecKwh.innerHTML = `${res.totalElecKwh} <small>kWh</small>`;
-  if (elAvgKw) elAvgKw.innerHTML = `${res.avgPowerKw} <small>kW</small>`;
+  if (elElecKwh) elElecKwh.innerHTML = `${res.totalElecKwh} <small>kWhₑ</small>`;
+  if (elThermalNet) elThermalNet.innerHTML = `${res.totalThermalNetKwh != null ? res.totalThermalNetKwh : "--"} <small>kWhₜ</small>`;
+  if (elRealCop) {
+    const copTxt = res.realNetCop > 0 ? res.realNetCop.toFixed(2) : "--";
+    elRealCop.innerHTML = `COP netto: <strong>${copTxt}</strong> · P media: <span id="kpiAvgKw">${res.avgPowerKw}</span> kW`;
+  } else if (elAvgKw) {
+    elAvgKw.innerHTML = `${res.avgPowerKw} <small>kW</small>`;
+  }
+  if (elDefSum) {
+    const rodNote = res.rodElecKwh > 0 ? ` · Resist. ${res.rodElecKwh} kWh` : " · Resist. 0 kWh";
+    elDefSum.textContent = `Defrost: ${res.defrostEpisodes || 0} (${res.defrostMinutes || 0}m)${rodNote}`;
+  }
+  if (elLedger) {
+    const rows = Array.isArray(res.dailyBreakdown) ? res.dailyBreakdown : [];
+    if (rows.length > 0) {
+      elLedger.innerHTML = `
+        <div style="font-size:0.7rem; color:#94a3b8; font-weight:700; margin-bottom:4px;">📅 REGISTRO GIORNALIERO (EL. / RESA NETTA / COP / DEFROST):</div>
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          ${rows.map(r => `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(15,23,42,0.7); border:1px solid #334155; border-radius:6px; padding:5px 8px; gap:6px; flex-wrap:wrap;">
+              <strong>${r.day}</strong>
+              <span>🔥 ${r.runMin}m${r.defrosts > 0 ? ` · ❄️${r.defrosts}` : ""}</span>
+              <span style="color:#facc15;">⚡ ${r.elecKwh.toFixed(1)} kWhₑ (${r.costEur.toFixed(2)}€)</span>
+              <span style="color:#10b981;">🔆 ${r.thermalNetKwh.toFixed(1)} kWhₜ${r.netCop ? ` · COP ${r.netCop.toFixed(2)}` : ""}</span>
+              <span style="color:#94a3b8;">🏠 ${r.tinRange}</span>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    } else {
+      elLedger.innerHTML = "";
+    }
+  }
 
   // Modulation Quality
   const modScoreBadge = document.getElementById("modScoreBadge");
@@ -525,6 +560,29 @@ async function fallbackLocalFetch() {
 // -------------------------------------------------------------
 // UI RENDERING & UPDATES
 // -------------------------------------------------------------
+function updateSynopticQuickCards(s) {
+  if (!s) return;
+  document.getElementById("cardOat").textContent = s.external_temp_c != null ? `${s.external_temp_c.toFixed(1)} °C` : "--";
+  document.getElementById("cardBuffer").textContent = s.buffer_temp_c != null ? `${s.buffer_temp_c.toFixed(1)} °C` : "--";
+  document.getElementById("cardSupply").textContent = s.pdc_supply_temp_c != null ? `${s.pdc_supply_temp_c.toFixed(1)} °C` : "--";
+  document.getElementById("cardIndoor").textContent = s.indoor_temp_bticino_c != null ? `${s.indoor_temp_bticino_c.toFixed(1)} °C` : "--";
+
+  const m = (typeof extractSynopticMetrics === "function") ? extractSynopticMetrics(s) : null;
+  const spEl = document.getElementById("cardSetpoint");
+  const spSub = document.getElementById("cardTargetRoomSub");
+  if (spEl) {
+    spEl.textContent = m ? m.targetWaterVal : (s.target_supply_temp_c != null ? `${Number(s.target_supply_temp_c).toFixed(1)} °C` : "--");
+  }
+  if (spSub) {
+    spSub.textContent = m ? `Casa: ${m.targetRoomReal}` : "Target Reale Impianto";
+  }
+
+  const compActive = (s.compressor_active === 1) || ((s.compressor_modulation_percent || 0) > 0);
+  document.getElementById("cardComp").textContent = compActive ? `${(s.compressor_modulation_percent || 0).toFixed(0)} %` : "OFF";
+  document.getElementById("cardComp").style.color = compActive ? "#10b981" : "#94a3b8";
+}
+window.updateSynopticQuickCards = updateSynopticQuickCards;
+
 function updateUI() {
   if (!state.latestSample) return;
   const s = state.latestSample;
@@ -535,16 +593,8 @@ function updateUI() {
   // 2. Render Charts
   updateChartData(state.samples);
 
-  // 3. Update Quick Cards
-  document.getElementById("cardOat").textContent = s.external_temp_c != null ? `${s.external_temp_c.toFixed(1)} °C` : "--";
-  document.getElementById("cardBuffer").textContent = s.buffer_temp_c != null ? `${s.buffer_temp_c.toFixed(1)} °C` : "--";
-  document.getElementById("cardSupply").textContent = s.pdc_supply_temp_c != null ? `${s.pdc_supply_temp_c.toFixed(1)} °C` : "--";
-  document.getElementById("cardIndoor").textContent = s.indoor_temp_bticino_c != null ? `${s.indoor_temp_bticino_c.toFixed(1)} °C` : "--";
-  document.getElementById("cardSetpoint").textContent = s.indoor_setpoint_bticino_c != null ? `${s.indoor_setpoint_bticino_c.toFixed(1)} °C` : "--";
-  
-  const compActive = (s.compressor_active === 1) || ((s.compressor_modulation_percent || 0) > 0);
-  document.getElementById("cardComp").textContent = compActive ? `${(s.compressor_modulation_percent || 0).toFixed(0)} %` : "OFF";
-  document.getElementById("cardComp").style.color = compActive ? "#10b981" : "#94a3b8";
+  // 3. Update Quick Cards (using Real Water & Room Targets)
+  updateSynopticQuickCards(s);
 
   // 4. Update Sonde Details Table
   renderDetailedSondeList(s);
@@ -574,28 +624,44 @@ function renderDetailedSondeList(s) {
   const container = document.getElementById("sondeCardsContainer");
   if (!container) return;
 
+  const apSt = (typeof cmdState !== "undefined" && cmdState.lastAutopilotState) ? cmdState.lastAutopilotState : null;
+  const tCond = (typeof computeR410aCondTempC === "function") ? computeR410aCondTempC(s.hot_gas_pressure_bar) : null;
+  const subcool = (tCond != null && s.liquid_gas_temp_c != null) ? (tCond - Number(s.liquid_gas_temp_c)).toFixed(1) : null;
+  const evapDep = (s.external_temp_c != null && s.suction_gas_temp_c != null) ? (Number(s.external_temp_c) - Number(s.suction_gas_temp_c)).toFixed(1) : null;
+  const errD6 = s.error_counter_d6 != null ? s.error_counter_d6 : (apSt && apSt.error_counter_d6 != null ? apSt.error_counter_d6 : 0);
+  const lcVals = [s.load_class_1_h, s.load_class_2_h, s.load_class_3_h, s.load_class_4_h, s.load_class_5_h];
+  const hasLoadClasses = lcVals.some(v => v != null);
+  const lcStr = hasLoadClasses ? lcVals.map(v => `${v != null ? Math.round(v) : "-"}h`).join(" / ") : "--";
+  const wo1cEv = (apSt && Array.isArray(apSt.recent_wo1c_events) && apSt.recent_wo1c_events.length)
+    ? apSt.recent_wo1c_events.slice(0, 2).map(e => `${e.actor}: ${e.desc}`).join(" · ")
+    : "Nessun evento recente";
+
   const items = [
     { label: "Temperatura Esterna (Sonda PdC)", val: s.external_temp_c, unit: "°C", color: "#38bdf8" },
+    { label: "Aria Ingresso ODU Evaporatore", val: s.primary_supply_temp_c, unit: "°C", color: "#7dd3fc" },
     { label: "Accumulo Puffer 200 Litri", val: s.buffer_temp_c, unit: "°C", color: "#f59e0b" },
     { label: "Mandata Pompa di Calore", val: s.pdc_supply_temp_c, unit: "°C", color: "#ef4444" },
     { label: "Ritorno Pompa di Calore", val: s.pdc_return_temp_c, unit: "°C", color: "#3b82f6" },
     { label: "Bollitore ACS Sanitario 220L", val: s.dhw_storage_temp_c, unit: "°C", color: "#c084fc" },
     { label: "Temperatura Corridoio (BTicino)", val: s.indoor_temp_bticino_c, unit: "°C", color: "#10b981" },
-    { label: "Setpoint Corridoio", val: s.indoor_setpoint_bticino_c, unit: "°C", color: "#eab308" },
+    { label: "Consenso BTicino (Relè Grundfos)", val: s.indoor_setpoint_bticino_c != null ? `${s.indoor_setpoint_bticino_c} °C (${s.grundfos_pump_active === 1 ? "ON" : "OFF"})` : "--", unit: "", color: "#eab308" },
     { label: "Umidità Relativa Corridoio", val: s.humidity_percent, unit: "%", color: "#60a5fa" },
-    { label: "Pressione Gas Caldo Refrigerante", val: s.hot_gas_pressure_bar, unit: "bar", color: "#ec4899" },
+    { label: "Pressione Gas Caldo Refrigerante", val: s.hot_gas_pressure_bar, unit: "barₐ", color: "#ec4899" },
+    { label: "T Condensazione / Sottoraffredd.", val: tCond != null ? `${tCond}°C / ${subcool ?? "--"} K` : "--", unit: "", color: "#22d3ee" },
     { label: "Temperatura Gas Caldo", val: s.hot_gas_temp_c, unit: "°C", color: "#f87171" },
     { label: "Temperatura Gas Liquido", val: s.liquid_gas_temp_c, unit: "°C", color: "#38bdf8" },
-    { label: "Temperatura Gas Aspirazione", val: s.suction_gas_temp_c, unit: "°C", color: "#93c5fd" },
+    { label: "T Aspirazione / Depress. Evap.", val: s.suction_gas_temp_c != null ? `${s.suction_gas_temp_c}°C (Δ ${evapDep ?? "--"} K)` : "--", unit: "", color: "#93c5fd" },
     { label: "Modulazione Compressore Inverter", val: s.compressor_modulation_percent, unit: "%", color: "#facc15" },
     { label: "Ore Funzionamento Compressore", val: s.compressor_hours, unit: "h", color: "#e2e8f0" },
     { label: "Avvii Totali Compressore", val: s.compressor_starts, unit: "avvii", color: "#e2e8f0" },
-    { label: "COP Istantaneo Riscaldamento", val: s.cop_heating, unit: "", color: "#10b981" },
-    { label: "COP Totale Macchina", val: s.cop_total, unit: "", color: "#6ee7b7" },
+    { label: "Classi Carico Inverter (C1..C5)", val: lcStr, unit: "", color: "#a5f3fc" },
+    { label: "COP Stagionale WO1C (Risc / Tot)", val: `${s.cop_heating ?? "--"} / ${s.cop_total ?? "--"}`, unit: "", color: "#10b981" },
     { label: "Circolatore Primario PdC", val: s.primary_pump_rotation_percent, unit: "%", color: "#34d399" },
     { label: "Curva Climatica (Inclinazione / Livello)", val: `${s.heating_curve_slope || 0.6} / ${s.heating_curve_shift || 0}`, unit: "", color: "#60a5fa" },
     { label: "Programma Operativo PdC", val: (s.active_program || "standby").toUpperCase(), unit: "", color: "#a78bfa" },
     { label: "Fase Compressore / Defrost", val: (s.compressor_phase || "off").toUpperCase(), unit: "", color: String(s.compressor_phase || "").includes("defrost") ? "#38bdf8" : "#cbd5e1" },
+    { label: "Errori Attivi Centralina WO1C (d6)", val: errD6 === 0 ? "0 (Nessun Guasto)" : `${errD6} ATTIVI`, unit: "", color: errD6 === 0 ? "#10b981" : "#ef4444" },
+    { label: "Ultimi Eventi Attuatori WO1C", val: wo1cEv, unit: "", color: "#cbd5e1" },
     { label: "Antigelo Hardware WO1C", val: (s.frost_protection_status || "off").toUpperCase(), unit: "", color: s.frost_protection_status === "on" ? "#f59e0b" : "#94a3b8" },
     {
       label: "Resistenza Backup (Oggi / Tot S1·S2)",

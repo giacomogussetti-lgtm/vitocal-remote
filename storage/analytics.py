@@ -75,13 +75,27 @@ def analyze_telemetry_period(
         hw_hours_delta = max(0.0, float(hours_vals[-1] - hours_vals[0]))
 
     # ------------------------------------------------------------------
-    # 3. SAMPLE-BY-SAMPLE CYCLE DETECTION
+    # 3. SAMPLE-BY-SAMPLE CYCLE DETECTION (ignoring empty Viessmann polls)
     # ------------------------------------------------------------------
     detected_cycles = []
     current_cycle_samples = []
+    defrost_episodes = 0
+    prev_defrost = False
 
     for s in window_samples:
+        viessmann_corrupted = (
+            s.get("pdc_supply_temp_c") is None
+            and s.get("active_program") is None
+            and s.get("compressor_modulation_percent") is None
+        )
+        if viessmann_corrupted:
+            continue
         is_active = (s.get("compressor_active") == 1) or ((s.get("compressor_modulation_percent") or 0) > 0)
+        is_def = "defrost" in str(s.get("compressor_phase") or "").lower()
+        if is_def and not prev_defrost:
+            defrost_episodes += 1
+        prev_defrost = is_def
+
         if is_active:
             current_cycle_samples.append(s)
         else:
@@ -189,32 +203,64 @@ def analyze_telemetry_period(
         )
 
     # ------------------------------------------------------------------
-    # 6. ELECTRICAL CONSUMPTION & COST ESTIMATION (€)
-    # Model: Vitocal AWBT-E-AC 111.A16 (11 kW thermal nominal)
-    # Standby: ~25 W | Active: 0.65 kW + (mod/100)*2.80 kW + Pump: 0.05 kW
+    # 6. CALIBRATED ELECTRICAL & NET THERMAL CONSUMPTION (Trapezoidal + Defrost)
+    # Model: Vitocal AWBT-E-AC 111.A16 (11 kW split R410A)
     # ------------------------------------------------------------------
     standby_hours = max(0.0, effective_hours - total_run_hours)
-    p_standby_kw = 0.025  # 25 W electronics/ViCare
+    integ_elec_kwh = 0.0
+    integ_thermal_kwh = 0.0
+    for idx_s, s in enumerate(window_samples):
+        t_cur = datetime.fromisoformat(s["timestamp_utc"])
+        if idx_s + 1 < len(window_samples):
+            t_next = datetime.fromisoformat(window_samples[idx_s + 1]["timestamp_utc"])
+            dt_s = max(15.0, min(1800.0, (t_next - t_cur).total_seconds()))
+        elif idx_s > 0:
+            t_prev = datetime.fromisoformat(window_samples[idx_s - 1]["timestamp_utc"])
+            dt_s = max(15.0, min(1800.0, (t_cur - t_prev).total_seconds()))
+        else:
+            dt_s = 300.0
+        dt_h = dt_s / 3600.0
+        corrupted = s.get("pdc_supply_temp_c") is None and s.get("active_program") is None
+        ref = window_samples[idx_s - 1] if (corrupted and idx_s > 0) else s
+        gf_kw = 0.030 if ref.get("grundfos_pump_active") == 1 else 0.0
+        is_comp = (ref.get("compressor_active") == 1) or ((ref.get("compressor_modulation_percent") or 0) > 0)
+        if not is_comp:
+            integ_elec_kwh += (0.020 + gf_kw) * dt_h
+            continue
+        is_def = "defrost" in str(ref.get("compressor_phase") or "").lower()
+        if is_def:
+            integ_elec_kwh += (1.35 + gf_kw) * dt_h
+            integ_thermal_kwh += -3.5 * dt_h
+            continue
+        mod = max(0.0, min(100.0, float(ref.get("compressor_modulation_percent") or 0)))
+        p_cond = float(ref.get("hot_gas_pressure_bar") or 17.0)
+        p_factor = max(0.72, min(1.25, 0.82 + 0.18 * ((p_cond - 14.0) / 6.0)))
+        p1_kw = 0.045 if (ref.get("primary_pump_rotation_percent") or 0) > 0 else 0.0
+        p_el = 0.55 + 2.55 * (mod / 100.0) * p_factor + p1_kw + gf_kw
+        lwt = float(ref.get("pdc_supply_temp_c") or 25.0)
+        oat = float(ref.get("external_temp_c") if ref.get("external_temp_c") is not None else 5.0)
+        t_suc = float(ref.get("suction_gas_temp_c") if ref.get("suction_gas_temp_c") is not None else (oat - 5.0))
+        t_cond = lwt + 1.2
+        t_evap = min(oat - 3.5, t_suc + 1.5)
+        carnot = (t_cond + 273.15) / max(12.0, t_cond - t_evap)
+        eta = 0.44 if mod <= 55 else (0.41 if mod <= 75 else 0.37)
+        dyn_cop = max(1.7, min(5.2, carnot * eta))
+        integ_elec_kwh += p_el * dt_h
+        integ_thermal_kwh += (p_el * dyn_cop) * dt_h
 
-    if active_mods:
-        # Calculate instantaneous power across active samples
-        active_kw_samples = [0.70 + (m / 100.0) * 2.80 for m in active_mods]
-        avg_active_kw = sum(active_kw_samples) / len(active_kw_samples)
-    else:
-        # Fallback average active load: ~35% modulation -> ~1.68 kW
-        avg_active_kw = 1.68
-
-    elec_kwh_active = total_run_hours * avg_active_kw
-    elec_kwh_standby = standby_hours * p_standby_kw
-    total_elec_kwh = round(elec_kwh_active + elec_kwh_standby, 2)
+    r1_vals = [int(s["heating_rod_level1_s"]) for s in window_samples if s.get("heating_rod_level1_s") is not None]
+    r2_vals = [int(s["heating_rod_level2_s"]) for s in window_samples if s.get("heating_rod_level2_s") is not None]
+    rod_kwh = ((max(0, r1_vals[-1] - r1_vals[0]) if len(r1_vals) >= 2 else 0) + (max(0, r2_vals[-1] - r2_vals[0]) if len(r2_vals) >= 2 else 0)) / 3600.0 * 3.0
+    total_elec_kwh = round(integ_elec_kwh + rod_kwh, 2)
+    total_thermal_net_kwh = round(max(0.0, integ_thermal_kwh + rod_kwh), 1)
     avg_power_kw = round(total_elec_kwh / effective_hours, 3)
 
     estimated_cost_eur = round(total_elec_kwh * cost_per_kwh, 2)
     projected_daily_cost_eur = round((total_elec_kwh / effective_hours) * 24.0 * cost_per_kwh, 2)
 
-    # Average COP
+    # Real Net COP in window (fallback to seasonal WO1C COP if idle)
     cop_vals = [s["cop_heating"] for s in window_samples if s.get("cop_heating") is not None and s.get("cop_heating") > 0]
-    avg_cop = round(sum(cop_vals) / len(cop_vals), 2) if cop_vals else 3.10
+    avg_cop = round(total_thermal_net_kwh / total_elec_kwh, 2) if (total_elec_kwh > 0.2 and total_thermal_net_kwh > 0) else (round(sum(cop_vals) / len(cop_vals), 2) if cop_vals else 3.10)
 
     # ------------------------------------------------------------------
     # 7. ANTI-FROST SAFETY & TEMPERATURE MINIMA
@@ -288,6 +334,8 @@ def analyze_telemetry_period(
         },
         "consumption": {
             "total_elec_kwh": total_elec_kwh,
+            "total_thermal_net_kwh": total_thermal_net_kwh,
+            "defrost_episodes": defrost_episodes,
             "avg_power_kw": avg_power_kw,
             "estimated_cost_eur": estimated_cost_eur,
             "projected_daily_cost_eur": projected_daily_cost_eur,

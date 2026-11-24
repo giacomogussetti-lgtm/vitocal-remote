@@ -56,7 +56,7 @@
       <!-- Collapsible Quick Metric Cards (Hidden by default) -->
       <details class="synoptic-kpi-drawer" id="synopticKpiDrawer">
         <summary class="synoptic-kpi-summary">
-          <span>📊 Letture Rapide (OAT, Puffer, Mandata, Casa, Setpoint, PdC)</span>
+          <span>📊 Letture Rapide (OAT, Puffer, Mandata, Casa, Target Reali, PdC)</span>
           <span class="synoptic-kpi-arrow">▾</span>
         </summary>
         <div class="cards-grid synoptic-kpi-grid" style="margin-top: 6px;">
@@ -81,9 +81,9 @@
             <span class="card-sub">BTicino Smarther</span>
           </div>
           <div class="status-card">
-            <span class="card-label">Setpoint</span>
-            <span class="card-value" id="cardSetpoint" style="color: #eab308;">--</span>
-            <span class="card-sub">Temperatura Target</span>
+            <span class="card-label">Target Acqua / Casa</span>
+            <span class="card-value" id="cardSetpoint" style="color: #f0abfc; font-size: 1.02rem;">--</span>
+            <span class="card-sub" id="cardTargetRoomSub">Target Reale Impianto</span>
           </div>
           <div class="status-card">
             <span class="card-label">Compressore</span>
@@ -234,7 +234,15 @@
             </div>
             <div class="cmd-inline-field">
               <label for="apDeltaLwt" class="label-with-help">Salto LWT ΔT (K) <button type="button" class="help-info-btn" data-help-key="ap_delta_lwt" aria-label="Spiegazione Salto LWT">i</button></label>
-              <input type="number" id="apDeltaLwt" class="form-input" min="10.0" max="25.0" step="0.5" value="18.0">
+              <input type="number" id="apDeltaLwt" class="form-input" min="10.0" max="25.0" step="0.5" value="15.5">
+            </div>
+            <div class="cmd-inline-field">
+              <label for="apMinLwt" class="label-with-help">Min Target Acqua (°C) <button type="button" class="help-info-btn" data-help-key="ap_lwt_bounds" aria-label="Spiegazione Min/Max Acqua">i</button></label>
+              <input type="number" id="apMinLwt" class="form-input" min="19.0" max="32.0" step="0.5" value="22.0">
+            </div>
+            <div class="cmd-inline-field">
+              <label for="apMaxLwt" class="label-with-help">Max Target Acqua (°C) <button type="button" class="help-info-btn" data-help-key="ap_lwt_bounds" aria-label="Spiegazione Min/Max Acqua">i</button></label>
+              <input type="number" id="apMaxLwt" class="form-input" min="22.0" max="36.0" step="0.5" value="26.5">
             </div>
             <div class="cmd-inline-field">
               <label for="apMaxCycle" class="label-with-help">Durata Max Ciclo (min) <button type="button" class="help-info-btn" data-help-key="ap_max_cycle" aria-label="Spiegazione Durata Max">i</button></label>
@@ -251,6 +259,18 @@
             <div class="cmd-inline-field">
               <label for="apWinEnd" class="label-with-help">Finestra COP Fine <button type="button" class="help-info-btn" data-help-key="ap_cop_window" aria-label="Spiegazione Finestra COP">i</button></label>
               <input type="time" id="apWinEnd" class="form-input" value="16:00">
+            </div>
+            <div class="cmd-inline-field">
+              <label for="apSoftStartStep" class="label-with-help">Soft-Start Step (min) <button type="button" class="help-info-btn" data-help-key="ap_soft_start" aria-label="Spiegazione Soft-Start">i</button></label>
+              <input type="number" id="apSoftStartStep" class="form-input" min="10" max="60" step="5" value="25">
+            </div>
+            <div class="cmd-inline-field">
+              <label for="apDefrostThresh" class="label-with-help">Soglia Defrost Guard <button type="button" class="help-info-btn" data-help-key="ap_defrost_guard" aria-label="Spiegazione Defrost Guard">i</button></label>
+              <input type="number" id="apDefrostThresh" class="form-input" min="1" max="5" step="1" value="2">
+            </div>
+            <div class="cmd-inline-field">
+              <label for="apAntiSeizeDays" class="label-with-help">Anti-Grippaggio GF (gg) <button type="button" class="help-info-btn" data-help-key="ap_anti_seize" aria-label="Spiegazione Anti-Grippaggio">i</button></label>
+              <input type="number" id="apAntiSeizeDays" class="form-input" min="0" max="30" step="1" value="4">
             </div>
           </div>
 
@@ -281,11 +301,26 @@
             </div>
           </div>
 
-          <label class="ap-checkbox-row" style="margin-top: 10px;">
-            <input type="checkbox" id="apSoftCurveTuning">
-            <span>Self-Tuning Soft Curva anti-overshoot (−1 K su PdC senza tagliare pompa)</span>
-            <button type="button" class="help-info-btn" data-help-key="ap_soft_curve" aria-label="Spiegazione Self-Tuning Soft">i</button>
-          </label>
+          <div class="cmd-subbox" style="margin-top: 10px;">
+            <div class="cmd-card-header" style="margin-bottom: 4px;">
+              <span class="cmd-sub-title">🧠 Protezioni Intelligenti Full-Auto v2</span>
+            </div>
+            <label class="ap-checkbox-row" style="margin-top: 6px;">
+              <input type="checkbox" id="apSoftStartEnabled" checked>
+              <span>Rampa Soft-Start Anti-Overshoot all'avvio a freddo</span>
+              <button type="button" class="help-info-btn" data-help-key="ap_soft_start" aria-label="Spiegazione Soft-Start">i</button>
+            </label>
+            <label class="ap-checkbox-row" style="margin-top: 6px;">
+              <input type="checkbox" id="apDefrostGuardEnabled" checked>
+              <span>Defrost Guard Anti-Brina (riduce −1°C se troppi defrost o OAT umida)</span>
+              <button type="button" class="help-info-btn" data-help-key="ap_defrost_guard" aria-label="Spiegazione Defrost Guard">i</button>
+            </label>
+            <label class="ap-checkbox-row" style="margin-top: 6px;">
+              <input type="checkbox" id="apSoftCurveTuning" checked>
+              <span>Self-Tuning Soft Curva anti-overshoot (con guardia isteresi Puffer)</span>
+              <button type="button" class="help-info-btn" data-help-key="ap_soft_curve" aria-label="Spiegazione Self-Tuning Soft">i</button>
+            </label>
+          </div>
 
           <button type="button" class="btn-action btn-primary" id="btnSaveAutopilotConfig" style="margin-top: 10px;">💾 Salva Parametri Strategia</button>
         </details>
@@ -686,20 +721,23 @@
 
       <!-- Electrical Energy Consumption Card -->
       <div class="sync-card">
-        <h4 style="color: var(--accent-cyan); font-size: 0.9rem; margin-bottom: 6px;">⚡ Stima Consumi Elettrici & Bilancio Energetico</h4>
-        <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;">
-          Modello integrato basato su inverter 11 kW Vitocal AWBT-E-AC, modulazione %, COP e assorbimento ausiliari.
+        <h4 style="color: var(--accent-cyan); font-size: 0.9rem; margin-bottom: 6px;">⚡ Consumi Calibrati, Resa Netta &amp; Registro Giornaliero</h4>
+        <p style="font-size: 0.74rem; color: var(--text-muted); margin-bottom: 10px;">
+          Integrazione trapezoidale su Vitocal 111-S (modulazione %, pressione R410A, penalità termica/elettrica defrost e resistenza backup S1/S2). La WO1C non ha wattmetro 230V interno.
         </p>
         <div class="cards-grid" style="grid-template-columns: repeat(2, 1fr); margin-top: 0;">
           <div class="status-card" style="padding: 8px 10px;">
             <span class="card-label">Energia Elettrica</span>
             <span class="card-value" id="kpiElecKwh" style="font-size: 1.15rem; color: #facc15;">-- <small>kWh</small></span>
+            <span class="card-sub" id="kpiDefrostSummary">Defrost: --</span>
           </div>
           <div class="status-card" style="padding: 8px 10px;">
-            <span class="card-label">Potenza Media</span>
-            <span class="card-value" id="kpiAvgKw" style="font-size: 1.15rem; color: #38bdf8;">-- <small>kW</small></span>
+            <span class="card-label">Resa Netta / COP Reale</span>
+            <span class="card-value" id="kpiThermalNetKwh" style="font-size: 1.12rem; color: #10b981;">-- <small>kWhₜ</small></span>
+            <span class="card-sub" id="kpiRealNetCop">COP netto: -- · P media: <span id="kpiAvgKw">--</span> kW</span>
           </div>
         </div>
+        <div id="dailyConsumptionLedger" style="margin-top: 10px; font-size: 0.72rem; color: #cbd5e1;"></div>
       </div>
     </section>
 

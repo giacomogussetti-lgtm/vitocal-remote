@@ -212,9 +212,9 @@ class BTicinoConnector:
                 "setpoint_c": None,
                 "humidity_percent": None,
                 "mode": None,
-                "heating_power_request": 0,
-                "boiler_status": False,
-                "grundfos_pump_active": 0,
+                "heating_power_request": None,
+                "boiler_status": None,
+                "grundfos_pump_active": None,
                 "device_reachable": False,
             }
 

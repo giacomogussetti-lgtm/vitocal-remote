@@ -233,16 +233,20 @@ def _validate_autopilot_params(params: dict[str, Any], force_enable: bool = Fals
         "t_max_c": (6.0, 18.0, float),
         "t_emergency_c": (4.5, 12.0, float),
         "target_lwt_delta_k": (10.0, 25.0, float),
-        "min_target_lwt_c": (20.0, 32.0, float),
-        "max_target_lwt_c": (24.0, 36.0, float),
+        "min_target_lwt_c": (19.0, 32.0, float),
+        "max_target_lwt_c": (22.0, 36.0, float),
         "max_cycle_minutes": (30, 360, int),
         "puffer_drain_minutes": (0, 60, int),
         "puffer_drain_stop_temp_c": (10.0, 20.0, float),
         "cron_idle_minutes": (1, 60, int),
         "cron_armed_minutes": (1, 30, int),
         "cron_active_minutes": (1, 15, int),
+        "soft_start_step_minutes": (10, 60, int),
+        "defrost_trim_threshold_count": (1, 5, int),
+        "defrost_guard_oat_max_c": (0.0, 10.0, float),
         "soft_curve_max_shift_delta_k": (1, 4, int),
         "soft_curve_cooldown_minutes": (15, 180, int),
+        "anti_seize_days": (0, 30, int),
     }
     for key, (lo, hi, caster) in bounds.items():
         if params.get(key) is not None:
@@ -253,6 +257,10 @@ def _validate_autopilot_params(params: dict[str, Any], force_enable: bool = Fals
 
     if "dynamic_cron_enabled" in params:
         clean["dynamic_cron_enabled"] = bool(params["dynamic_cron_enabled"])
+    if "soft_start_enabled" in params:
+        clean["soft_start_enabled"] = bool(params["soft_start_enabled"])
+    if "defrost_guard_enabled" in params:
+        clean["defrost_guard_enabled"] = bool(params["defrost_guard_enabled"])
     if "soft_curve_tuning_enabled" in params:
         clean["soft_curve_tuning_enabled"] = bool(params["soft_curve_tuning_enabled"])
 

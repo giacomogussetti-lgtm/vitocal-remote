@@ -45,4 +45,11 @@ class TelemetrySample(BaseModel):
     frost_protection_status: Optional[str] = None
     heating_rod_level1_s: Optional[int] = None
     heating_rod_level2_s: Optional[int] = None
+    primary_supply_temp_c: Optional[float] = None
+    error_counter_d6: Optional[int] = None
+    load_class_1_h: Optional[float] = None
+    load_class_2_h: Optional[float] = None
+    load_class_3_h: Optional[float] = None
+    load_class_4_h: Optional[float] = None
+    load_class_5_h: Optional[float] = None
     active_preset: Optional[str] = "manual"

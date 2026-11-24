@@ -72,34 +72,117 @@ def log_sample(run_autopilot: bool = True) -> bool:
     except Exception as e:
         logger.error("Errore lettura BTicino: %s", e)
 
-    # 2b. Fallback to previous valid telemetry if BTicino was momentarily in sleep/Wi-Fi retry
+    # 2b. Fallback to previous valid telemetry if BTicino was momentarily in sleep/Wi-Fi retry (code 6)
+    #     OR if Viessmann cloud returned a transient timeout/empty response.
     cloud_file = Config.DATA_DIR / "cloud_telemetry.jsonl"
-    if not b_data or b_data.get("indoor_temp_c") is None:
+    prev_lines: list[str] = []
+    if cloud_file.exists():
         try:
-            if cloud_file.exists():
-                with open(cloud_file, "r", encoding="utf-8") as f:
-                    lines = [ln.strip() for ln in f if ln.strip()]
-                for prev_ln in reversed(lines):
-                    prev_rec = json.loads(prev_ln)
-                    if prev_rec.get("indoor_temp_bticino_c") is not None:
-                        if b_data.get("indoor_temp_c") is None:
-                            b_data["indoor_temp_c"] = prev_rec.get("indoor_temp_bticino_c")
-                        if b_data.get("setpoint_c") is None:
-                            b_data["setpoint_c"] = prev_rec.get("indoor_setpoint_bticino_c")
-                        if b_data.get("humidity_percent") is None:
-                            b_data["humidity_percent"] = prev_rec.get("humidity_percent")
-                        if b_data.get("grundfos_pump_active") is None:
-                            b_data["grundfos_pump_active"] = prev_rec.get("grundfos_pump_active")
-                        logger.info("Recuperati valori precedenti BTicino da cache cloud: T=%.1f °C", b_data["indoor_temp_c"])
-                        break
+            with open(cloud_file, "r", encoding="utf-8") as f:
+                prev_lines = [ln.strip() for ln in f if ln.strip()]
+        except Exception:
+            prev_lines = []
+
+    bticino_unreachable = (
+        not b_data
+        or b_data.get("indoor_temp_c") is None
+        or b_data.get("device_reachable") is False
+    )
+    if bticino_unreachable and prev_lines:
+        try:
+            for prev_ln in reversed(prev_lines):
+                prev_rec = json.loads(prev_ln)
+                if prev_rec.get("indoor_temp_bticino_c") is not None:
+                    if b_data.get("indoor_temp_c") is None:
+                        b_data["indoor_temp_c"] = prev_rec.get("indoor_temp_bticino_c")
+                    if b_data.get("setpoint_c") is None:
+                        b_data["setpoint_c"] = prev_rec.get("indoor_setpoint_bticino_c")
+                    if b_data.get("humidity_percent") is None:
+                        b_data["humidity_percent"] = prev_rec.get("humidity_percent")
+                    if b_data.get("grundfos_pump_active") is None or b_data.get("device_reachable") is False:
+                        b_data["grundfos_pump_active"] = prev_rec.get("grundfos_pump_active")
+                    logger.info(
+                        "Recuperati valori precedenti BTicino da cache cloud (code 6/retry): T=%.1f °C, GF=%s",
+                        b_data["indoor_temp_c"],
+                        b_data.get("grundfos_pump_active"),
+                    )
+                    break
         except Exception as fb_err:
-            logger.debug("Fallback cloud cache: %s", fb_err)
+            logger.debug("Fallback cloud cache BTicino: %s", fb_err)
+
+    viessmann_missing = (
+        not v_data
+        or (v_data.get("supply_temp_c") is None and v_data.get("outside_temp_c") is None)
+    )
+    if viessmann_missing and prev_lines:
+        try:
+            for prev_ln in reversed(prev_lines):
+                prev_rec = json.loads(prev_ln)
+                if prev_rec.get("pdc_supply_temp_c") is not None and prev_rec.get("active_mode") is not None:
+                    v_map = {
+                        "outside_temp_c": "external_temp_c",
+                        "supply_temp_c": "pdc_supply_temp_c",
+                        "return_temp_c": "pdc_return_temp_c",
+                        "buffer_temp_c": "buffer_temp_c",
+                        "dhw_storage_temp_c": "dhw_storage_temp_c",
+                        "compressor_active": "compressor_active",
+                        "compressor_hours": "compressor_hours",
+                        "compressor_starts": "compressor_starts",
+                        "heating_curve_slope": "heating_curve_slope",
+                        "heating_curve_shift": "heating_curve_shift",
+                        "active_mode": "active_mode",
+                        "active_program": "active_program",
+                        "hot_gas_pressure_bar": "hot_gas_pressure_bar",
+                        "hot_gas_temp_c": "hot_gas_temp_c",
+                        "liquid_gas_temp_c": "liquid_gas_temp_c",
+                        "suction_gas_temp_c": "suction_gas_temp_c",
+                        "compressor_modulation_percent": "compressor_modulation_percent",
+                        "primary_pump_rotation_percent": "primary_pump_rotation_percent",
+                        "primary_supply_temp_c": "primary_supply_temp_c",
+                        "cop_heating": "cop_heating",
+                        "cop_dhw": "cop_dhw",
+                        "cop_total": "cop_total",
+                        "target_supply_temp_c": "target_supply_temp_c",
+                        "normal_setpoint_c": "normal_setpoint_c",
+                        "reduced_setpoint_c": "reduced_setpoint_c",
+                        "dhw_setpoint_c": "dhw_setpoint_c",
+                        "compressor_phase": "compressor_phase",
+                        "frost_protection_status": "frost_protection_status",
+                        "heating_rod_level1_s": "heating_rod_level1_s",
+                        "heating_rod_level2_s": "heating_rod_level2_s",
+                        "error_counter_d6": "error_counter_d6",
+                        "load_class_1_h": "load_class_1_h",
+                        "load_class_2_h": "load_class_2_h",
+                        "load_class_3_h": "load_class_3_h",
+                        "load_class_4_h": "load_class_4_h",
+                        "load_class_5_h": "load_class_5_h",
+                    }
+                    for v_key, rec_key in v_map.items():
+                        if v_data.get(v_key) is None and prev_rec.get(rec_key) is not None:
+                            v_data[v_key] = prev_rec.get(rec_key)
+                    logger.warning(
+                        "Viessmann API non disponibile in questo tick: mantenuti valori precedenti (Comp=%s, LWT=%s °C).",
+                        v_data.get("compressor_active"),
+                        v_data.get("supply_temp_c"),
+                    )
+                    break
+        except Exception as fb_v_err:
+            logger.debug("Fallback cloud cache Viessmann: %s", fb_v_err)
 
     if not v_data and not b_data:
         logger.error("Nessun dato ottenuto da Viessmann o BTicino. Interruzione.")
         return False
 
     # 3. Assemble TelemetrySample
+    comp_raw_known = (
+        v_data.get("compressor_active") is not None
+        or v_data.get("compressor_modulation_percent") is not None
+    )
+    comp_flag = (
+        (1 if (v_data.get("compressor_active") or (v_data.get("compressor_modulation_percent", 0) or 0) > 0) else 0)
+        if comp_raw_known
+        else None
+    )
     sample = TelemetrySample(
         external_temp_c=v_data.get("outside_temp_c"),
         indoor_temp_bticino_c=b_data.get("indoor_temp_c"),
@@ -109,7 +192,7 @@ def log_sample(run_autopilot: bool = True) -> bool:
         pdc_return_temp_c=v_data.get("return_temp_c"),
         buffer_temp_c=v_data.get("buffer_temp_c"),
         dhw_storage_temp_c=v_data.get("dhw_storage_temp_c"),
-        compressor_active=1 if (v_data.get("compressor_active") or (v_data.get("compressor_modulation_percent", 0) or 0) > 0) else 0,
+        compressor_active=comp_flag,
         compressor_hours=v_data.get("compressor_hours"),
         compressor_starts=v_data.get("compressor_starts"),
         heating_curve_slope=v_data.get("heating_curve_slope"),
@@ -125,6 +208,7 @@ def log_sample(run_autopilot: bool = True) -> bool:
         suction_gas_temp_c=v_data.get("suction_gas_temp_c"),
         compressor_modulation_percent=v_data.get("compressor_modulation_percent"),
         primary_pump_rotation_percent=v_data.get("primary_pump_rotation_percent"),
+        primary_supply_temp_c=v_data.get("primary_supply_temp_c"),
         cop_heating=v_data.get("cop_heating"),
         cop_dhw=v_data.get("cop_dhw"),
         cop_total=v_data.get("cop_total"),
@@ -137,6 +221,12 @@ def log_sample(run_autopilot: bool = True) -> bool:
         frost_protection_status=v_data.get("frost_protection_status"),
         heating_rod_level1_s=v_data.get("heating_rod_level1_s"),
         heating_rod_level2_s=v_data.get("heating_rod_level2_s"),
+        error_counter_d6=v_data.get("error_counter_d6"),
+        load_class_1_h=v_data.get("load_class_1_h"),
+        load_class_2_h=v_data.get("load_class_2_h"),
+        load_class_3_h=v_data.get("load_class_3_h"),
+        load_class_4_h=v_data.get("load_class_4_h"),
+        load_class_5_h=v_data.get("load_class_5_h"),
         active_preset="cloud_github_actions",
     )
 
@@ -170,7 +260,10 @@ def log_sample(run_autopilot: bool = True) -> bool:
     if run_autopilot:
         try:
             from scripts.autopilot import run_autopilot_tick
-            run_autopilot_tick(sample.model_dump())
+            run_autopilot_tick(
+                sample.model_dump(),
+                extra_diagnostics={"logbook_entries": v_data.get("logbook_entries")},
+            )
         except Exception as ap_err:
             logger.error("Errore valutazione autopilota (telemetria comunque salvata): %s", ap_err)
 

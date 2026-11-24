@@ -30,15 +30,64 @@ const EXTRA_CHANNELS_STORAGE_KEY = "vitocal_extra_channels";
 
 let yAxisCustom = loadYAxisCustom();
 
-function estimateSamplePower(sample) {
-  if (!sample) return { pElecKw: 0, pThermalKw: 0, cop: null };
-  const isComp = sample.compressor_active === 1 || (Number(sample.compressor_modulation_percent) || 0) > 0;
-  if (!isComp) return { pElecKw: 0.025, pThermalKw: 0, cop: null };
-  const mod = Number(sample.compressor_modulation_percent) || 0;
-  const pElecKw = 0.70 + (mod / 100.0) * 2.80;
-  const cop = (sample.cop_heating != null && Number(sample.cop_heating) > 0) ? Number(sample.cop_heating) : 3.1;
-  return { pElecKw, pThermalKw: pElecKw * cop, cop };
+const R410A_T_PTS = [-20, -15, -10, -5, 0, 5, 10, 15, 20, 25, 30, 35, 40, 45];
+const R410A_P_ABS = [3.996, 4.812, 5.750, 6.822, 8.040, 9.417, 10.966, 12.700, 14.634, 16.782, 19.160, 21.784, 24.671, 27.839];
+
+function computeR410aCondTempC(pBarAbs) {
+  if (pBarAbs == null || isNaN(Number(pBarAbs))) return null;
+  const p = Number(pBarAbs);
+  if (p < R410A_P_ABS[0] || p > R410A_P_ABS[R410A_P_ABS.length - 1]) return null;
+  for (let i = 0; i < R410A_P_ABS.length - 1; i++) {
+    if (p >= R410A_P_ABS[i] && p <= R410A_P_ABS[i + 1]) {
+      const frac = (p - R410A_P_ABS[i]) / (R410A_P_ABS[i + 1] - R410A_P_ABS[i]);
+      return Math.round((R410A_T_PTS[i] + frac * 5.0) * 10) / 10;
+    }
+  }
+  return null;
 }
+window.computeR410aCondTempC = computeR410aCondTempC;
+
+/**
+ * Calibrated physics + defrost-aware power estimator for Vitocal 111-S (AWBT-E-AC 111.A16).
+ * Accounts for compressor modulation, condensing pressure, Carnot-based instantaneous COP,
+ * reverse-cycle defrost penalty (draws electricity while extracting heat from buffer),
+ * and Grundfos/electronic auxiliaries.
+ */
+function estimateSamplePower(sample) {
+  if (!sample) return { pElecKw: 0, pThermalKw: 0, cop: null, isDefrost: false };
+  const gfKw = sample.grundfos_pump_active === 1 ? 0.030 : 0.0;
+  const standbyKw = 0.020 + gfKw;
+  const isComp = sample.compressor_active === 1 || (Number(sample.compressor_modulation_percent) || 0) > 0;
+  if (!isComp) return { pElecKw: standbyKw, pThermalKw: 0, cop: null, isDefrost: false };
+
+  const phase = String(sample.compressor_phase || "").toLowerCase();
+  const isDefrost = phase.includes("defrost");
+  const mod = Math.max(0, Math.min(100, Number(sample.compressor_modulation_percent) || 0));
+
+  if (isDefrost) {
+    // Reverse-cycle defrost: draws ~1.35 kW_e while extracting ~3.5 kW_t from the 200L buffer
+    return { pElecKw: 1.35 + gfKw, pThermalKw: -3.5, cop: 0, isDefrost: true };
+  }
+
+  const pCond = sample.hot_gas_pressure_bar != null ? Number(sample.hot_gas_pressure_bar) : 17.0;
+  const pressFactor = clamp(0.82 + 0.18 * ((pCond - 14.0) / 6.0), 0.72, 1.25);
+  const p1Kw = (Number(sample.primary_pump_rotation_percent) || 0) > 0 ? 0.045 : 0.0;
+  const pElecKw = 0.55 + 2.55 * (mod / 100.0) * pressFactor + p1Kw + gfKw;
+
+  // Dynamic Carnot-calibrated COP from real condensing/evaporating temperatures (instead of static seasonal 3.1)
+  const lwt = sample.pdc_supply_temp_c != null ? Number(sample.pdc_supply_temp_c) : 25.0;
+  const tCondC = computeR410aCondTempC(pCond) ?? (lwt + 1.5);
+  const oat = sample.external_temp_c != null ? Number(sample.external_temp_c) : 5.0;
+  const tSuc = sample.suction_gas_temp_c != null ? Number(sample.suction_gas_temp_c) : (oat - 5.0);
+  const tEvapC = Math.min(oat - 3.5, tSuc + 1.5);
+  const liftK = Math.max(12.0, tCondC - tEvapC);
+  const carnotCop = (tCondC + 273.15) / liftK;
+  // Inverter part-load efficiency bonus around 35-55% vs 85-90% high-speed penalty
+  const partLoadEff = mod <= 55 ? 0.44 : (mod <= 75 ? 0.41 : 0.37);
+  const dynCop = clamp(carnotCop * partLoadEff, 1.7, 5.2);
+  return { pElecKw, pThermalKw: pElecKw * dynCop, cop: dynCop, isDefrost: false };
+}
+window.estimateSamplePower = estimateSamplePower;
 
 function loadExtraChannelsSet() {
   try {
@@ -168,6 +217,91 @@ const CHANNEL_DEFS = [
   { key: "humidity_percent", label: "Umidità Casa", unit: "%", color: "#94a3b8", yAxis: "yOther", group: "system", borderDash: [3, 4], borderWidth: 1.8, active: false, defaultInLegend: true, keywords: "umidità relativa casa" },
 
   // --- Extra Searchable Channels (Added on demand via 🔍 + Canali) ---
+  {
+    key: "_t_cond_c",
+    label: "T Condensazione R410A",
+    unit: "°C",
+    color: "#f472b6",
+    yAxis: "yTemp",
+    group: "temp",
+    borderDash: [4, 2],
+    borderWidth: 1.9,
+    active: false,
+    defaultInLegend: false,
+    keywords: "condensazione r410a saturazione pressione gas caldo",
+    computed: (s) => s ? computeR410aCondTempC(s.hot_gas_pressure_bar) : null,
+  },
+  {
+    key: "_subcooling_k",
+    label: "Sottoraffreddamento R410A",
+    unit: "K",
+    color: "#22d3ee",
+    yAxis: "yTemp",
+    group: "temp",
+    borderWidth: 2.0,
+    active: false,
+    defaultInLegend: false,
+    keywords: "subcooling sottoraffreddamento carica gas refrigerante frigo",
+    computed: (s) => {
+      if (!s || s.liquid_gas_temp_c == null) return null;
+      const tc = computeR410aCondTempC(s.hot_gas_pressure_bar);
+      return tc != null ? Math.round((tc - Number(s.liquid_gas_temp_c)) * 10) / 10 : null;
+    },
+  },
+  {
+    key: "_evap_depression_k",
+    label: "Depressione Evap. (OAT−Tsuc)",
+    unit: "K",
+    color: "#38bdf8",
+    yAxis: "yTemp",
+    group: "temp",
+    borderDash: [5, 2],
+    borderWidth: 2.0,
+    active: false,
+    defaultInLegend: false,
+    keywords: "depressione evaporatore brina defrost ghiaccio aspirazione oat",
+    computed: (s) => (s && s.external_temp_c != null && s.suction_gas_temp_c != null)
+      ? Math.round((Number(s.external_temp_c) - Number(s.suction_gas_temp_c)) * 10) / 10
+      : null,
+  },
+  {
+    key: "_discharge_superheat_k",
+    label: "Surriscald. Scarico (Thot−Tc)",
+    unit: "K",
+    color: "#fb923c",
+    yAxis: "yTemp",
+    group: "temp",
+    borderDash: [3, 2],
+    borderWidth: 1.8,
+    active: false,
+    defaultInLegend: false,
+    keywords: "surriscaldamento scarico discharge superheat gas caldo carica",
+    computed: (s) => {
+      if (!s || s.hot_gas_temp_c == null) return null;
+      const tc = computeR410aCondTempC(s.hot_gas_pressure_bar);
+      return tc != null ? Math.round((Number(s.hot_gas_temp_c) - tc) * 10) / 10 : null;
+    },
+  },
+  {
+    key: "_delta_buf_target",
+    label: "Scarto Puffer − Target LWT",
+    unit: "K",
+    color: "#e879f9",
+    yAxis: "yTemp",
+    group: "temp",
+    borderDash: [4, 3],
+    borderWidth: 1.9,
+    active: false,
+    defaultInLegend: false,
+    keywords: "scarto puffer target lwt isteresi stacco setpoint wo1c",
+    computed: (s) => {
+      const tgt = computeVitocalTargetLwt(s, false);
+      return (s && s.buffer_temp_c != null && tgt != null)
+        ? Math.round((Number(s.buffer_temp_c) - tgt) * 10) / 10
+        : null;
+    },
+  },
+  { key: "primary_supply_temp_c", label: "T Aria Ingresso ODU", unit: "°C", color: "#7dd3fc", yAxis: "yTemp", group: "temp", borderWidth: 1.8, active: false, defaultInLegend: false, keywords: "aria ingresso evaporatore odu esterna primaria" },
   { key: "hot_gas_temp_c", label: "T Gas Caldo Frigo", unit: "°C", color: "#f97316", yAxis: "yTemp", group: "temp", borderWidth: 1.8, active: false, defaultInLegend: false, keywords: "temperatura gas caldo scarico compressore frigo" },
   { key: "liquid_gas_temp_c", label: "T Gas Liquido Frigo", unit: "°C", color: "#06b6d4", yAxis: "yTemp", group: "temp", borderWidth: 1.8, active: false, defaultInLegend: false, keywords: "temperatura gas liquido condensatore frigo" },
   { key: "suction_gas_temp_c", label: "T Gas Aspirazione", unit: "°C", color: "#60a5fa", yAxis: "yTemp", group: "temp", borderWidth: 1.8, active: false, defaultInLegend: false, keywords: "temperatura gas aspirazione evaporatore frigo" },
@@ -354,19 +488,29 @@ function parseSamplesChrono(samples) {
 
 /**
  * Classifies each sample into 0=Standby, 1=Solo PdC, 2=Solo Grundfos, 3=PdC+Grundfos,
- * smoothing isolated single-sample nulls caused by transient Wi-Fi/cloud drops.
+ * smoothing isolated single-sample nulls and transient cloud glitches (e.g. Viessmann empty
+ * poll with all sensors null, or BTicino Wi-Fi sleep code 6 logging GF=0 while SP >> T_in).
  */
 function classifyActivityStates(chronoFiltered) {
   const n = chronoFiltered.length;
   const raw = chronoFiltered.map(({ sample, ts }) => {
-    const compKnown = sample.compressor_active != null || sample.compressor_modulation_percent != null;
+    const viessmannCorrupted =
+      sample.pdc_supply_temp_c == null &&
+      sample.active_program == null &&
+      sample.compressor_modulation_percent == null;
+    const compKnown = !viessmannCorrupted && (sample.compressor_active != null || sample.compressor_modulation_percent != null);
     const compOn = compKnown ? (sample.compressor_active === 1 || (Number(sample.compressor_modulation_percent) || 0) > 0) : null;
     const gfKnown = sample.grundfos_pump_active != null;
     const gfOn = gfKnown ? (sample.grundfos_pump_active === 1) : null;
-    return { ts, compOn, gfOn };
+    const btDemanding =
+      sample.indoor_setpoint_bticino_c != null &&
+      sample.indoor_temp_bticino_c != null &&
+      Number(sample.indoor_setpoint_bticino_c) >= Number(sample.indoor_temp_bticino_c) + 1.5;
+    return { ts, compOn, gfOn, btDemanding };
   });
 
   const maxNeighborSpan = 20 * 60 * 1000;
+  const maxGlitchSpan = 6 * 60 * 1000;
   return raw.map((item, i) => {
     let comp = item.compOn;
     if (comp === null) {
@@ -375,6 +519,17 @@ function classifyActivityStates(chronoFiltered) {
     let gf = item.gfOn;
     if (gf === null) {
       gf = (i > 0 && i < n - 1 && (raw[i + 1].ts - raw[i - 1].ts) <= maxNeighborSpan && raw[i - 1].gfOn === true && raw[i + 1].gfOn === true);
+    } else if (
+      gf === false &&
+      item.btDemanding &&
+      i > 0 &&
+      i < n - 1 &&
+      (raw[i + 1].ts - raw[i - 1].ts) <= maxGlitchSpan &&
+      raw[i - 1].gfOn === true &&
+      raw[i + 1].gfOn === true
+    ) {
+      // Smooth historical 1-sample Netatmo code 6 Wi-Fi sleep drop while thermostat setpoint >> room temp
+      gf = true;
     }
     const state = (comp ? 1 : 0) + (gf ? 2 : 0);
     return { ts: item.ts, state, comp: Boolean(comp), gf: Boolean(gf) };
@@ -382,27 +537,32 @@ function classifyActivityStates(chronoFiltered) {
 }
 
 function computeRunEnergyMetrics(startIdx, endIdx, durationMin, chronoFiltered) {
-  let thermalKwSum = 0;
-  let elecKwSum = 0;
-  let cnt = 0;
+  let thermalKwh = 0;
+  let elecKwh = 0;
+  let totalH = 0;
   if (chronoFiltered && chronoFiltered.length) {
     for (let k = startIdx; k <= endIdx && k < chronoFiltered.length; k++) {
       const pwr = estimateSamplePower(chronoFiltered[k].sample);
-      if (pwr.pThermalKw > 0) {
-        thermalKwSum += pwr.pThermalKw;
-        elecKwSum += pwr.pElecKw;
-        cnt++;
+      let dtMs = 60000;
+      if (k < endIdx && k + 1 < chronoFiltered.length) {
+        dtMs = clamp(chronoFiltered[k + 1].ts - chronoFiltered[k].ts, 15000, 15 * 60 * 1000);
+      } else if (k > startIdx) {
+        dtMs = clamp(chronoFiltered[k].ts - chronoFiltered[k - 1].ts, 15000, 15 * 60 * 1000);
+      } else {
+        dtMs = Math.max(1, durationMin) * 60000;
       }
+      const dtH = dtMs / 3600000.0;
+      thermalKwh += pwr.pThermalKw * dtH;
+      elecKwh += pwr.pElecKw * dtH;
+      totalH += dtH;
     }
   }
-  const avgThermalKw = cnt > 0 ? (thermalKwSum / cnt) : 0;
-  const avgElecKw = cnt > 0 ? (elecKwSum / cnt) : 0;
-  const durH = Math.max(1, durationMin) / 60.0;
+  const durH = totalH > 0 ? totalH : (Math.max(1, durationMin) / 60.0);
   return {
-    avgThermalKw,
-    avgElecKw,
-    thermalKwh: avgThermalKw * durH,
-    elecKwh: avgElecKw * durH,
+    avgThermalKw: Math.max(0, thermalKwh / durH),
+    avgElecKw: Math.max(0, elecKwh / durH),
+    thermalKwh: Math.max(0, thermalKwh),
+    elecKwh: Math.max(0, elecKwh),
   };
 }
 
@@ -586,15 +746,30 @@ function detectSetpointCutoffEvents(chronoFiltered, states) {
 }
 
 function detectDefrostEvents(chronoFiltered) {
-  const out = [];
-  if (!chronoFiltered) return out;
+  const episodes = [];
+  if (!chronoFiltered || !chronoFiltered.length) return episodes;
+  let cur = null;
   for (let i = 0; i < chronoFiltered.length; i++) {
     const phase = String(chronoFiltered[i].sample.compressor_phase || "").toLowerCase();
+    const ts = chronoFiltered[i].ts;
     if (phase.includes("defrost")) {
-      out.push({ ts: chronoFiltered[i].ts, phase: chronoFiltered[i].sample.compressor_phase });
+      if (cur && (ts - cur.endTs) <= 10 * 60 * 1000) {
+        cur.endTs = ts;
+        cur.samples++;
+      } else {
+        if (cur) episodes.push(cur);
+        cur = { ts, endTs: ts, samples: 1, phase: chronoFiltered[i].sample.compressor_phase };
+      }
+    } else if (cur) {
+      episodes.push(cur);
+      cur = null;
     }
   }
-  return out;
+  if (cur) episodes.push(cur);
+  for (const ep of episodes) {
+    ep.durationMin = Math.max(2, Math.round((ep.endTs - ep.ts) / 60000) + 1);
+  }
+  return episodes;
 }
 
 window.detectSetpointCutoffEvents = detectSetpointCutoffEvents;
@@ -1247,6 +1422,7 @@ function updateVisibleWindowStats() {
   const subStates = classifyActivityStates(sub);
   const subCompRuns = buildCompressorOnRuns(subStates, sub);
   const subCutoffs = detectSetpointCutoffEvents(sub, subStates);
+  const subDefrosts = detectDefrostEvents(sub);
 
   let totalOnMin = 0;
   let totalThermalKwh = 0;
@@ -1257,10 +1433,10 @@ function updateVisibleWindowStats() {
     totalElecKwh += r.elecKwh || 0;
   }
   const avgMin = subCompRuns.length ? Math.round(totalOnMin / subCompRuns.length) : 0;
+  const totalDefrostMin = subDefrosts.reduce((acc, ep) => acc + (ep.durationMin || 0), 0);
 
   let tinMin = Infinity, tinMax = -Infinity;
   let oatMin = Infinity, oatMax = -Infinity;
-  let copSum = 0, copCnt = 0;
   for (const { sample } of sub) {
     if (sample.indoor_temp_bticino_c != null) {
       const v = Number(sample.indoor_temp_bticino_c);
@@ -1272,20 +1448,20 @@ function updateVisibleWindowStats() {
       oatMin = Math.min(oatMin, v);
       oatMax = Math.max(oatMax, v);
     }
-    if (sample.cop_heating != null && Number(sample.cop_heating) > 0) {
-      copSum += Number(sample.cop_heating);
-      copCnt++;
-    }
   }
 
   const parts = [];
   if (subCompRuns.length > 0) {
     parts.push(`<span class="chart-stat-item">🔥 PdC ON: <strong>${formatDurationCompact(totalOnMin)}</strong> (${subCompRuns.length} cicli · media ${avgMin}m)</span>`);
-    if (totalThermalKwh > 0) {
-      parts.push(`<span class="chart-stat-item" style="color:#fde047;">🔆 Resa: <strong>~${totalThermalKwh.toFixed(1)} kWhₜ</strong> (El ${totalElecKwh.toFixed(1)} kWhₑ)</span>`);
+    if (totalThermalKwh > 0 && totalElecKwh > 0) {
+      const netCop = totalThermalKwh / totalElecKwh;
+      parts.push(`<span class="chart-stat-item" style="color:#fde047;">🔆 Resa netta: <strong>~${totalThermalKwh.toFixed(1)} kWhₜ</strong> (El ${totalElecKwh.toFixed(1)} kWhₑ · COP ${netCop.toFixed(2)})</span>`);
     }
   } else {
     parts.push('<span class="chart-stat-item">⏸ PdC ON: <strong>0m</strong></span>');
+  }
+  if (subDefrosts.length > 0) {
+    parts.push(`<span class="chart-stat-item" style="color:#38bdf8;">❄️ Defrost: <strong>${subDefrosts.length}</strong> (${totalDefrostMin}m)</span>`);
   }
   if (subCutoffs.length > 0) {
     parts.push(`<span class="chart-stat-item" style="color:#fca5a5;">🎯 Stop SP: <strong>${subCutoffs.length}</strong></span>`);
@@ -1294,10 +1470,7 @@ function updateVisibleWindowStats() {
     parts.push(`<span class="chart-stat-item">🏠 Casa: <strong>${tinMin.toFixed(1)}–${tinMax.toFixed(1)}°</strong></span>`);
   }
   if (oatMin < Infinity) {
-    parts.push(`<span class="chart-stat-item">❄️ OAT: <strong>${oatMin.toFixed(1)}–${oatMax.toFixed(1)}°</strong></span>`);
-  }
-  if (copCnt > 0) {
-    parts.push(`<span class="chart-stat-item">⚡ COP: <strong>${(copSum / copCnt).toFixed(2)}</strong></span>`);
+    parts.push(`<span class="chart-stat-item">🌡️ OAT: <strong>${oatMin.toFixed(1)}–${oatMax.toFixed(1)}°</strong></span>`);
   }
   box.innerHTML = parts.join("");
 }

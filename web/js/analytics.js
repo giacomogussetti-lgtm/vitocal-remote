@@ -41,12 +41,28 @@ function computePeriodAnalytics(samples, hoursRequested = 24, costPerKwh = 0.25,
   const hwStartsDelta = startsArr.length > 0 ? Math.max(0, startsArr[startsArr.length - 1] - startsArr[0]) : 0;
   const hwHoursDelta = hoursArr.length > 0 ? Math.max(0, hoursArr[hoursArr.length - 1] - hoursArr[0]) : 0;
 
-  // 3. Cycle Detection
+  // 3. Cycle Detection (ignoring corrupted empty Viessmann polls like 21/11 13:41:25)
   const detectedCycles = [];
   let curCycle = [];
+  let defrostEpisodes = 0;
+  let defrostMinutes = 0;
+  let prevDefrost = false;
 
-  for (const s of windowItems) {
+  for (let idx = 0; idx < windowItems.length; idx++) {
+    const s = windowItems[idx];
+    const viessmannCorrupted =
+      s.pdc_supply_temp_c == null &&
+      s.active_program == null &&
+      s.compressor_modulation_percent == null;
+    if (viessmannCorrupted) {
+      // Do not falsely break an active cycle on a transient empty Viessmann poll
+      continue;
+    }
     const isActive = (s.compressor_active === 1) || ((s.compressor_modulation_percent || 0) > 0);
+    const isDef = String(s.compressor_phase || "").toLowerCase().includes("defrost");
+    if (isDef && !prevDefrost) defrostEpisodes++;
+    prevDefrost = isDef;
+
     if (isActive) {
       curCycle.push(s);
     } else {
@@ -113,25 +129,125 @@ function computePeriodAnalytics(samples, hoursRequested = 24, costPerKwh = 0.25,
     verdict = "⚠️ Short-Cycling Rilevato (Cicli Brevi)";
     diagnosis = `La PdC ha effettuato ${totalStarts} avviamenti di soli ${durAvg} min in media. Sui 200L di puffer, la macchina si arresta precocemente. Suggerito sincronizzare con Grundfos.`;
   } else if (parseFloat(durAvg) >= 40) {
-    score = highPct < 20 ? 95 : 85;
-    verdict = "🌟 Modulazione Ottimale (Inverter Dolce & Continuo)";
-    diagnosis = `Modulazione eccellente: i cicli durano in media ${durAvg} min a regime medio ${avgMod}%. Il compressore opera in zona ad altissima resa energetica.`;
+    const defrostPenalty = Math.min(20, defrostEpisodes * 3);
+    score = Math.max(55, (highPct < 20 ? 95 : (highPct < 55 ? 85 : 75)) - defrostPenalty);
+    verdict = defrostEpisodes >= 4
+      ? "❄️ Cicli Lunghi ma Alti Sbrinamenti (Defrost)"
+      : "🌟 Modulazione Ottimale (Inverter Dolce & Continuo)";
+    diagnosis = defrostEpisodes >= 4
+      ? `Cicli lunghi (${durAvg} min, carico medio ${avgMod}%) ma ${defrostEpisodes} episodi di defrost che penalizzano il COP netto. Consigliato Soft-Start + Defrost Guard attivi.`
+      : `Modulazione eccellente: i cicli durano in media ${durAvg} min a regime medio ${avgMod}%. Il compressore opera in zona ad alta resa energetica.`;
   } else {
     score = 75;
     verdict = "🟢 Modulazione Buona / Regolare";
     diagnosis = `Funzionamento regolare: ${totalStarts} avviamenti con durata media di ${durAvg} min. Ripartizione del carico bilanciata.`;
   }
 
-  // 6. Electricity & Cost Estimation
-  const pStandbyKw = 0.025;
-  const avgActiveKw = activeMods.length > 0
-    ? (activeMods.reduce((acc, m) => acc + (0.70 + (m / 100.0) * 2.80), 0) / activeMods.length)
-    : 1.68;
+  // 6. Trapezoidal Time-Integrated Calibrated Consumption & Daily Ledger
+  const fallbackEstimatePower = (s) => {
+    const gfKw = s.grundfos_pump_active === 1 ? 0.030 : 0.0;
+    const isComp = s.compressor_active === 1 || (Number(s.compressor_modulation_percent) || 0) > 0;
+    if (!isComp) return { pElecKw: 0.020 + gfKw, pThermalKw: 0, isDefrost: false };
+    const isDef = String(s.compressor_phase || "").toLowerCase().includes("defrost");
+    if (isDef) return { pElecKw: 1.35 + gfKw, pThermalKw: -3.5, isDefrost: true };
+    const mod = Number(s.compressor_modulation_percent) || 0;
+    const pEl = 0.55 + 2.55 * (mod / 100.0) + 0.045 + gfKw;
+    return { pElecKw: pEl, pThermalKw: pEl * 3.1, isDefrost: false };
+  };
+  const pwrFn = (typeof window !== "undefined" && typeof window.estimateSamplePower === "function")
+    ? window.estimateSamplePower
+    : fallbackEstimatePower;
 
-  const totalElecKwh = parseFloat(((totalRunHours * avgActiveKw) + (standbyHours * pStandbyKw)).toFixed(2));
+  let integElecKwh = 0;
+  let integThermalNetKwh = 0;
+  const dailyMap = new Map();
+
+  for (let i = 0; i < windowItems.length; i++) {
+    const s = windowItems[i];
+    const tCur = new Date(s.timestamp_utc).getTime();
+    let dtH = 5 / 60.0;
+    if (i + 1 < windowItems.length) {
+      const tNext = new Date(windowItems[i + 1].timestamp_utc).getTime();
+      const dtMs = Math.max(15000, Math.min(30 * 60 * 1000, tNext - tCur));
+      dtH = dtMs / 3600000.0;
+    } else if (i > 0) {
+      const tPrev = new Date(windowItems[i - 1].timestamp_utc).getTime();
+      const dtMs = Math.max(15000, Math.min(30 * 60 * 1000, tCur - tPrev));
+      dtH = dtMs / 3600000.0;
+    }
+    const viessmannCorrupted =
+      s.pdc_supply_temp_c == null &&
+      s.active_program == null &&
+      s.compressor_modulation_percent == null;
+    const refSample = (viessmannCorrupted && i > 0) ? windowItems[i - 1] : s;
+    const pwr = pwrFn(refSample);
+    const dEl = pwr.pElecKw * dtH;
+    const dTh = pwr.pThermalKw * dtH;
+    integElecKwh += dEl;
+    integThermalNetKwh += dTh;
+    if (pwr.isDefrost) defrostMinutes += dtH * 60.0;
+
+    // Daily bucket (local date)
+    const dObj = new Date(tCur);
+    const dayKey = `${String(dObj.getDate()).padStart(2, "0")}/${String(dObj.getMonth() + 1).padStart(2, "0")}`;
+    if (!dailyMap.has(dayKey)) {
+      dailyMap.set(dayKey, {
+        day: dayKey,
+        sortTs: dObj.getTime(),
+        elecKwh: 0,
+        thermalNetKwh: 0,
+        runMin: 0,
+        defrosts: 0,
+        prevDef: false,
+        tinMin: Infinity,
+        tinMax: -Infinity,
+      });
+    }
+    const bucket = dailyMap.get(dayKey);
+    bucket.elecKwh += dEl;
+    bucket.thermalNetKwh += dTh;
+    const compOn = refSample.compressor_active === 1 || (Number(refSample.compressor_modulation_percent) || 0) > 0;
+    if (compOn) bucket.runMin += dtH * 60.0;
+    if (pwr.isDefrost && !bucket.prevDef) bucket.defrosts++;
+    bucket.prevDef = pwr.isDefrost;
+    if (s.indoor_temp_bticino_c != null) {
+      const tin = Number(s.indoor_temp_bticino_c);
+      bucket.tinMin = Math.min(bucket.tinMin, tin);
+      bucket.tinMax = Math.max(bucket.tinMax, tin);
+    }
+  }
+
+  // Add backup electric heatingRod energy if S1/S2 incremented in this window (3 kW per stage)
+  const r1Arr = windowItems.filter(s => s.heating_rod_level1_s != null).map(s => Number(s.heating_rod_level1_s));
+  const r2Arr = windowItems.filter(s => s.heating_rod_level2_s != null).map(s => Number(s.heating_rod_level2_s));
+  const dr1s = r1Arr.length >= 2 ? Math.max(0, r1Arr[r1Arr.length - 1] - r1Arr[0]) : 0;
+  const dr2s = r2Arr.length >= 2 ? Math.max(0, r2Arr[r2Arr.length - 1] - r2Arr[0]) : 0;
+  const rodElecKwh = ((dr1s + dr2s) / 3600.0) * 3.0;
+  integElecKwh += rodElecKwh;
+  integThermalNetKwh += rodElecKwh;
+
+  const totalElecKwh = parseFloat(integElecKwh.toFixed(2));
+  const totalThermalNetKwh = parseFloat(Math.max(0, integThermalNetKwh).toFixed(1));
+  const realNetCop = (totalElecKwh > 0.2 && totalThermalNetKwh > 0)
+    ? parseFloat((totalThermalNetKwh / totalElecKwh).toFixed(2))
+    : 0;
   const avgPowerKw = parseFloat((totalElecKwh / effectiveHours).toFixed(3));
   const estimatedCostEur = parseFloat((totalElecKwh * costPerKwh).toFixed(2));
   const projectedDailyCost = parseFloat(((totalElecKwh / effectiveHours) * 24 * costPerKwh).toFixed(2));
+
+  const dailyBreakdown = Array.from(dailyMap.values())
+    .sort((a, b) => b.sortTs - a.sortTs)
+    .slice(0, 7)
+    .map(b => ({
+      day: b.day,
+      runMin: Math.round(b.runMin),
+      defrosts: b.defrosts,
+      elecKwh: parseFloat(b.elecKwh.toFixed(2)),
+      thermalNetKwh: parseFloat(Math.max(0, b.thermalNetKwh).toFixed(1)),
+      netCop: (b.elecKwh > 0.5 && b.thermalNetKwh > 0) ? parseFloat((b.thermalNetKwh / b.elecKwh).toFixed(2)) : null,
+      costEur: parseFloat((b.elecKwh * costPerKwh).toFixed(2)),
+      tinRange: b.tinMin < Infinity ? `${b.tinMin.toFixed(1)}–${b.tinMax.toFixed(1)}°` : "--",
+    }));
 
   // 7. Anti-frost safety
   const inTemps = windowItems.filter(s => s.indoor_temp_bticino_c != null).map(s => s.indoor_temp_bticino_c);
@@ -182,6 +298,12 @@ function computePeriodAnalytics(samples, hoursRequested = 24, costPerKwh = 0.25,
     verdict,
     diagnosis,
     totalElecKwh,
+    totalThermalNetKwh,
+    realNetCop,
+    defrostEpisodes,
+    defrostMinutes: Math.round(defrostMinutes),
+    rodElecKwh: parseFloat(rodElecKwh.toFixed(2)),
+    dailyBreakdown,
     avgPowerKw,
     estimatedCostEur,
     projectedDailyCost,
@@ -218,7 +340,8 @@ function getEmptyAnalytics(hours) {
     durAvg: "0", durMin: "0", durMax: "0", avgMod: "0", maxMod: "0",
     lowPct: "0", midPct: "0", highPct: "0", isShortCycling: false,
     score: 100, verdict: "In attesa di dati...", diagnosis: "Nessun dato registrato nel periodo.",
-    totalElecKwh: 0, avgPowerKw: 0, estimatedCostEur: 0, projectedDailyCost: 0,
+    totalElecKwh: 0, totalThermalNetKwh: 0, realNetCop: 0, defrostEpisodes: 0, defrostMinutes: 0, rodElecKwh: 0, dailyBreakdown: [],
+    avgPowerKw: 0, estimatedCostEur: 0, projectedDailyCost: 0,
     minIndoor: "--", minBuffer: "--", minOutdoor: "--", safetyMargin: 0,
     safetyStatus: "safe", safetyVerdict: "Dati insufficienti", safetyAdvice: "", cycles: []
   };

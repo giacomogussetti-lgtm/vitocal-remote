@@ -39,9 +39,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "debounce_minutes": 20,
     "cop_window_start": "11:00",
     "cop_window_end": "16:00",
-    "target_lwt_delta_k": 18.0,
-    "min_target_lwt_c": 25.0,
-    "max_target_lwt_c": 28.5,
+    "target_lwt_delta_k": 15.5,
+    "min_target_lwt_c": 22.0,
+    "max_target_lwt_c": 26.5,
     "max_cycle_minutes": 300,
     "puffer_drain_minutes": 25,
     "puffer_drain_stop_temp_c": 13.8,
@@ -52,9 +52,15 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "cron_idle_minutes": 15,
     "cron_armed_minutes": 5,
     "cron_active_minutes": 2,
-    "soft_curve_tuning_enabled": False,
+    "soft_start_enabled": True,
+    "soft_start_step_minutes": 25,
+    "defrost_guard_enabled": True,
+    "defrost_trim_threshold_count": 2,
+    "defrost_guard_oat_max_c": 5.5,
+    "soft_curve_tuning_enabled": True,
     "soft_curve_max_shift_delta_k": 2,
-    "soft_curve_cooldown_minutes": 60,
+    "soft_curve_cooldown_minutes": 45,
+    "anti_seize_days": 4,
 }
 
 DEFAULT_STATE: dict[str, Any] = {
@@ -68,13 +74,21 @@ DEFAULT_STATE: dict[str, Any] = {
     "last_action_utc": None,
     "last_action_reason": "In attesa di attivazione dalla PWA",
     "indoor_slope_c_per_h": 0.0,
-    "calculated_target_lwt_c": 25.5,
-    "calculated_pdc_setpoint_c": 15,
+    "calculated_target_lwt_c": 23.0,
+    "calculated_pdc_setpoint_c": 13,
+    "target_pdc_setpoint_c": 13,
+    "soft_start_last_step_utc": None,
     "current_cron_interval_min": 5,
     "defrost_detected_today": 0,
+    "cycle_defrost_episodes": 0,
+    "prev_phase_was_defrost": False,
     "heating_rod_delta_s": 0,
     "soft_curve_trim_k": 0,
     "soft_curve_last_trim_utc": None,
+    "last_grundfos_run_utc": None,
+    "last_anti_seize_utc": None,
+    "error_counter_d6": 0,
+    "recent_wo1c_events": [],
     "api_usage": {
         "date_utc": None,
         "viessmann_reads": 0,
@@ -284,25 +298,67 @@ def compute_indoor_derivative(samples: list[dict[str, Any]], window_hours: float
 
 
 def _compute_daily_diagnostics(samples: list[dict[str, Any]], rome_tz) -> tuple[int, int]:
-    """Counts defrost phase samples and backup heatingRod delta seconds for the current local day."""
+    """Counts distinct defrost episodes and backup heatingRod delta seconds for the current local day."""
     if not samples:
         return 0, 0
     today_local = datetime.now(rome_tz).date()
-    defrost_count = 0
+    defrost_episodes = 0
+    prev_was_defrost = False
     rod_vals: list[int] = []
     for s in samples:
         dt = _parse_iso(s.get("timestamp_utc"))
         if not dt or dt.astimezone(rome_tz).date() != today_local:
             continue
         phase = str(s.get("compressor_phase") or "").lower()
-        if "defrost" in phase:
-            defrost_count += 1
+        is_def = "defrost" in phase
+        if is_def and not prev_was_defrost:
+            defrost_episodes += 1
+        prev_was_defrost = is_def
         r1 = s.get("heating_rod_level1_s")
         r2 = s.get("heating_rod_level2_s")
         if r1 is not None or r2 is not None:
             rod_vals.append(int(r1 or 0) + int(r2 or 0))
     rod_delta = max(0, rod_vals[-1] - rod_vals[0]) if len(rod_vals) >= 2 else 0
-    return defrost_count, rod_delta
+    return defrost_episodes, rod_delta
+
+
+def _decode_wo1c_logbook(entries: Any) -> list[dict[str, Any]]:
+    """
+    Translates Vitotronic WO1C internal actor state transitions into readable labels.
+    Note: ViCare cloud maps numeric internal actor transition IDs to misleading inverter enum strings
+    even on normal shutdowns/defrosts; hardware faults are tracked via error_counter_d6.
+    """
+    if not isinstance(entries, list):
+        return []
+    actor_map = {
+        "VERDICHTER1": "Compressore",
+        "SEK_PUMPE1": "Circolatore P1",
+        "KAELTEKR_UMKEHR": "Valvola 4-Vie Defrost",
+        "HEIZSTAB1": "Resistenza S1",
+        "HEIZSTAB2": "Resistenza S2",
+    }
+    out: list[dict[str, Any]] = []
+    for item in entries[:6]:
+        if not isinstance(item, dict):
+            continue
+        actor_raw = str(item.get("actor") or "")
+        status_val = item.get("status")
+        actor_label = actor_map.get(actor_raw, actor_raw or "WO1C")
+        if actor_raw == "KAELTEKR_UMKEHR":
+            desc = "Inversione Defrost ON" if status_val else "Fine Defrost -> Riscald."
+        elif actor_raw == "SEK_PUMPE1":
+            desc = f"Pompa P1 -> {status_val}%" if status_val is not None else "Cambio stato P1"
+        elif actor_raw == "VERDICHTER1":
+            desc = "Compressore ON" if status_val else "Arresto / Pausa Compressore"
+        else:
+            desc = f"Stato={status_val}"
+        out.append({
+            "ts": str(item.get("timestamp") or ""),
+            "actor": actor_label,
+            "desc": desc,
+            "info_s": item.get("additionalInfo"),
+        })
+    return out
 
 
 def _hhmm_to_minutes(hhmm: str) -> int:
@@ -553,15 +609,30 @@ def _apply_antifrost_assist_grundfos(cfg: dict[str, Any]) -> tuple[bool, str]:
     )
 
 
+def _apply_anti_seize_grundfos(cfg: dict[str, Any], duration_minutes: int = 15) -> tuple[bool, str]:
+    """Briefly spins Grundfos pump alone (PdC stays in standby) to prevent rotor seizure during long idle spells."""
+    b_conn = BTicinoConnector()
+    return b_conn.set_thermostat_setpoint(
+        temp=float(cfg["bticino_force_on_temp_c"]),
+        mode="manual",
+        duration_minutes=duration_minutes,
+    )
+
+
 def _clamp_target_lwt(t_in: float, cfg: dict[str, Any]) -> float:
     raw = float(t_in) + float(cfg["target_lwt_delta_k"])
     return round(max(float(cfg["min_target_lwt_c"]), min(float(cfg["max_target_lwt_c"]), raw)), 1)
 
 
-def run_autopilot_tick(latest_sample: dict[str, Any] | Any, dry_run: bool = False) -> dict[str, Any]:
+def run_autopilot_tick(
+    latest_sample: dict[str, Any] | Any,
+    dry_run: bool = False,
+    extra_diagnostics: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """
-    Executes one evaluation tick of the Full-Auto Mountain Custody state machine.
-    Updates data/autopilot_state.json and optionally adjusts cron-job.org polling rate.
+    Executes one evaluation tick of the Full-Auto Mountain Custody v2 state machine.
+    Includes Soft-Start anti-overshoot ramp, Defrost-Aware derating (safe against WO1C
+    buffer upper hysteresis), smart Grundfos anti-seize, and adaptive telemetry polling.
     """
     if hasattr(latest_sample, "model_dump"):
         sample = latest_sample.model_dump()
@@ -575,7 +646,7 @@ def run_autopilot_tick(latest_sample: dict[str, Any] | Any, dry_run: bool = Fals
     now_local = now_utc.astimezone(rome_tz)
     now_iso = now_utc.isoformat()
 
-    recent = _load_recent_samples(limit=100)
+    recent = _load_recent_samples(limit=200)
     if sample and (not recent or recent[-1].get("timestamp_utc") != sample.get("timestamp_utc")):
         recent.append(sample)
 
@@ -589,12 +660,21 @@ def run_autopilot_tick(latest_sample: dict[str, Any] | Any, dry_run: bool = Fals
     buf_temp = sample.get("buffer_temp_c")
     gf_active = sample.get("grundfos_pump_active")
     comp_active = sample.get("compressor_active")
+    comp_mod = sample.get("compressor_modulation_percent")
+    suction_temp = sample.get("suction_gas_temp_c")
+    comp_phase = str(sample.get("compressor_phase") or "").lower()
     frost_status = str(sample.get("frost_protection_status") or "").lower()
 
     st["last_eval_utc"] = now_iso
     st["indoor_slope_c_per_h"] = slope_c_h
     st["defrost_detected_today"] = defrost_cnt
     st["heating_rod_delta_s"] = rod_delta_s
+    if gf_active == 1:
+        st["last_grundfos_run_utc"] = now_iso
+    if sample.get("error_counter_d6") is not None:
+        st["error_counter_d6"] = int(sample.get("error_counter_d6") or 0)
+    if isinstance(extra_diagnostics, dict) and extra_diagnostics.get("logbook_entries"):
+        st["recent_wo1c_events"] = _decode_wo1c_logbook(extra_diagnostics.get("logbook_entries"))
 
     ref_tin = float(t_in) if t_in is not None else float(cfg["t_min_c"])
     if (
@@ -603,19 +683,22 @@ def run_autopilot_tick(latest_sample: dict[str, Any] | Any, dry_run: bool = Fals
         and st.get("calculated_target_lwt_c") is not None
         and st.get("calculated_pdc_setpoint_c") is not None
     ):
-        # Lock Target LWT & Setpoint PdC once the cycle starts so Viessmann WO1C modulates undisturbed
+        # Keep active setpoint locked during HEATING_SYNC / PUFFER_DRAIN except controlled Soft-Start / Defrost Guard steps
         target_lwt = float(st["calculated_target_lwt_c"])
         pdc_setpoint = int(st["calculated_pdc_setpoint_c"])
+        regime_sp = int(st.get("target_pdc_setpoint_c") or pdc_setpoint)
     else:
         target_lwt = _clamp_target_lwt(ref_tin, cfg)
-        pdc_setpoint = compute_inverse_setpoint_for_target_lwt(
+        regime_sp = compute_inverse_setpoint_for_target_lwt(
             target_lwt_c=target_lwt,
             oat_c=float(oat),
             slope=float(curve_slope),
             shift=float(curve_shift),
         )
+        pdc_setpoint = regime_sp
         st["calculated_target_lwt_c"] = target_lwt
         st["calculated_pdc_setpoint_c"] = pdc_setpoint
+        st["target_pdc_setpoint_c"] = regime_sp
 
     if not cfg.get("enabled"):
         st["state"] = "DISABLED"
@@ -636,7 +719,7 @@ def run_autopilot_tick(latest_sample: dict[str, Any] | Any, dry_run: bool = Fals
 
     # ---------------- STATE MACHINE ----------------
     if cur_state == "IDLE":
-        # Edge case: autonomous PdC frost protection heating puffer above threshold
+        # Edge case 1: autonomous PdC frost protection heating puffer above threshold
         if (frost_status == "on" or comp_active == 1) and buf_temp is not None and float(buf_temp) >= float(cfg["antifrost_pdc_assist_buffer_c"]) and gf_active == 0:
             if not dry_run:
                 ok, msg = _apply_antifrost_assist_grundfos(cfg)
@@ -645,6 +728,25 @@ def run_autopilot_tick(latest_sample: dict[str, Any] | Any, dry_run: bool = Fals
                 st["last_action_reason"] = f"Assist antigelo PdC (Puffer {buf_temp}°C): Grundfos aperta 30 min ({msg})"
             else:
                 st["last_action_reason"] = "[DRY-RUN] Assist antigelo PdC -> Grundfos 30 min"
+
+        # Edge case 2: Smart Grundfos Anti-Seize during prolonged mild idle periods (replaces daily 08:00 BTicino schedule)
+        anti_seize_days = int(cfg.get("anti_seize_days") or 0)
+        if anti_seize_days > 0 and gf_active == 0 and 12 <= now_local.hour <= 12 and now_local.minute < 45:
+            last_gf_dt = _parse_iso(st.get("last_grundfos_run_utc")) or _parse_iso(st.get("state_since_utc"))
+            last_as_dt = _parse_iso(st.get("last_anti_seize_utc"))
+            days_idle = ((now_utc - last_gf_dt).total_seconds() / 86400.0) if last_gf_dt else 0.0
+            as_cooldown_ok = last_as_dt is None or ((now_utc - last_as_dt).total_seconds() / 3600.0) >= 24.0
+            if days_idle >= anti_seize_days and as_cooldown_ok:
+                if not dry_run:
+                    ok_as, msg_as = _apply_anti_seize_grundfos(cfg, duration_minutes=15)
+                    record_api_usage(b_reads=1, b_writes=1, event_label="ap_anti_seize", state_dict=st)
+                    if ok_as:
+                        st["last_anti_seize_utc"] = now_iso
+                        st["last_grundfos_run_utc"] = now_iso
+                        st["last_action_utc"] = now_iso
+                        st["last_action_reason"] = f"Anti-grippaggio Grundfos (ferma da {days_idle:.1f} gg): avvio 15 min a PdC spenta."
+                else:
+                    st["last_action_reason"] = f"[DRY-RUN] Anti-grippaggio Grundfos ({days_idle:.1f} gg idle)"
 
         if t_in_f <= float(cfg["t_min_c"]):
             below_dt = _parse_iso(st.get("below_threshold_since_utc"))
@@ -678,8 +780,23 @@ def run_autopilot_tick(latest_sample: dict[str, Any] | Any, dry_run: bool = Fals
             )
             if in_cop or is_emergency or is_steep_drop:
                 trigger_why = "Emergenza Gelo" if is_emergency else ("Crollo Rapido Notturno" if is_steep_drop else "Finestra Alto COP")
+                # Soft-Start Anti-Overshoot: avoid 14K cold-start error on WO1C PI controller
+                start_sp = regime_sp
+                start_lwt = target_lwt
+                if cfg.get("soft_start_enabled", True) and buf_temp is not None and float(buf_temp) < target_lwt - 5.0:
+                    soft_lwt_cap = max(20.5, min(target_lwt, float(buf_temp) + 9.5))
+                    soft_sp = compute_inverse_setpoint_for_target_lwt(
+                        target_lwt_c=soft_lwt_cap,
+                        oat_c=float(oat),
+                        slope=float(curve_slope),
+                        shift=float(curve_shift),
+                    )
+                    # Start at most 2 C below regime_sp so WO1C ramps cleanly without stalling
+                    start_sp = max(11, max(regime_sp - 2, min(regime_sp, soft_sp)))
+                    start_lwt = compute_wo1c_lwt(float(oat), float(start_sp), float(curve_slope), float(curve_shift))
+
                 if not dry_run:
-                    ok, msg = _apply_start_heating(cfg, pdc_setpoint, now_local, is_emergency=(is_emergency or is_steep_drop))
+                    ok, msg = _apply_start_heating(cfg, start_sp, now_local, is_emergency=(is_emergency or is_steep_drop))
                     emerg_flag = bool(is_emergency or is_steep_drop)
                     record_api_usage(
                         v_reads=6 if emerg_flag else 4,
@@ -694,10 +811,17 @@ def run_autopilot_tick(latest_sample: dict[str, Any] | Any, dry_run: bool = Fals
                         st["state_since_utc"] = now_iso
                         st["cycle_started_utc"] = now_iso
                         st["cycle_is_emergency"] = emerg_flag
+                        st["target_pdc_setpoint_c"] = regime_sp
+                        st["calculated_pdc_setpoint_c"] = start_sp
+                        st["calculated_target_lwt_c"] = start_lwt
+                        st["soft_start_last_step_utc"] = now_iso
+                        st["cycle_defrost_episodes"] = 0
+                        st["prev_phase_was_defrost"] = False
                         st["soft_curve_trim_k"] = 0
                         st["soft_curve_last_trim_utc"] = None
                         st["last_action_utc"] = now_iso
-                        st["last_action_reason"] = f"Avvio ciclo ({trigger_why}): Target LWT {target_lwt}°C (T_set={pdc_setpoint}°C). {msg}"
+                        soft_note = f" (Soft-Start da {start_sp}°C -> regime {regime_sp}°C)" if start_sp < regime_sp else ""
+                        st["last_action_reason"] = f"Avvio ciclo ({trigger_why}): Target Acqua {start_lwt}°C (SP={start_sp}°C){soft_note}. {msg}"
                     else:
                         st["last_action_reason"] = f"Errore avvio ciclo ({trigger_why}): {msg}"
                 else:
@@ -705,59 +829,145 @@ def run_autopilot_tick(latest_sample: dict[str, Any] | Any, dry_run: bool = Fals
                     st["state_since_utc"] = now_iso
                     st["cycle_started_utc"] = now_iso
                     st["cycle_is_emergency"] = bool(is_emergency or is_steep_drop)
+                    st["target_pdc_setpoint_c"] = regime_sp
+                    st["calculated_pdc_setpoint_c"] = start_sp
+                    st["calculated_target_lwt_c"] = start_lwt
+                    st["soft_start_last_step_utc"] = now_iso
+                    st["cycle_defrost_episodes"] = 0
+                    st["prev_phase_was_defrost"] = False
                     st["soft_curve_trim_k"] = 0
-                    st["last_action_reason"] = f"[DRY-RUN] Avvio ({trigger_why}) LWT={target_lwt}°C"
+                    st["last_action_reason"] = f"[DRY-RUN] Avvio ({trigger_why}) LWT={start_lwt}°C (SP={start_sp}->{regime_sp}°C)"
 
     elif cur_state == "HEATING_SYNC":
         cycle_dt = _parse_iso(st.get("cycle_started_utc")) or now_utc
         elapsed_min = (now_utc - cycle_dt).total_seconds() / 60.0
         is_emerg_cycle = bool(st.get("cycle_is_emergency"))
 
-        # Re-assert Grundfos ON if manual timer/cloud dropped prematurely
-        if gf_active == 0 and elapsed_min >= 5 and not dry_run:
+        # Track distinct defrost episodes inside this cycle
+        is_defrost_now = "defrost" in comp_phase
+        if is_defrost_now and not bool(st.get("prev_phase_was_defrost")):
+            st["cycle_defrost_episodes"] = int(st.get("cycle_defrost_episodes") or 0) + 1
+        st["prev_phase_was_defrost"] = is_defrost_now
+
+        # Re-assert Grundfos ON only if truly dropped (and setpoint actually fell below room + 2 C)
+        bt_sp_live = sample.get("indoor_setpoint_bticino_c")
+        if gf_active == 0 and elapsed_min >= 5 and (bt_sp_live is None or float(bt_sp_live) < t_in_f + 2.0) and not dry_run:
             b_conn = BTicinoConnector()
             rem_min = max(30, int(cfg["max_cycle_minutes"] - elapsed_min) + int(cfg["puffer_drain_minutes"]))
             b_conn.set_thermostat_setpoint(float(cfg["bticino_force_on_temp_c"]), mode="manual", duration_minutes=rem_min)
             record_api_usage(b_reads=1, b_writes=1, event_label="ap_reassert_grundfos", state_dict=st)
 
-        # Optional Soft Curve Self-Tuning (reduces PdC setpoint -1 K instead of cutting Grundfos)
-        soft_trimmed_now = False
-        if cfg.get("soft_curve_tuning_enabled") and elapsed_min >= 15:
-            cur_trim = int(st.get("soft_curve_trim_k") or 0)
-            max_trim = int(cfg.get("soft_curve_max_shift_delta_k") or 2)
-            last_trim_dt = _parse_iso(st.get("soft_curve_last_trim_utc"))
-            cooldown_min = float(cfg.get("soft_curve_cooldown_minutes") or 60)
-            cooldown_ok = last_trim_dt is None or ((now_utc - last_trim_dt).total_seconds() / 60.0) >= cooldown_min
-            overshoot_risk = (slope_c_h > 0.30 and t_in_f >= float(cfg["t_min_c"]) + 0.4) or (t_in_f >= float(cfg["t_max_c"]) - 0.1)
-            if overshoot_risk and cooldown_ok and abs(cur_trim - 1) <= max_trim and pdc_setpoint > 10:
-                new_sp = max(10, pdc_setpoint - 1)
-                new_lwt = compute_wo1c_lwt(float(oat), float(new_sp), float(curve_slope), float(curve_shift))
+        # 1) Controlled Soft-Start Ramp-Up (+1 C setpoint step toward regime_sp if no defrost derating active)
+        cur_trim = int(st.get("soft_curve_trim_k") or 0)
+        soft_stepped_now = False
+        if (
+            cfg.get("soft_start_enabled", True)
+            and cur_trim == 0
+            and pdc_setpoint < regime_sp
+            and not is_defrost_now
+        ):
+            last_step_dt = _parse_iso(st.get("soft_start_last_step_utc")) or cycle_dt
+            step_elapsed = (now_utc - last_step_dt).total_seconds() / 60.0
+            step_min = float(cfg.get("soft_start_step_minutes") or 25)
+            buf_caught_up = buf_temp is not None and float(buf_temp) >= (target_lwt - 1.2)
+            if step_elapsed >= step_min or (step_elapsed >= 12.0 and buf_caught_up):
+                next_sp = min(regime_sp, pdc_setpoint + 1)
+                next_lwt = compute_wo1c_lwt(float(oat), float(next_sp), float(curve_slope), float(curve_shift))
                 if not dry_run:
                     v_conn = ViessmannConnector()
                     v_conn.connect()
-                    ok_r, _ = v_conn.set_reduced_temperature(float(new_sp))
-                    ok_n, _ = v_conn.set_normal_temperature(float(new_sp))
+                    ok_r, _ = v_conn.set_reduced_temperature(float(next_sp))
+                    ok_n, _ = v_conn.set_normal_temperature(float(next_sp))
+                    record_api_usage(v_reads=3, v_writes=2, event_label="ap_soft_start_step", state_dict=st)
+                    if ok_r or ok_n:
+                        pdc_setpoint = next_sp
+                        target_lwt = next_lwt
+                        st["calculated_pdc_setpoint_c"] = next_sp
+                        st["calculated_target_lwt_c"] = next_lwt
+                        st["soft_start_last_step_utc"] = now_iso
+                        st["last_action_utc"] = now_iso
+                        st["last_action_reason"] = f"Soft-Start step +1°C -> SP={next_sp}°C (Target Acqua {next_lwt}°C, Puffer {buf_temp}°C)."
+                        soft_stepped_now = True
+                else:
+                    pdc_setpoint = next_sp
+                    target_lwt = next_lwt
+                    st["calculated_pdc_setpoint_c"] = next_sp
+                    st["calculated_target_lwt_c"] = next_lwt
+                    st["soft_start_last_step_utc"] = now_iso
+                    st["last_action_reason"] = f"[DRY-RUN] Soft-Start +1°C -> SP={next_sp}°C (LWT={next_lwt}°C)"
+                    soft_stepped_now = True
+
+        # 2) Defrost-Aware Derating & Anti-Overshoot Soft Curve Trim
+        # CRITICAL HYSTERESIS SAFETY RULE: Never lower Target LWT while buffer_temp_c > new_lwt + 1.0 K,
+        # otherwise WO1C trips its +2.5 K upper buffer cutoff immediately! Wait until buffer is near/below
+        # new_lwt (e.g. right after a defrost or during steady modulation) before stepping down -1 C.
+        soft_trimmed_now = False
+        if not soft_stepped_now and elapsed_min >= 15:
+            max_trim = int(cfg.get("soft_curve_max_shift_delta_k") or 2)
+            last_trim_dt = _parse_iso(st.get("soft_curve_last_trim_utc"))
+            cooldown_min = float(cfg.get("soft_curve_cooldown_minutes") or 45)
+            cooldown_ok = last_trim_dt is None or ((now_utc - last_trim_dt).total_seconds() / 60.0) >= cooldown_min
+
+            # Hydraulic anti-short-cycle floor: keep target LWT >= max(21.0, T_in + 12.5 K)
+            min_safe_lwt = max(21.0, t_in_f + 12.5)
+            candidate_sp = max(10, pdc_setpoint - 1)
+            candidate_lwt = compute_wo1c_lwt(float(oat), float(candidate_sp), float(curve_slope), float(curve_shift))
+            hysteresis_safe = (buf_temp is None) or (float(buf_temp) <= candidate_lwt + 1.0)
+            floor_ok = candidate_lwt >= min_safe_lwt and candidate_sp < pdc_setpoint
+
+            # Trigger A: Defrost Guard in humid cold air (breaks 88% <-> defrost resonance loop)
+            defrost_thresh = int(cfg.get("defrost_trim_threshold_count") or 2)
+            oat_frost_max = float(cfg.get("defrost_guard_oat_max_c") or 5.5)
+            evap_dep = (float(oat) - float(suction_temp)) if suction_temp is not None else 0.0
+            defrost_overload = (
+                bool(cfg.get("defrost_guard_enabled", True))
+                and float(oat) <= oat_frost_max
+                and (
+                    int(st.get("cycle_defrost_episodes") or 0) >= defrost_thresh
+                    or (evap_dep >= 13.0 and (comp_mod or 0) >= 75.0)
+                )
+            )
+
+            # Trigger B: Indoor temperature approaching T_max fast
+            overshoot_risk = (
+                bool(cfg.get("soft_curve_tuning_enabled", True))
+                and (
+                    (slope_c_h > 0.30 and t_in_f >= float(cfg["t_min_c"]) + 0.4)
+                    or (t_in_f >= float(cfg["t_max_c"]) - 0.1)
+                )
+            )
+
+            if (defrost_overload or overshoot_risk) and cooldown_ok and hysteresis_safe and floor_ok and abs(cur_trim - 1) <= max_trim:
+                why_trim = (
+                    f"Defrost Guard ({st.get('cycle_defrost_episodes', 0)} brin., ΔEvap={evap_dep:.0f}K)"
+                    if defrost_overload
+                    else "Self-tuning soft anti-overshoot"
+                )
+                if not dry_run:
+                    v_conn = ViessmannConnector()
+                    v_conn.connect()
+                    ok_r, _ = v_conn.set_reduced_temperature(float(candidate_sp))
+                    ok_n, _ = v_conn.set_normal_temperature(float(candidate_sp))
                     record_api_usage(v_reads=3, v_writes=2, event_label="ap_soft_curve_trim", state_dict=st)
                     if ok_r or ok_n:
                         st["soft_curve_trim_k"] = cur_trim - 1
                         st["soft_curve_last_trim_utc"] = now_iso
-                        st["calculated_pdc_setpoint_c"] = new_sp
-                        st["calculated_target_lwt_c"] = new_lwt
+                        st["calculated_pdc_setpoint_c"] = candidate_sp
+                        st["calculated_target_lwt_c"] = candidate_lwt
                         st["last_action_utc"] = now_iso
-                        st["last_action_reason"] = f"Self-tuning soft curva (-1K -> T_set={new_sp}°C, LWT={new_lwt}°C) per modulare dolce senza tagliare Grundfos."
+                        st["last_action_reason"] = f"{why_trim}: ridotto SP −1°C -> {candidate_sp}°C (Target Acqua {candidate_lwt}°C) per modulare dolce senza stacchi."
                         soft_trimmed_now = True
                 else:
                     st["soft_curve_trim_k"] = cur_trim - 1
                     st["soft_curve_last_trim_utc"] = now_iso
-                    st["calculated_pdc_setpoint_c"] = new_sp
-                    st["calculated_target_lwt_c"] = new_lwt
-                    st["last_action_reason"] = f"[DRY-RUN] Soft trim -1K -> T_set={new_sp}°C (LWT={new_lwt}°C)"
+                    st["calculated_pdc_setpoint_c"] = candidate_sp
+                    st["calculated_target_lwt_c"] = candidate_lwt
+                    st["last_action_reason"] = f"[DRY-RUN] {why_trim} -> SP={candidate_sp}°C (LWT={candidate_lwt}°C)"
                     soft_trimmed_now = True
 
         stop_target = (t_in_f >= float(cfg["t_max_c"])) and not soft_trimmed_now
         if cfg.get("soft_curve_tuning_enabled") and t_in_f < float(cfg["t_max_c"]) + 0.2:
             if abs(int(st.get("soft_curve_trim_k") or 0)) < int(cfg.get("soft_curve_max_shift_delta_k") or 2):
-                # Allow trimmed cycle a brief soft-modulation window before cutoff up to T_max + 0.2 C
                 stop_target = False
         stop_max_dur = elapsed_min >= float(cfg["max_cycle_minutes"])
         stop_window = (not is_emerg_cycle) and _is_past_cop_window_end(now_local, cfg)
@@ -796,6 +1006,9 @@ def run_autopilot_tick(latest_sample: dict[str, Any] | Any, dry_run: bool = Fals
             st["cycle_is_emergency"] = False
             st["soft_curve_trim_k"] = 0
             st["soft_curve_last_trim_utc"] = None
+            st["cycle_defrost_episodes"] = 0
+            st["prev_phase_was_defrost"] = False
+            st["soft_start_last_step_utc"] = None
 
     # ---------------- DYNAMIC CRON FREQUENCY ----------------
     next_state = st["state"]
