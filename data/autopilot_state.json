@@ -5,40 +5,26 @@
   "cycle_started_utc": null,
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-24T16:15:54.268894+00:00",
+  "last_eval_utc": "2026-11-24T16:31:26.041417+00:00",
   "last_action_utc": "2026-11-24T15:27:28.128903+00:00",
-  "last_action_reason": "Standby OK: T=8.2°C > 7.5°C (pendenza +0.20°C/h).",
-  "indoor_slope_c_per_h": 0.202,
+  "last_action_reason": "Standby OK: T=8.2°C > 7.5°C (pendenza +0.19°C/h).",
+  "indoor_slope_c_per_h": 0.188,
   "calculated_target_lwt_c": 26.2,
   "calculated_pdc_setpoint_c": 15,
   "current_cron_interval_min": 15,
-  "defrost_detected_today": 9,
+  "defrost_detected_today": 8,
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": 0,
   "soft_curve_last_trim_utc": null,
   "api_usage": {
     "date_utc": "2026-11-24",
-    "viessmann_reads": 894,
+    "viessmann_reads": 896,
     "viessmann_writes": 8,
-    "bticino_reads": 893,
+    "bticino_reads": 895,
     "bticino_writes": 7,
     "cronjob_patches": 2,
-    "github_runs": 443,
+    "github_runs": 444,
     "recent_events": [
-      {
-        "ts": "2026-11-23T16:16:05.516548+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-23T16:31:14.671457+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-23T16:45:53.667360+00:00",
         "lbl": "telemetry_poll",
@@ -3592,6 +3578,13 @@
       },
       {
         "ts": "2026-11-24T16:15:54.264960+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-24T16:31:26.038357+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
