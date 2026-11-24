@@ -1,37 +1,30 @@
 {
-  "state": "ARMED",
-  "state_since_utc": "2026-11-23T20:31:23.929559+00:00",
+  "state": "HEATING_SYNC",
+  "state_since_utc": "2026-11-24T10:01:23.559165+00:00",
   "below_threshold_since_utc": "2026-11-23T20:01:26.602133+00:00",
-  "cycle_started_utc": null,
+  "cycle_started_utc": "2026-11-24T10:01:23.559165+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-24T09:55:41.938790+00:00",
-  "last_action_utc": "2026-11-21T15:27:29.714857+00:00",
-  "last_action_reason": "Richiesta calore confermata da 30 min (T=7.5°C). Attesa finestra COP / emergenza.",
-  "indoor_slope_c_per_h": -0.055,
+  "last_eval_utc": "2026-11-24T10:01:23.559165+00:00",
+  "last_action_utc": "2026-11-24T10:01:23.559165+00:00",
+  "last_action_reason": "Avvio ciclo (Finestra Alto COP): Target LWT 25.0°C (T_set=14°C). Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual) | Temperatura Ridotta impostata e verificata con successo: 14 °C | Modalità PdC impostata e verificata: dhwAndHeating",
+  "indoor_slope_c_per_h": -0.057,
   "calculated_target_lwt_c": 25.0,
   "calculated_pdc_setpoint_c": 14,
-  "current_cron_interval_min": 5,
+  "current_cron_interval_min": 1,
   "defrost_detected_today": 0,
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": 0,
   "soft_curve_last_trim_utc": null,
   "api_usage": {
     "date_utc": "2026-11-24",
-    "viessmann_reads": 236,
-    "viessmann_writes": 0,
-    "bticino_reads": 240,
-    "bticino_writes": 0,
-    "cronjob_patches": 0,
-    "github_runs": 120,
+    "viessmann_reads": 242,
+    "viessmann_writes": 3,
+    "bticino_reads": 243,
+    "bticino_writes": 1,
+    "cronjob_patches": 1,
+    "github_runs": 121,
     "recent_events": [
-      {
-        "ts": "2026-11-23T10:01:18.546017+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-23T10:15:54.034960+00:00",
         "lbl": "telemetry_poll",
@@ -1452,6 +1445,26 @@
         "vr": 2,
         "br": 2,
         "gh": 1
+      },
+      {
+        "ts": "2026-11-24T10:01:23.557137+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-24T10:01:37.162019+00:00",
+        "lbl": "ap_start_heating",
+        "vr": 4,
+        "vw": 3,
+        "br": 1,
+        "bw": 1
+      },
+      {
+        "ts": "2026-11-24T10:01:37.690862+00:00",
+        "lbl": "ap_cron_adapt",
+        "cp": 1
       }
     ]
   }
