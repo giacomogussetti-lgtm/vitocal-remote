@@ -103,12 +103,16 @@ def main() -> int:
     print(
         f"Autopilota      : enabled={cfg.get('enabled')} | state={st.get('state')} "
         f"| T_min={cfg.get('t_min_c')}°C | T_max={cfg.get('t_max_c')}°C | Emergenza={cfg.get('t_emergency_c')}°C "
-        f"| SoftTune={cfg.get('soft_curve_tuning_enabled', False)}"
+        f"| SoftStart={cfg.get('soft_start_enabled', False)} | DefrostGuard={cfg.get('defrost_guard_enabled', False)} | SoftTune={cfg.get('soft_curve_tuning_enabled', False)}"
     )
+    ci = cfg.get("cron_idle_minutes", cfg.get("cron_idle_min", 15))
+    ca = cfg.get("cron_armed_minutes", cfg.get("cron_armed_min", 5))
+    cact = cfg.get("cron_active_minutes", cfg.get("cron_active_min", 1))
     print(
         f"Cron / Target   : cron_attivo={st.get('current_cron_interval_min', '--')}m "
-        f"(idle={cfg.get('cron_idle_min', 15)}m / armed={cfg.get('cron_armed_min', 5)}m / active={cfg.get('cron_active_min', 2)}m) "
-        f"| TargetLWT={st.get('calculated_target_lwt_c', '--')}°C | PdC_SP={st.get('calculated_pdc_setpoint_c', '--')}°C"
+        f"(idle={ci}m / armed={ca}m / active={cact}m) "
+        f"| TargetLWT={st.get('calculated_target_lwt_c', '--')}°C (min={cfg.get('min_target_lwt_c', 22.5)} / max={cfg.get('max_target_lwt_c', 26.5)} / ΔT={cfg.get('target_lwt_delta_k', 15.5)}K) "
+        f"| PdC_SP={st.get('calculated_pdc_setpoint_c', '--')}°C | d6_err={st.get('error_counter_d6', 0)}"
     )
     print(f"Ultimo motivo   : {st.get('last_action_reason', '--')}")
 
@@ -156,26 +160,65 @@ def main() -> int:
         rod_on_cnt = 0
         print("Resistenza El.  : Contatori non ancora storicizzati nei campioni precedenti.")
 
-    # Defrost & frost protection counts
+    # Defrost episodes (distinct) & BPHE thermal safety margin
     defrost_samples = [
         (dt, s) for dt, s in window
         if "defrost" in str(s.get("compressor_phase") or "").lower()
     ]
+    defrost_episodes = []
+    cur_def = []
+    for dt, s in defrost_samples:
+        if cur_def and (dt - cur_def[-1][0]).total_seconds() > 600:
+            defrost_episodes.append(cur_def)
+            cur_def = [(dt, s)]
+        else:
+            cur_def.append((dt, s))
+    if cur_def:
+        defrost_episodes.append(cur_def)
+
+    def_lwt_mins = [s["pdc_supply_temp_c"] for _, s in defrost_samples if s.get("pdc_supply_temp_c") is not None]
+    def_buf_mins = [s["buffer_temp_c"] for _, s in defrost_samples if s.get("buffer_temp_c") is not None]
+    def_lwt_min = min(def_lwt_mins) if def_lwt_mins else None
+    def_buf_min = min(def_buf_mins) if def_buf_mins else None
     frost_samples = [
         (dt, s) for dt, s in window
         if str(s.get("frost_protection_status") or "").lower() == "on"
     ]
-    print(f"Defrost / Frost : campioni in defrost={len(defrost_samples)} | antigelo hardware active={len(frost_samples)}")
+    bphe_str = (
+        f" | BPHE min in defrost: LWT_min={def_lwt_min:.1f}°C, Buf_min={def_buf_min:.1f}°C"
+        if (def_lwt_min is not None and def_buf_min is not None)
+        else ""
+    )
+    print(f"Defrost / Frost : {len(defrost_episodes)} episodi distinti ({len(defrost_samples)} campioni){bphe_str} | antigelo HW={len(frost_samples)}")
 
     # Modes & programs seen
     modes = sorted({str(s.get("active_mode")) for _, s in window if s.get("active_mode")})
     progs = sorted({str(s.get("active_program")) for _, s in window if s.get("active_program")})
     print(f"Modi / Programmi: modes={modes} | programs={progs}")
 
-    # Cycle breakdown
+    # Calibrated energy consumption summary via storage.analytics
+    try:
+        from storage.analytics import analyze_telemetry_period
+        an = analyze_telemetry_period([s for _, s in window], period_hours=args.hours)
+        co = an.get("consumption", {})
+        print(
+            f"Consumi Stimati : {co.get('total_elec_kwh', 0):.2f} kWh_e (~{co.get('estimated_cost_eur', 0):.2f} EUR) "
+            f"| Resa netta={co.get('total_thermal_net_kwh', 0):.1f} kWh_t | COP netto={co.get('avg_cop', '--')}"
+        )
+    except Exception:
+        pass
+
+    # Cycle breakdown (filtering out single empty Viessmann poll glitches)
     cycles = []
     cur_cycle = []
     for dt, s in window:
+        v_empty = (
+            s.get("pdc_supply_temp_c") is None
+            and s.get("buffer_temp_c") is None
+            and s.get("compressor_modulation_percent") is None
+        )
+        if v_empty and cur_cycle:
+            continue
         is_on = (s.get("compressor_active") == 1) or ((s.get("compressor_modulation_percent") or 0) > 0)
         if is_on:
             cur_cycle.append((dt, s))
@@ -194,11 +237,12 @@ def main() -> int:
     for idx, cyc in enumerate(cycles, 1):
         c_start = cyc[0][0].astimezone(CET)
         c_end = cyc[-1][0].astimezone(CET)
-        dur_min = max(5.0, (cyc[-1][0] - cyc[0][0]).total_seconds() / 60.0 + 5.0)
-        mods = [s.get("compressor_modulation_percent") for _, s in cyc if s.get("compressor_modulation_percent") is not None]
+        dur_min = max(1.0, (cyc[-1][0] - cyc[0][0]).total_seconds() / 60.0 + 1.0)
+        mods = [s.get("compressor_modulation_percent") for _, s in cyc if (s.get("compressor_modulation_percent") or 0) > 0]
         sups = [s.get("pdc_supply_temp_c") for _, s in cyc if s.get("pdc_supply_temp_c") is not None]
+        bufs_c = [s.get("buffer_temp_c") for _, s in cyc if s.get("buffer_temp_c") is not None]
+        tins_c = [s.get("indoor_temp_bticino_c") for _, s in cyc if s.get("indoor_temp_bticino_c") is not None]
         p1s = [s.get("primary_pump_rotation_percent") for _, s in cyc if s.get("primary_pump_rotation_percent") is not None]
-        cops = [s.get("cop_heating") for _, s in cyc if (s.get("cop_heating") or 0) > 0]
         dt_prim = [
             float(s["pdc_supply_temp_c"]) - float(s["pdc_return_temp_c"])
             for _, s in cyc
@@ -209,20 +253,17 @@ def main() -> int:
             for _, s in cyc
             if s.get("pdc_supply_temp_c") is not None and s.get("buffer_temp_c") is not None
         ]
-        dt_buf_ret = [
-            float(s["buffer_temp_c"]) - float(s["pdc_return_temp_c"])
-            for _, s in cyc
-            if s.get("buffer_temp_c") is not None and s.get("pdc_return_temp_c") is not None
-        ]
         gf_cnt = sum(1 for _, s in cyc if s.get("grundfos_pump_active") == 1)
         gf_pct = 100.0 * gf_cnt / len(cyc)
+        min_mod = min(mods) if mods else 0.0
         avg_mod = sum(mods) / len(mods) if mods else 0.0
+        max_mod = max(mods) if mods else 0.0
         max_sup = max(sups) if sups else 0.0
+        max_buf = max(bufs_c) if bufs_c else 0.0
         avg_p1 = sum(p1s) / len(p1s) if p1s else None
-        avg_cop = sum(cops) / len(cops) if cops else None
         avg_dt_p = sum(dt_prim) / len(dt_prim) if dt_prim else None
         avg_dt_sb = sum(dt_sup_buf) / len(dt_sup_buf) if dt_sup_buf else None
-        avg_dt_br = sum(dt_buf_ret) / len(dt_buf_ret) if dt_buf_ret else None
+        tin_str = f"Casa={tins_c[0]:.1f}->{tins_c[-1]:.1f}°C ({tins_c[-1]-tins_c[0]:+.1f}K)" if len(tins_c) >= 2 else "Casa=--"
         if dur_min < 35:
             if gf_pct >= 50:
                 short_with_gf += 1
@@ -234,16 +275,17 @@ def main() -> int:
             high_dt_sup_buf_cycles += 1
         p1_str = f"P1={avg_p1:3.0f}%" if avg_p1 is not None else "P1=--"
         dtp_str = f"ΔTp={avg_dt_p:4.1f}K" if avg_dt_p is not None else "ΔTp=--"
-        dtsb_str = f"ΔTsb={avg_dt_sb:4.1f}K" if avg_dt_sb is not None else "ΔTsb=--"
-        dtbr_str = f"ΔTbr={avg_dt_br:4.1f}K" if avg_dt_br is not None else "ΔTbr=--"
-        cop_str = f"COP={avg_cop:4.2f}" if avg_cop is not None else "COP=--"
         print(
-            f"  #{idx:2d} {c_start.strftime('%d/%m %H:%M')}->{c_end.strftime('%H:%M')} (~{dur_min:4.0f}m)"
-            f" | Mod={avg_mod:3.0f}% | {p1_str} | LWTmax={max_sup:4.1f}°C | {dtp_str} {dtsb_str} {dtbr_str} | {cop_str} | GF={gf_pct:3.0f}%"
+            f"  #{idx:2d} {c_start.strftime('%d/%m %H:%M')}->{c_end.strftime('%H:%M')} (~{dur_min:3.0f}m)"
+            f" | Mod={min_mod:2.0f}/{avg_mod:2.0f}/{max_mod:2.0f}% | LWTmax={max_sup:4.1f} BufMax={max_buf:4.1f}°C | {dtp_str} {p1_str} | {tin_str} | GF={gf_pct:3.0f}%"
         )
 
     # Automated tuning hints
     print("\n--- RACCOMANDAZIONI DIAGNOSTICHE ---")
+    if def_lwt_min is not None and def_lwt_min < 12.0:
+        print(f"  [!] ATTENZIONE BPHE: LWT minima in defrost scesa a {def_lwt_min:.1f}°C (<12°C). Verificare riserva termica puffer / alzare min_target_lwt_c!")
+    if def_buf_min is not None and def_buf_min < 17.0:
+        print(f"  [!] ATTENZIONE PUFFER: Puffer minimo in defrost sceso a {def_buf_min:.1f}°C (<17°C).")
     if short_no_gf > 0:
         print(f"  [!] {short_no_gf} cicli brevi (<35m) con Grundfos spenta: attivare o verificare sincronizzazione PdC<->BTicino.")
     if short_with_gf > 0:

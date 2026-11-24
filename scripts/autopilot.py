@@ -40,7 +40,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "cop_window_start": "11:00",
     "cop_window_end": "16:00",
     "target_lwt_delta_k": 15.5,
-    "min_target_lwt_c": 22.0,
+    "min_target_lwt_c": 22.5,
     "max_target_lwt_c": 26.5,
     "max_cycle_minutes": 300,
     "puffer_drain_minutes": 25,
@@ -51,7 +51,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "dynamic_cron_enabled": True,
     "cron_idle_minutes": 15,
     "cron_armed_minutes": 5,
-    "cron_active_minutes": 2,
+    "cron_active_minutes": 1,
     "soft_start_enabled": True,
     "soft_start_step_minutes": 25,
     "defrost_guard_enabled": True,
@@ -784,15 +784,17 @@ def run_autopilot_tick(
                 start_sp = regime_sp
                 start_lwt = target_lwt
                 if cfg.get("soft_start_enabled", True) and buf_temp is not None and float(buf_temp) < target_lwt - 5.0:
-                    soft_lwt_cap = max(20.5, min(target_lwt, float(buf_temp) + 9.5))
+                    # Keep >= 21.8 C so even an early defrost retains safe BPHE thermal reserve (no heatingRod / freeze risk)
+                    soft_lwt_cap = max(21.8, min(target_lwt, float(buf_temp) + 10.5))
                     soft_sp = compute_inverse_setpoint_for_target_lwt(
                         target_lwt_c=soft_lwt_cap,
                         oat_c=float(oat),
                         slope=float(curve_slope),
                         shift=float(curve_shift),
                     )
-                    # Start at most 2 C below regime_sp so WO1C ramps cleanly without stalling
-                    start_sp = max(11, max(regime_sp - 2, min(regime_sp, soft_sp)))
+                    # Start at most 1-2 C below regime_sp (never below 12 C in humid/cold air)
+                    max_drop = 1 if (regime_sp <= 13 and float(oat) <= 5.5) else 2
+                    start_sp = max(12, max(regime_sp - max_drop, min(regime_sp, soft_sp)))
                     start_lwt = compute_wo1c_lwt(float(oat), float(start_sp), float(curve_slope), float(curve_shift))
 
                 if not dry_run:
@@ -908,9 +910,11 @@ def run_autopilot_tick(
             cooldown_min = float(cfg.get("soft_curve_cooldown_minutes") or 45)
             cooldown_ok = last_trim_dt is None or ((now_utc - last_trim_dt).total_seconds() / 60.0) >= cooldown_min
 
-            # Hydraulic anti-short-cycle floor: keep target LWT >= max(21.0, T_in + 12.5 K)
-            min_safe_lwt = max(21.0, t_in_f + 12.5)
-            candidate_sp = max(10, pdc_setpoint - 1)
+            # Hydraulic & Defrost-BPHE safety floor: keep target LWT >= max(22.0, T_in + 13.5 K)
+            # Verified on Nov 24 defrosts: Buf >= 22 C keeps BPHE outlet LWT >= 13-14 C during reverse-cycle defrost
+            # (zero BPHE freeze risk, zero backup heatingRod activation) and stays above the 38% inverter min floor.
+            min_safe_lwt = max(22.0, t_in_f + 13.5)
+            candidate_sp = max(11, pdc_setpoint - 1)
             candidate_lwt = compute_wo1c_lwt(float(oat), float(candidate_sp), float(curve_slope), float(curve_shift))
             hysteresis_safe = (buf_temp is None) or (float(buf_temp) <= candidate_lwt + 1.0)
             floor_ok = candidate_lwt >= min_safe_lwt and candidate_sp < pdc_setpoint
