@@ -5,7 +5,7 @@
   "cycle_started_utc": "2026-11-24T10:01:23.559165+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": "2026-11-24T15:01:46.738961+00:00",
-  "last_eval_utc": "2026-11-24T15:25:43.857169+00:00",
+  "last_eval_utc": "2026-11-24T15:26:33.065433+00:00",
   "last_action_utc": "2026-11-24T15:01:46.738961+00:00",
   "last_action_reason": "Stop PdC (Durata max raggiunta), avvio scarico puffer 25 min. Modalità PdC impostata e verificata: standby | Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual)",
   "indoor_slope_c_per_h": 0.225,
@@ -18,12 +18,12 @@
   "soft_curve_last_trim_utc": null,
   "api_usage": {
     "date_utc": "2026-11-24",
-    "viessmann_reads": 876,
+    "viessmann_reads": 878,
     "viessmann_writes": 4,
-    "bticino_reads": 880,
+    "bticino_reads": 882,
     "bticino_writes": 6,
     "cronjob_patches": 1,
-    "github_runs": 437,
+    "github_runs": 438,
     "recent_events": [
       {
         "ts": "2026-11-23T15:31:11.181554+00:00",
@@ -3558,6 +3558,13 @@
       },
       {
         "ts": "2026-11-24T15:25:43.853069+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-24T15:26:33.062933+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
