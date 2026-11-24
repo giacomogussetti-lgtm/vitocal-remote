@@ -5,54 +5,65 @@
   "cycle_started_utc": null,
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-24T21:15:50.492362+00:00",
+  "last_eval_utc": "2026-11-24T21:31:18.673685+00:00",
   "last_action_utc": "2026-11-24T15:27:28.128903+00:00",
-  "last_action_reason": "Standby OK: T=8.2°C > 7.5°C (pendenza -0.00°C/h).",
-  "indoor_slope_c_per_h": -0.0,
-  "calculated_target_lwt_c": 26.2,
-  "calculated_pdc_setpoint_c": 15,
+  "last_action_reason": "Standby OK: T=8.2°C > 7.5°C (pendenza +0.00°C/h).",
+  "indoor_slope_c_per_h": 0.0,
+  "calculated_target_lwt_c": 23.7,
+  "calculated_pdc_setpoint_c": 13,
+  "target_pdc_setpoint_c": 13,
+  "soft_start_last_step_utc": null,
   "current_cron_interval_min": 15,
-  "defrost_detected_today": 4,
+  "defrost_detected_today": 3,
+  "cycle_defrost_episodes": 0,
+  "prev_phase_was_defrost": false,
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": 0,
   "soft_curve_last_trim_utc": null,
+  "last_grundfos_run_utc": null,
+  "last_anti_seize_utc": null,
+  "error_counter_d6": 0,
+  "recent_wo1c_events": [
+    {
+      "ts": "2026-11-24T16:02:11.000Z",
+      "actor": "Circolatore P1",
+      "desc": "Pompa P1 -> 0%",
+      "info_s": 120
+    },
+    {
+      "ts": "2026-11-24T16:00:15.000Z",
+      "actor": "Circolatore P1",
+      "desc": "Pompa P1 -> 100%",
+      "info_s": 117
+    },
+    {
+      "ts": "2026-11-24T16:00:12.000Z",
+      "actor": "Compressore",
+      "desc": "Arresto / Pausa Compressore",
+      "info_s": 180
+    },
+    {
+      "ts": "2026-11-24T15:51:40.000Z",
+      "actor": "Valvola 4-Vie Defrost",
+      "desc": "Fine Defrost -> Riscald.",
+      "info_s": 0
+    },
+    {
+      "ts": "2026-11-24T15:46:46.000Z",
+      "actor": "Valvola 4-Vie Defrost",
+      "desc": "Inversione Defrost ON",
+      "info_s": 900
+    }
+  ],
   "api_usage": {
     "date_utc": "2026-11-24",
-    "viessmann_reads": 934,
+    "viessmann_reads": 936,
     "viessmann_writes": 8,
-    "bticino_reads": 933,
+    "bticino_reads": 935,
     "bticino_writes": 7,
     "cronjob_patches": 2,
-    "github_runs": 463,
+    "github_runs": 464,
     "recent_events": [
-      {
-        "ts": "2026-11-23T21:15:52.150415+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-23T21:20:51.364437+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-23T21:25:50.518368+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-23T21:31:06.323268+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-23T21:36:08.968767+00:00",
         "lbl": "telemetry_poll",
@@ -3545,6 +3556,13 @@
       },
       {
         "ts": "2026-11-24T21:15:50.489944+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-24T21:31:18.670408+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
