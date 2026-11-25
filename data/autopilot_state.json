@@ -5,10 +5,10 @@
   "cycle_started_utc": null,
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-25T22:01:12.672513+00:00",
+  "last_eval_utc": "2026-11-25T22:05:43.546913+00:00",
   "last_action_utc": "2026-11-24T15:27:28.128903+00:00",
   "last_action_reason": "Richiesta calore confermata da 30 min (T=7.5°C). Attesa finestra COP / emergenza.",
-  "indoor_slope_c_per_h": -0.043,
+  "indoor_slope_c_per_h": -0.046,
   "calculated_target_lwt_c": 22.8,
   "calculated_pdc_setpoint_c": 13,
   "target_pdc_setpoint_c": 13,
@@ -57,20 +57,13 @@
   ],
   "api_usage": {
     "date_utc": "2026-11-25",
-    "viessmann_reads": 248,
+    "viessmann_reads": 250,
     "viessmann_writes": 0,
-    "bticino_reads": 248,
+    "bticino_reads": 250,
     "bticino_writes": 0,
     "cronjob_patches": 1,
-    "github_runs": 124,
+    "github_runs": 125,
     "recent_events": [
-      {
-        "ts": "2026-11-24T22:01:31.465332+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-24T22:15:55.838284+00:00",
         "lbl": "telemetry_poll",
@@ -988,6 +981,13 @@
       },
       {
         "ts": "2026-11-25T22:01:12.670675+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-25T22:05:43.545239+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
