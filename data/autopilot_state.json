@@ -1,15 +1,15 @@
 {
   "state": "IDLE",
   "state_since_utc": "2026-11-24T15:27:28.128903+00:00",
-  "below_threshold_since_utc": null,
+  "below_threshold_since_utc": "2026-11-25T16:45:51.271882+00:00",
   "cycle_started_utc": null,
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-25T16:31:22.698034+00:00",
+  "last_eval_utc": "2026-11-25T16:45:51.271882+00:00",
   "last_action_utc": "2026-11-24T15:27:28.128903+00:00",
-  "last_action_reason": "Standby OK: T=7.6°C > 7.5°C (pendenza +0.00°C/h).",
-  "indoor_slope_c_per_h": 0.0,
-  "calculated_target_lwt_c": 23.1,
+  "last_action_reason": "T interna 7.5°C <= 7.5°C: inizio conferma (20 min).",
+  "indoor_slope_c_per_h": -0.019,
+  "calculated_target_lwt_c": 23.0,
   "calculated_pdc_setpoint_c": 13,
   "target_pdc_setpoint_c": 13,
   "soft_start_last_step_utc": null,
@@ -57,20 +57,13 @@
   ],
   "api_usage": {
     "date_utc": "2026-11-25",
-    "viessmann_reads": 128,
+    "viessmann_reads": 130,
     "viessmann_writes": 0,
-    "bticino_reads": 128,
+    "bticino_reads": 130,
     "bticino_writes": 0,
     "cronjob_patches": 0,
-    "github_runs": 64,
+    "github_runs": 65,
     "recent_events": [
-      {
-        "ts": "2026-11-24T16:31:26.038357+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-24T16:46:00.726535+00:00",
         "lbl": "telemetry_poll",
@@ -721,6 +714,13 @@
         "vr": 2,
         "br": 2,
         "gh": 1
+      },
+      {
+        "ts": "2026-11-25T16:45:51.270229+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
       }
     ]
   },
@@ -731,8 +731,8 @@
     "inverter_min_mod_pct": 38.6,
     "defrost_lwt_drop_p90_k": 9.5,
     "ua_building_c_24h_per_k": 0.159,
-    "recommended_target_lwt_c": 22.5,
-    "pred_autonomy_hours": 67.7,
+    "recommended_target_lwt_c": 23.2,
+    "pred_autonomy_hours": 70.1,
     "updated_utc": "2026-11-24T22:20:01.930293+00:00"
   }
 }
