@@ -5,10 +5,10 @@
   "cycle_started_utc": null,
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-25T12:01:21.158173+00:00",
+  "last_eval_utc": "2026-11-25T12:15:57.453801+00:00",
   "last_action_utc": "2026-11-24T15:27:28.128903+00:00",
-  "last_action_reason": "Standby OK: T=7.6°C > 7.5°C (pendenza -0.05°C/h).",
-  "indoor_slope_c_per_h": -0.053,
+  "last_action_reason": "Standby OK: T=7.6°C > 7.5°C (pendenza -0.06°C/h).",
+  "indoor_slope_c_per_h": -0.057,
   "calculated_target_lwt_c": 23.1,
   "calculated_pdc_setpoint_c": 13,
   "target_pdc_setpoint_c": 13,
@@ -57,118 +57,13 @@
   ],
   "api_usage": {
     "date_utc": "2026-11-25",
-    "viessmann_reads": 98,
+    "viessmann_reads": 100,
     "viessmann_writes": 0,
-    "bticino_reads": 98,
+    "bticino_reads": 100,
     "bticino_writes": 0,
     "cronjob_patches": 0,
-    "github_runs": 49,
+    "github_runs": 50,
     "recent_events": [
-      {
-        "ts": "2026-11-24T12:01:55.477867+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-24T12:02:32.081661+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-24T12:03:31.612626+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-24T12:04:44.310324+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-24T12:05:46.305896+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-24T12:06:32.558473+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-24T12:07:27.251780+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-24T12:08:31.446245+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-24T12:09:31.928241+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-24T12:10:54.216997+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-24T12:11:27.769134+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-24T12:12:31.430206+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-24T12:13:32.383975+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-24T12:14:41.636540+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-24T12:15:49.157718+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-24T12:16:37.638842+00:00",
         "lbl": "telemetry_poll",
@@ -2099,6 +1994,13 @@
       },
       {
         "ts": "2026-11-25T12:01:21.155582+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-25T12:15:57.451255+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
