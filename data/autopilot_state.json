@@ -5,11 +5,11 @@
   "cycle_started_utc": null,
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-26T00:45:46.395444+00:00",
+  "last_eval_utc": "2026-11-26T00:50:59.334087+00:00",
   "last_action_utc": "2026-11-24T15:27:28.128903+00:00",
   "last_action_reason": "Richiesta calore confermata da 30 min (T=7.5°C). Attesa finestra COP / emergenza.",
-  "indoor_slope_c_per_h": -0.0,
-  "calculated_target_lwt_c": 22.8,
+  "indoor_slope_c_per_h": -0.005,
+  "calculated_target_lwt_c": 22.7,
   "calculated_pdc_setpoint_c": 13,
   "target_pdc_setpoint_c": 13,
   "soft_start_last_step_utc": null,
@@ -55,22 +55,67 @@
       "info_s": 900
     }
   ],
+  "active_window_start_local": null,
+  "active_window_end_local": null,
+  "weather_deferred_date": null,
+  "armed_by_prearm": false,
+  "weather_plan": {
+    "available": false,
+    "source": "missing_secrets",
+    "fallback_reason": "Coordinate meteo non configurate (WEATHER_LAT / WEATHER_LON nei Secrets/.env): uso finestra statica.",
+    "evaluated_local": "26/11 01:50",
+    "effective_window_start": "11:00",
+    "effective_window_end": "16:00",
+    "in_window_now": false,
+    "remaining_window_min": 0,
+    "today_window": null,
+    "tomorrow_window": null,
+    "projection_to_tomorrow": {
+      "start_tin_c": 7.2,
+      "min_tin_c": 6.11,
+      "end_tin_c": 6.11,
+      "hours_simulated": 33.2,
+      "target_local": "27/11 11:00",
+      "first_below_tmin_local": "26/11 02:50",
+      "first_below_safe_local": "26/11 02:50"
+    },
+    "short_cycle_action": "normal",
+    "extended_end_hhmm": null,
+    "prearm_recommended": false,
+    "prearm_reason": null,
+    "defer_recommended": false,
+    "defer_reason": null,
+    "decision_summary": "🕒 Fuori finestra (11:00–16:00): attesa ora migliore o emergenza ≤ 6.8°C",
+    "decision_trace": [
+      "Finestra Attiva (statica): 11:00–16:00. Coordinate meteo non configurate (WEATHER_LAT / WEATHER_LON nei Secrets/.env): uso finestra statica.",
+      "Proiezione casa fino a domani 11:00 (33.2h, UA×1.15=0.199): 7.2°C → 6.1°C (min 6.1°C vs pavimento sicurezza 7.2°C)."
+    ],
+    "assumptions": {
+      "ua_raw_c_24h_k": 0.173,
+      "ua_safety_factor": 1.15,
+      "ua_effective_c_24h_k": 0.199,
+      "t_evap_offset_k": 7.5,
+      "lwt_ref_c": 23.0,
+      "p_atm_hpa": 900.0,
+      "safe_floor_c": 7.2,
+      "min_cycle_minutes": 120,
+      "arbitrage_cop_delta": 0.25,
+      "oat_bias_c": 0.0,
+      "oat_mae_c": null,
+      "oat_samples_matched": 0,
+      "frost_penalty_scale": 1.0,
+      "tin_projection_mae_c": null
+    }
+  },
   "api_usage": {
     "date_utc": "2026-11-26",
-    "viessmann_reads": 20,
+    "viessmann_reads": 22,
     "viessmann_writes": 0,
-    "bticino_reads": 20,
+    "bticino_reads": 22,
     "bticino_writes": 0,
     "cronjob_patches": 0,
-    "github_runs": 10,
+    "github_runs": 11,
     "recent_events": [
-      {
-        "ts": "2026-11-25T00:45:48.443080+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-25T01:01:17.002061+00:00",
         "lbl": "telemetry_poll",
@@ -1146,6 +1191,13 @@
         "vr": 2,
         "br": 2,
         "gh": 1
+      },
+      {
+        "ts": "2026-11-26T00:50:59.332311+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
       }
     ]
   },
@@ -1155,9 +1207,9 @@
     "k_rad_kw_per_k": 0.372,
     "inverter_min_mod_pct": 38.6,
     "defrost_lwt_drop_p90_k": 9.5,
-    "ua_building_c_24h_per_k": 0.159,
-    "recommended_target_lwt_c": 25.1,
-    "pred_autonomy_hours": 75.5,
-    "updated_utc": "2026-11-24T22:20:01.930293+00:00"
+    "ua_building_c_24h_per_k": 0.173,
+    "recommended_target_lwt_c": 26.2,
+    "pred_autonomy_hours": 72.1,
+    "updated_utc": "2026-11-26T00:42:34.944883+00:00"
   }
 }
