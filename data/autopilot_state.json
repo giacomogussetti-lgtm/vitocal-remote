@@ -5,7 +5,7 @@
   "cycle_started_utc": "2026-11-26T08:01:19.186928+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-26T10:31:09.965641+00:00",
+  "last_eval_utc": "2026-11-26T10:31:32.133801+00:00",
   "last_action_utc": "2026-11-26T08:01:19.186928+00:00",
   "last_action_reason": "Avvio ciclo (Finestra Alto COP): Target Acqua 21.9°C (SP=12°C). Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual) | Temperatura Ridotta impostata e verificata con successo: 12 °C | Modalità PdC impostata e verificata: dhwAndHeating",
   "indoor_slope_c_per_h": 0.237,
@@ -20,7 +20,7 @@
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": 0,
   "soft_curve_last_trim_utc": null,
-  "last_grundfos_run_utc": "2026-11-26T10:31:09.965641+00:00",
+  "last_grundfos_run_utc": "2026-11-26T10:31:32.133801+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
@@ -160,20 +160,13 @@
   },
   "api_usage": {
     "date_utc": "2026-11-26",
-    "viessmann_reads": 494,
+    "viessmann_reads": 496,
     "viessmann_writes": 4,
-    "bticino_reads": 489,
+    "bticino_reads": 491,
     "bticino_writes": 1,
     "cronjob_patches": 1,
-    "github_runs": 244,
+    "github_runs": 245,
     "recent_events": [
-      {
-        "ts": "2026-11-25T10:31:10.689216+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-25T10:45:50.351469+00:00",
         "lbl": "telemetry_poll",
@@ -2623,6 +2616,13 @@
       },
       {
         "ts": "2026-11-26T10:31:09.962399+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-26T10:31:32.131165+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
