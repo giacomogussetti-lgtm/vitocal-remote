@@ -5,10 +5,10 @@
   "cycle_started_utc": null,
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-26T01:15:48.487667+00:00",
+  "last_eval_utc": "2026-11-26T01:20:52.405258+00:00",
   "last_action_utc": "2026-11-24T15:27:28.128903+00:00",
   "last_action_reason": "Richiesta calore confermata da 30 min (T=7.5°C). Attesa finestra COP / emergenza.",
-  "indoor_slope_c_per_h": -0.028,
+  "indoor_slope_c_per_h": -0.032,
   "calculated_target_lwt_c": 22.7,
   "calculated_pdc_setpoint_c": 13,
   "target_pdc_setpoint_c": 13,
@@ -63,7 +63,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "26/11 02:15",
+    "evaluated_local": "26/11 02:20",
     "effective_window_start": "13:00",
     "effective_window_end": "18:00",
     "in_window_now": false,
@@ -112,8 +112,8 @@
       "end_tin_c": 6.06,
       "hours_simulated": 30.7,
       "target_local": "27/11 09:00",
-      "first_below_tmin_local": "26/11 03:15",
-      "first_below_safe_local": "26/11 03:15"
+      "first_below_tmin_local": "26/11 03:20",
+      "first_below_safe_local": "26/11 03:20"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -148,20 +148,13 @@
   },
   "api_usage": {
     "date_utc": "2026-11-26",
-    "viessmann_reads": 34,
+    "viessmann_reads": 36,
     "viessmann_writes": 0,
-    "bticino_reads": 34,
+    "bticino_reads": 36,
     "bticino_writes": 0,
     "cronjob_patches": 0,
-    "github_runs": 17,
+    "github_runs": 18,
     "recent_events": [
-      {
-        "ts": "2026-11-25T01:15:57.614275+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-25T01:31:04.734535+00:00",
         "lbl": "telemetry_poll",
@@ -1268,6 +1261,13 @@
       },
       {
         "ts": "2026-11-26T01:15:48.485496+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-26T01:20:52.403115+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
