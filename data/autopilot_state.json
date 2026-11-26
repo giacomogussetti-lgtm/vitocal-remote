@@ -1,26 +1,26 @@
 {
-  "state": "PUFFER_DRAIN",
-  "state_since_utc": "2026-11-26T14:01:44.853639+00:00",
-  "below_threshold_since_utc": "2026-11-25T16:45:51.271882+00:00",
-  "cycle_started_utc": "2026-11-26T08:01:19.186928+00:00",
+  "state": "IDLE",
+  "state_since_utc": "2026-11-26T14:27:31.343850+00:00",
+  "below_threshold_since_utc": null,
+  "cycle_started_utc": null,
   "cycle_is_emergency": false,
-  "drain_started_utc": "2026-11-26T14:01:44.853639+00:00",
-  "last_eval_utc": "2026-11-26T14:26:35.357487+00:00",
-  "last_action_utc": "2026-11-26T14:01:44.853639+00:00",
-  "last_action_reason": "Stop PdC (Durata max raggiunta (360m) — stop preferito a estensione: notte sicura (min 7.2°C ≥ 7.2°C) e domani COP migliore (4.91 vs 4.64)), avvio scarico puffer 25 min. Modalità PdC impostata e verificata: standby | Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual)",
-  "indoor_slope_c_per_h": 0.137,
+  "drain_started_utc": null,
+  "last_eval_utc": "2026-11-26T14:27:31.343850+00:00",
+  "last_action_utc": "2026-11-26T14:27:31.343850+00:00",
+  "last_action_reason": "Ciclo completato (Timeout scarico (26 min)) -> ritorno in IDLE. Modalità BTicino aggiornata su 'hg' | Modalità PdC impostata e verificata: standby",
+  "indoor_slope_c_per_h": 0.136,
   "calculated_target_lwt_c": 21.9,
   "calculated_pdc_setpoint_c": 12,
   "target_pdc_setpoint_c": 12,
-  "soft_start_last_step_utc": "2026-11-26T08:01:19.186928+00:00",
-  "current_cron_interval_min": 1,
+  "soft_start_last_step_utc": null,
+  "current_cron_interval_min": 15,
   "defrost_detected_today": 4,
-  "cycle_defrost_episodes": 6,
+  "cycle_defrost_episodes": 0,
   "prev_phase_was_defrost": false,
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": 0,
   "soft_curve_last_trim_utc": null,
-  "last_grundfos_run_utc": "2026-11-26T14:26:35.357487+00:00",
+  "last_grundfos_run_utc": "2026-11-26T14:27:31.343850+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
@@ -55,21 +55,21 @@
       "info_s": 900
     }
   ],
-  "active_window_start_local": "09:00",
-  "active_window_end_local": "15:01",
+  "active_window_start_local": null,
+  "active_window_end_local": null,
   "weather_deferred_date": null,
   "armed_by_prearm": false,
   "committed_window_date": "2026-11-26",
   "committed_window_start": "09:00",
   "committed_window_end": "15:01",
   "window_postponed_date": null,
-  "min_end_temp_extended": true,
-  "min_end_ext_count": 1,
+  "min_end_temp_extended": false,
+  "min_end_ext_count": 0,
   "weather_plan": {
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "26/11 15:26",
+    "evaluated_local": "26/11 15:27",
     "effective_window_start": "09:00",
     "effective_window_end": "15:01",
     "window_locked": true,
@@ -122,9 +122,9 @@
       "start_tin_c": 8.1,
       "min_tin_c": 7.27,
       "end_tin_c": 7.27,
-      "hours_simulated": 17.6,
+      "hours_simulated": 17.5,
       "target_local": "27/11 09:00",
-      "first_below_tmin_local": "27/11 05:26",
+      "first_below_tmin_local": "27/11 05:27",
       "first_below_safe_local": null
     },
     "short_cycle_action": "normal",
@@ -138,7 +138,7 @@
       "Finestra Oggi: 09:00–15:01 🔒 (COP netto stimato 4.61, OAT +4.1°C, RH 93%, Brina MEDIO, allineata a statica).",
       "Finestra bloccata 🔒 (09:00–15:01): entro 90m dall'avvio non slitta più.",
       "Finestra Domani: 09:00–14:00 (COP netto 4.92, OAT +2.9°C, RH 79%, Brina MEDIO).",
-      "Proiezione casa fino a domani 09:00 (17.6h, UA×1.15=0.206): 8.1°C → 7.3°C (min 7.3°C vs pavimento sicurezza 7.2°C)."
+      "Proiezione casa fino a domani 09:00 (17.5h, UA×1.15=0.206): 8.1°C → 7.3°C (min 7.3°C vs pavimento sicurezza 7.2°C)."
     ],
     "assumptions": {
       "ua_raw_c_24h_k": 0.179,
@@ -161,12 +161,12 @@
   },
   "api_usage": {
     "date_utc": "2026-11-26",
-    "viessmann_reads": 958,
-    "viessmann_writes": 6,
-    "bticino_reads": 951,
-    "bticino_writes": 3,
-    "cronjob_patches": 1,
-    "github_runs": 474,
+    "viessmann_reads": 966,
+    "viessmann_writes": 10,
+    "bticino_reads": 954,
+    "bticino_writes": 4,
+    "cronjob_patches": 2,
+    "github_runs": 475,
     "recent_events": [
       {
         "ts": "2026-11-25T14:31:29.051166+00:00",
@@ -4142,18 +4142,38 @@
         "vr": 2,
         "br": 2,
         "gh": 1
+      },
+      {
+        "ts": "2026-11-26T14:27:31.338887+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-26T14:27:36.989863+00:00",
+        "lbl": "ap_idle_shutdown",
+        "vr": 6,
+        "vw": 4,
+        "br": 1,
+        "bw": 1
+      },
+      {
+        "ts": "2026-11-26T14:27:37.647316+00:00",
+        "lbl": "ap_cron_adapt",
+        "cp": 1
       }
     ]
   },
   "thermal_model": {
-    "cycles_observed": 3,
-    "confidence_pct": 43,
-    "k_rad_kw_per_k": 0.413,
-    "inverter_min_mod_pct": 38.6,
-    "defrost_lwt_drop_p90_k": 9.5,
-    "ua_building_c_24h_per_k": 0.179,
-    "recommended_target_lwt_c": 23.5,
-    "pred_autonomy_hours": 51.3,
-    "updated_utc": "2026-11-26T01:52:15.012022+00:00"
+    "cycles_observed": 7,
+    "confidence_pct": 69,
+    "k_rad_kw_per_k": 0.444,
+    "inverter_min_mod_pct": 38.8,
+    "defrost_lwt_drop_p90_k": 9.1,
+    "ua_building_c_24h_per_k": 0.18,
+    "recommended_target_lwt_c": 23.9,
+    "pred_autonomy_hours": 51.0,
+    "updated_utc": "2026-11-26T14:27:37.027634+00:00"
   }
 }
