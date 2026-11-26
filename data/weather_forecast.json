@@ -806,7 +806,7 @@
     "frost_penalty_scale": 1.0,
     "tin_proj_samples_matched": 3,
     "tin_projection_mae_c": 0.11,
-    "calibrated_utc": "2026-11-26T09:32:31.108908+00:00"
+    "calibrated_utc": "2026-11-26T09:33:29.858006+00:00"
   },
   "calibration_history": [
     {
@@ -1938,7 +1938,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "26/11 10:32",
+    "evaluated_local": "26/11 10:33",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": true,
@@ -1946,7 +1946,7 @@
     "committed_window_start": "09:00",
     "committed_window_end": "14:00",
     "in_window_now": true,
-    "remaining_window_min": 208,
+    "remaining_window_min": 207,
     "next_hour_cop_net": 4.45,
     "next_hour_label": "Oggi 10:00",
     "today_window": {
@@ -1991,10 +1991,10 @@
       "start_tin_c": 7.4,
       "min_tin_c": 6.58,
       "end_tin_c": 6.58,
-      "hours_simulated": 22.5,
+      "hours_simulated": 22.4,
       "target_local": "27/11 09:00",
-      "first_below_tmin_local": "26/11 11:32",
-      "first_below_safe_local": "26/11 18:32"
+      "first_below_tmin_local": "26/11 11:33",
+      "first_below_safe_local": "26/11 18:33"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -2002,11 +2002,11 @@
     "prearm_reason": null,
     "defer_recommended": false,
     "defer_reason": null,
-    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 208m)",
+    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 207m)",
     "decision_trace": [
       "Finestra Oggi: 09:00–14:00 🔒 (COP netto stimato 4.61, OAT +4.4°C, RH 94%, Brina MEDIO, allineata a statica).",
       "Finestra Domani: 09:00–14:00 (COP netto 4.80, OAT +3.4°C, RH 84%, Brina MEDIO).",
-      "Proiezione casa fino a domani 09:00 (22.5h, UA×1.15=0.206): 7.4°C → 6.6°C (min 6.6°C vs pavimento sicurezza 7.2°C)."
+      "Proiezione casa fino a domani 09:00 (22.4h, UA×1.15=0.206): 7.4°C → 6.6°C (min 6.6°C vs pavimento sicurezza 7.2°C)."
     ],
     "assumptions": {
       "ua_raw_c_24h_k": 0.179,
