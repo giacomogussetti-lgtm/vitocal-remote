@@ -5,7 +5,7 @@
   "cycle_started_utc": null,
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-26T04:05:45.738451+00:00",
+  "last_eval_utc": "2026-11-26T04:10:57.081919+00:00",
   "last_action_utc": "2026-11-24T15:27:28.128903+00:00",
   "last_action_reason": "Richiesta calore confermata da 30 min (T=7.5°C). Attesa finestra COP / emergenza.",
   "indoor_slope_c_per_h": -0.0,
@@ -67,9 +67,9 @@
   "min_end_ext_count": 0,
   "weather_plan": {
     "available": true,
-    "source": "open_meteo_live",
+    "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "26/11 05:05",
+    "evaluated_local": "26/11 05:10",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": false,
@@ -122,10 +122,10 @@
       "start_tin_c": 7.2,
       "min_tin_c": 6.2,
       "end_tin_c": 6.2,
-      "hours_simulated": 27.9,
+      "hours_simulated": 27.8,
       "target_local": "27/11 09:00",
-      "first_below_tmin_local": "26/11 06:05",
-      "first_below_safe_local": "26/11 06:05"
+      "first_below_tmin_local": "26/11 06:10",
+      "first_below_safe_local": "26/11 06:10"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -139,7 +139,7 @@
       "Guardia Emergenza: T_casa (7.2°C) toccherebbe ≤7.0°C alle 11:00 → avvio anticipato/bloccato a 10:00–15:00.",
       "Anti-Slittamento: mantenuta finestra 09:00–14:00 (miglioramento insufficiente o rinvio già usato oggi).",
       "Finestra Domani: 09:00–14:00 (COP netto 4.80, OAT +3.1°C, RH 83%, Brina MEDIO).",
-      "Proiezione casa fino a domani 09:00 (27.9h, UA×1.15=0.206): 7.2°C → 6.2°C (min 6.2°C vs pavimento sicurezza 7.2°C)."
+      "Proiezione casa fino a domani 09:00 (27.8h, UA×1.15=0.206): 7.2°C → 6.2°C (min 6.2°C vs pavimento sicurezza 7.2°C)."
     ],
     "assumptions": {
       "ua_raw_c_24h_k": 0.179,
@@ -162,12 +162,12 @@
   },
   "api_usage": {
     "date_utc": "2026-11-26",
-    "viessmann_reads": 102,
+    "viessmann_reads": 104,
     "viessmann_writes": 0,
-    "bticino_reads": 102,
+    "bticino_reads": 104,
     "bticino_writes": 0,
     "cronjob_patches": 0,
-    "github_runs": 51,
+    "github_runs": 52,
     "recent_events": [
       {
         "ts": "2026-11-25T04:15:57.224595+00:00",
@@ -1436,6 +1436,13 @@
       },
       {
         "ts": "2026-11-26T04:05:45.735998+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-26T04:10:57.079491+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,

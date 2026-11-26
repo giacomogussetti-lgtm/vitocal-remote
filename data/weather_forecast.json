@@ -806,7 +806,7 @@
     "frost_penalty_scale": 1.0,
     "tin_proj_samples_matched": 0,
     "tin_projection_mae_c": null,
-    "calibrated_utc": "2026-11-26T04:05:45.878051+00:00"
+    "calibrated_utc": "2026-11-26T04:10:57.104334+00:00"
   },
   "calibration_history": [
     {
@@ -1846,9 +1846,9 @@
   ],
   "plan": {
     "available": true,
-    "source": "open_meteo_live",
+    "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "26/11 05:05",
+    "evaluated_local": "26/11 05:10",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": false,
@@ -1901,10 +1901,10 @@
       "start_tin_c": 7.2,
       "min_tin_c": 6.2,
       "end_tin_c": 6.2,
-      "hours_simulated": 27.9,
+      "hours_simulated": 27.8,
       "target_local": "27/11 09:00",
-      "first_below_tmin_local": "26/11 06:05",
-      "first_below_safe_local": "26/11 06:05"
+      "first_below_tmin_local": "26/11 06:10",
+      "first_below_safe_local": "26/11 06:10"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -1918,7 +1918,7 @@
       "Guardia Emergenza: T_casa (7.2°C) toccherebbe ≤7.0°C alle 11:00 → avvio anticipato/bloccato a 10:00–15:00.",
       "Anti-Slittamento: mantenuta finestra 09:00–14:00 (miglioramento insufficiente o rinvio già usato oggi).",
       "Finestra Domani: 09:00–14:00 (COP netto 4.80, OAT +3.1°C, RH 83%, Brina MEDIO).",
-      "Proiezione casa fino a domani 09:00 (27.9h, UA×1.15=0.206): 7.2°C → 6.2°C (min 6.2°C vs pavimento sicurezza 7.2°C)."
+      "Proiezione casa fino a domani 09:00 (27.8h, UA×1.15=0.206): 7.2°C → 6.2°C (min 6.2°C vs pavimento sicurezza 7.2°C)."
     ],
     "assumptions": {
       "ua_raw_c_24h_k": 0.179,
