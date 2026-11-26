@@ -806,7 +806,7 @@
     "frost_penalty_scale": 0.94,
     "tin_proj_samples_matched": 5,
     "tin_projection_mae_c": 0.86,
-    "calibrated_utc": "2026-11-26T14:01:16.293144+00:00"
+    "calibrated_utc": "2026-11-26T14:01:44.880285+00:00"
   },
   "calibration_history": [
     {
@@ -1496,7 +1496,7 @@
       "tin_projection_mae_c": 0.77
     },
     {
-      "ts_utc": "2026-11-26T14:01:16.293138+00:00",
+      "ts_utc": "2026-11-26T14:01:44.880278+00:00",
       "oat_samples_matched": 5,
       "oat_bias_c": 0.21,
       "oat_raw_mae_c": 0.8,
@@ -1610,7 +1610,7 @@
       "pred_tin_c": 7.69
     },
     {
-      "created_utc": "2026-11-26T14:01:16.275355+00:00",
+      "created_utc": "2026-11-26T14:01:44.853639+00:00",
       "target_local": "2026-11-26T21:00",
       "pred_tin_c": 7.86
     }
