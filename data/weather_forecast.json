@@ -806,7 +806,7 @@
     "frost_penalty_scale": 0.94,
     "tin_proj_samples_matched": 5,
     "tin_projection_mae_c": 0.86,
-    "calibrated_utc": "2026-11-26T14:11:36.832810+00:00"
+    "calibrated_utc": "2026-11-26T14:12:40.294803+00:00"
   },
   "calibration_history": [
     {
@@ -2041,7 +2041,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "26/11 15:11",
+    "evaluated_local": "26/11 15:12",
     "effective_window_start": "09:00",
     "effective_window_end": "15:01",
     "window_locked": true,
@@ -2096,7 +2096,7 @@
       "end_tin_c": 7.24,
       "hours_simulated": 17.8,
       "target_local": "27/11 09:00",
-      "first_below_tmin_local": "27/11 05:11",
+      "first_below_tmin_local": "27/11 05:12",
       "first_below_safe_local": null
     },
     "short_cycle_action": "normal",
