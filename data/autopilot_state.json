@@ -5,10 +5,10 @@
   "cycle_started_utc": null,
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-26T03:40:53.545289+00:00",
+  "last_eval_utc": "2026-11-26T03:45:49.430519+00:00",
   "last_action_utc": "2026-11-24T15:27:28.128903+00:00",
   "last_action_reason": "Richiesta calore confermata da 30 min (T=7.5°C). Attesa finestra COP / emergenza.",
-  "indoor_slope_c_per_h": -0.009,
+  "indoor_slope_c_per_h": 0.0,
   "calculated_target_lwt_c": 22.7,
   "calculated_pdc_setpoint_c": 13,
   "target_pdc_setpoint_c": 13,
@@ -69,7 +69,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "26/11 04:40",
+    "evaluated_local": "26/11 04:45",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": false,
@@ -122,10 +122,10 @@
       "start_tin_c": 7.2,
       "min_tin_c": 6.11,
       "end_tin_c": 6.11,
-      "hours_simulated": 28.3,
+      "hours_simulated": 28.2,
       "target_local": "27/11 09:00",
-      "first_below_tmin_local": "26/11 05:40",
-      "first_below_safe_local": "26/11 05:40"
+      "first_below_tmin_local": "26/11 05:45",
+      "first_below_safe_local": "26/11 05:45"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -138,7 +138,7 @@
       "Finestra Oggi: 09:00–14:00 (COP netto stimato 4.24, OAT +2.9°C, RH 97%, Brina ALTO, allineata a statica).",
       "Guardia Emergenza: T_casa (7.2°C) toccherebbe ≤7.0°C alle 10:00 → avvio anticipato/bloccato a 09:00–14:00.",
       "Finestra Domani: 09:00–14:00 (COP netto 4.67, OAT +2.8°C, RH 86%, Brina MEDIO).",
-      "Proiezione casa fino a domani 09:00 (28.3h, UA×1.15=0.206): 7.2°C → 6.1°C (min 6.1°C vs pavimento sicurezza 7.2°C)."
+      "Proiezione casa fino a domani 09:00 (28.2h, UA×1.15=0.206): 7.2°C → 6.1°C (min 6.1°C vs pavimento sicurezza 7.2°C)."
     ],
     "assumptions": {
       "ua_raw_c_24h_k": 0.179,
@@ -161,12 +161,12 @@
   },
   "api_usage": {
     "date_utc": "2026-11-26",
-    "viessmann_reads": 92,
+    "viessmann_reads": 94,
     "viessmann_writes": 0,
-    "bticino_reads": 92,
+    "bticino_reads": 94,
     "bticino_writes": 0,
     "cronjob_patches": 0,
-    "github_runs": 46,
+    "github_runs": 47,
     "recent_events": [
       {
         "ts": "2026-11-25T03:45:54.887011+00:00",
@@ -1414,6 +1414,13 @@
       },
       {
         "ts": "2026-11-26T03:40:53.542979+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-26T03:45:49.428327+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
