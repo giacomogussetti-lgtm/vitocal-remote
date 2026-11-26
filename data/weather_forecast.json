@@ -806,7 +806,7 @@
     "frost_penalty_scale": 0.94,
     "tin_proj_samples_matched": 5,
     "tin_projection_mae_c": 0.86,
-    "calibrated_utc": "2026-11-26T14:07:29.558517+00:00"
+    "calibrated_utc": "2026-11-26T14:08:36.106976+00:00"
   },
   "calibration_history": [
     {
@@ -1879,7 +1879,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 88.0,
-      "tin_proj_c": 7.23,
+      "tin_proj_c": 7.24,
       "in_window": true
     },
     {
@@ -2041,7 +2041,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "26/11 15:07",
+    "evaluated_local": "26/11 15:08",
     "effective_window_start": "09:00",
     "effective_window_end": "15:01",
     "window_locked": true,
@@ -2092,11 +2092,11 @@
     },
     "projection_to_tomorrow": {
       "start_tin_c": 8.1,
-      "min_tin_c": 7.23,
-      "end_tin_c": 7.23,
+      "min_tin_c": 7.24,
+      "end_tin_c": 7.24,
       "hours_simulated": 17.9,
       "target_local": "27/11 09:00",
-      "first_below_tmin_local": "27/11 05:07",
+      "first_below_tmin_local": "27/11 05:08",
       "first_below_safe_local": null
     },
     "short_cycle_action": "normal",
