@@ -1137,6 +1137,8 @@ function readAutopilotFormValues() {
     weather_arbitrage_cop_delta: parseFloat(document.getElementById("apWeatherArbDelta")?.value || "0.25"),
     weather_min_cop_gain: parseFloat(document.getElementById("apWeatherMinGain")?.value || "0.08"),
     weather_refresh_hours: clampInt(document.getElementById("apWeatherRefreshH")?.value, 1, 12, 3),
+    min_cycle_end_temp_c: parseFloat(document.getElementById("apMinEndTemp")?.value || "8.2"),
+    window_lock_before_start_minutes: clampInt(document.getElementById("apWinLockMin")?.value, 15, 240, 90),
   };
 }
 
@@ -1159,6 +1161,16 @@ function bindAutopilotButtons() {
     synBanner.addEventListener("click", () => {
       const cmdTabBtn = document.querySelector('.nav-item[data-tab="tab-commands"]');
       if (cmdTabBtn) cmdTabBtn.click();
+    });
+  }
+
+  const btnSynWx = document.getElementById("btnSynWxOpenCommands");
+  if (btnSynWx) {
+    btnSynWx.addEventListener("click", () => {
+      const cmdTabBtn = document.querySelector('.nav-item[data-tab="tab-commands"]');
+      if (cmdTabBtn) cmdTabBtn.click();
+      const brainDrawer = document.getElementById("apPredictiveBrainDrawer");
+      if (brainDrawer) brainDrawer.open = true;
     });
   }
 
@@ -1366,6 +1378,8 @@ function renderAutopilotUI(cfg, st) {
       apWeatherArbDelta: cfg.weather_arbitrage_cop_delta,
       apWeatherMinGain: cfg.weather_min_cop_gain,
       apWeatherRefreshH: cfg.weather_refresh_hours,
+      apMinEndTemp: cfg.min_cycle_end_temp_c,
+      apWinLockMin: cfg.window_lock_before_start_minutes,
     };
     for (const [elId, val] of Object.entries(mapVals)) {
       const el = document.getElementById(elId);
@@ -1398,6 +1412,7 @@ function renderAutopilotUI(cfg, st) {
 
   renderWeatherBrainUI(cfg, st, cmdState.lastWeatherForecast);
   renderSelfTuningAuditUI(st, cmdState.lastThermalModel, cmdState.lastWeatherForecast);
+  renderSynopticWeatherDrawer(cfg, st, cmdState.lastWeatherForecast);
 
   // Render live converging physical model summary
   const tmEl = document.getElementById("apThermalModelSummary");
@@ -1641,6 +1656,53 @@ function renderSelfTuningAuditUI(st, tm, wf) {
     </div>
     ${tableHtml}
   `;
+}
+
+function renderSynopticWeatherDrawer(cfg, st, wf) {
+  const sumEl = document.getElementById("synopticWeatherSummaryText");
+  const verdictEl = document.getElementById("synWxVerdict");
+  const pairEl = document.getElementById("synWxPair");
+  const stripEl = document.getElementById("synWxMiniStrip");
+  if (!sumEl || !verdictEl || !pairEl || !stripEl) return;
+
+  const wp = (st && st.weather_plan) || (wf && wf.plan) || null;
+  const effStart = (st && st.active_window_start_local) || (wp && wp.effective_window_start) || (cfg && cfg.cop_window_start) || "11:00";
+  const effEnd = (st && st.active_window_end_local) || (wp && wp.effective_window_end) || (cfg && cfg.cop_window_end) || "16:00";
+  const lockIcon = (wp && wp.window_locked) ? " 🔒" : "";
+  const tw = wp && wp.today_window;
+  const tmw = wp && wp.tomorrow_window;
+  const copStr = tw && tw.avg_cop_net != null ? ` · COP ${Number(tw.avg_cop_net).toFixed(2)}` : "";
+  const proj = wp && wp.projection_to_tomorrow;
+  const minTinStr = proj && proj.min_tin_c != null ? ` · Min attesa ${Number(proj.min_tin_c).toFixed(1)}°C` : "";
+
+  sumEl.textContent = `☀️ Finestra Target: ${effStart}–${effEnd}${lockIcon}${copStr}${minTinStr}`;
+  verdictEl.textContent = (wp && wp.decision_summary) || `Finestra statica ${effStart}–${effEnd}`;
+
+  const chips = [];
+  if (tw) {
+    chips.push(`<div class="syn-wx-chip"><strong>Oggi ${escapeHtmlSafe(effStart)}–${escapeHtmlSafe(effEnd)}${lockIcon}</strong><span>COP ${Number(tw.avg_cop_net).toFixed(2)} · OAT ${Number(tw.avg_temp_c) >= 0 ? "+" : ""}${Number(tw.avg_temp_c).toFixed(1)}°C · RH ${tw.avg_rh_pct}% · Brina ${escapeHtmlSafe(tw.frost_risk)}</span></div>`);
+  }
+  if (tmw) {
+    chips.push(`<div class="syn-wx-chip"><strong>Domani ${escapeHtmlSafe(tmw.start_hhmm)}–${escapeHtmlSafe(tmw.end_hhmm)}</strong><span>COP ${Number(tmw.avg_cop_net).toFixed(2)} · OAT ${Number(tmw.avg_temp_c) >= 0 ? "+" : ""}${Number(tmw.avg_temp_c).toFixed(1)}°C · RH ${tmw.avg_rh_pct}% · Brina ${escapeHtmlSafe(tmw.frost_risk)}</span></div>`);
+  }
+  pairEl.innerHTML = chips.join("") || '<span class="cmd-muted-note">Previsioni orarie in caricamento...</span>';
+
+  const hourly = (wf && Array.isArray(wf.hourly_preview)) ? wf.hourly_preview.slice(0, 12) : [];
+  if (hourly.length) {
+    stripEl.innerHTML = hourly.map(h => {
+      const tinTxt = h.tin_proj_c != null ? `🏠 ${Number(h.tin_proj_c).toFixed(1)}°` : "";
+      return `
+        <div class="ap-hour-pill ${h.in_window ? "in-window" : ""}">
+          <span class="ap-hour-time">${escapeHtmlSafe(h.day_tag)} ${escapeHtmlSafe(h.hh)}</span>
+          <span>${escapeHtmlSafe(h.icon || "🌤️")} ${Number(h.temp_c) >= 0 ? "+" : ""}${Number(h.temp_c).toFixed(1)}°</span>
+          <span>RH ${h.rh_pct}%</span>
+          <span class="ap-hour-cop">COP ${Number(h.cop_net).toFixed(2)}</span>
+          ${tinTxt ? `<span class="ap-hour-tin">${tinTxt}</span>` : ""}
+        </div>`;
+    }).join("");
+  } else {
+    stripEl.innerHTML = "";
+  }
 }
 
 function computeApiQuotaSummary() {

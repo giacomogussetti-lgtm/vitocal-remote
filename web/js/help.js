@@ -143,6 +143,18 @@ const HELP_CATALOG = {
     impact: "Ogni parametro NON oscilla sugli ultimi campioni: calcola la mediana robusta su tutto lo storico con Bayesian shrinkage w = n / (n + k). All'aumentare dei cicli osservati (n), il valore converge asintoticamente verso il comportamento reale dell'impianto.",
     tip: "La tabella Open-Meteo vs Sonda OAT ti permette di verificare ora per ora quanto 'sgarra' la previsione rispetto al sensore fisico esterno della tua Vitocal."
   },
+  ap_min_end_temp: {
+    title: "🌡️ T Minima Fine Ciclo (°C)",
+    what: "Temperatura minima che casa deve aver raggiunto prima di spegnere il ciclo alla chiusura della finestra COP o al raggiungimento dei 300 minuti.",
+    impact: "Se si parte da molto freddo (es. emergenza a 6.8 °C), in 300 minuti la casa arriva solo a ~7.9–8.0 °C riducendo l'autonomia prima del riavvio. Se T_casa è sotto questa soglia (default 8.2 °C), il ciclo viene esteso una volta fino a +60 min (max 18:30) per completare la carica del massetto.",
+    tip: "8.0–8.3 °C assicura abbastanza isteresi fino al giorno successivo senza tirare troppo tardi la sera."
+  },
+  ap_window_lock: {
+    title: "🔒 Blocco Finestra Pre-Avvio (min)",
+    what: "Impedisce alla finestra dinamica di continuare a slittare in avanti man mano che arrivano nuovi aggiornamenti meteo orari.",
+    impact: "Entro N minuti prima dell'orario previsto di avvio (default 90 min), la finestra di oggi viene congelata. Inoltre, anche prima di quel limite, l'algoritmo non posticipa mai oltre il punto in cui T_casa toccherebbe l'Emergenza.",
+    tip: "90 minuti è l'equilibrio ideale tra adattamento meteo mattutino e certezza dell'accensione."
+  },
   cmd_profiles_smart: {
     title: "🎯 Scenari & Profili Coordinati (PdC + Consenso Pompa)",
     what: "Combina in un solo tocco i parametri Vitocal (modo, curva, temperature, fascia oraria) e il consenso relè del BTicino Smarther.",

@@ -79,19 +79,22 @@ function estimateSamplePower(sample) {
   const pCond = sample.hot_gas_pressure_bar != null ? Number(sample.hot_gas_pressure_bar) : 17.0;
   const pressFactor = clamp(0.82 + 0.18 * ((pCond - 14.0) / 6.0), 0.72, 1.25);
   const p1Kw = (Number(sample.primary_pump_rotation_percent) || 0) > 0 ? 0.045 : 0.0;
-  const pElecKw = 0.55 + 2.55 * (mod / 100.0) * pressFactor + p1Kw + gfKw;
+  const pElecKw = 0.28 + 2.95 * (mod / 100.0) * pressFactor + p1Kw + gfKw;
 
-  // Dynamic Carnot-calibrated COP from real condensing/evaporating temperatures (instead of static seasonal 3.1)
+  // Dynamic EN 14511 / R410A Carnot-calibrated COP from real condensing/evaporating temperatures
   const lwt = sample.pdc_supply_temp_c != null ? Number(sample.pdc_supply_temp_c) : 25.0;
-  const tCondC = computeR410aCondTempC(pCond) ?? (lwt + 1.5);
+  const tCondC = sample.hot_gas_pressure_bar != null
+    ? (computeR410aCondTempC(pCond) ?? (lwt + 3.0))
+    : (lwt + 3.0);
   const oat = sample.external_temp_c != null ? Number(sample.external_temp_c) : 5.0;
-  const tSuc = sample.suction_gas_temp_c != null ? Number(sample.suction_gas_temp_c) : (oat - 5.0);
-  const tEvapC = Math.min(oat - 3.5, tSuc + 1.5);
+  const tEvapC = sample.suction_gas_temp_c != null
+    ? Math.min(oat - 3.5, Number(sample.suction_gas_temp_c) + 1.5)
+    : (oat - 6.5);
   const liftK = Math.max(12.0, tCondC - tEvapC);
   const carnotCop = (tCondC + 273.15) / liftK;
-  // Inverter part-load efficiency bonus around 35-55% vs 85-90% high-speed penalty
-  const partLoadEff = mod <= 55 ? 0.44 : (mod <= 75 ? 0.41 : 0.37);
-  const dynCop = clamp(carnotCop * partLoadEff, 1.7, 5.2);
+  // Literature-calibrated Second-Law efficiency matching Vitocal 111.A16 EN 14511 (A7/W35=4.4, A2/W35=3.32)
+  const partLoadEff = mod <= 55 ? 0.48 : (mod <= 75 ? 0.44 : 0.39);
+  const dynCop = clamp(carnotCop * partLoadEff, 1.7, 5.3);
   return { pElecKw, pThermalKw: pElecKw * dynCop, cop: dynCop, isDefrost: false };
 }
 window.estimateSamplePower = estimateSamplePower;

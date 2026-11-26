@@ -80,7 +80,7 @@ def _shrink(obs: Optional[float], prior: float, n_obs: int, prior_weight: float 
 
 
 def _estimate_sample_thermal_kw(sample: dict[str, Any]) -> float:
-    """Calibrated Vitocal 111-S 11 kW thermal output model matching storage/analytics.py."""
+    """Unified EN 14511 / R410A Vitocal 111-S 111.A16 thermal output model matching analytics & charts."""
     phase = str(sample.get("compressor_phase") or "").lower()
     if "defrost" in phase:
         return -3.5
@@ -89,17 +89,22 @@ def _estimate_sample_thermal_kw(sample: dict[str, Any]) -> float:
     if not comp_on:
         return 0.0
     m = max(0.0, min(100.0, float(mod if mod is not None else 45.0)))
-    oat = float(sample.get("external_temp_c") if sample.get("external_temp_c") is not None else 5.0)
-    lwt = float(sample.get("pdc_supply_temp_c") if sample.get("pdc_supply_temp_c") is not None else 25.0)
+    p_raw = sample.get("hot_gas_pressure_bar")
+    p_cond = float(p_raw) if p_raw is not None else 17.0
+    p_factor = max(0.72, min(1.25, 0.82 + 0.18 * ((p_cond - 14.0) / 6.0)))
+    p1_kw = 0.045 if (sample.get("primary_pump_rotation_percent") or 0) > 0 else 0.0
+    p_el = 0.28 + 2.95 * (m / 100.0) * p_factor + p1_kw
 
-    # Calibrated Carnot-like COP & electrical power for Vitocal 111-S split 11 kW
-    elec_kw = 0.28 + 2.75 * ((m / 100.0) ** 1.15)
-    t_cond_k = (lwt + 5.0) + 273.15
-    t_evap_k = (oat - 6.0) + 273.15
-    dt_k = max(12.0, t_cond_k - t_evap_k)
-    cop_carnot = 0.44 * (t_cond_k / dt_k)
-    cop_dyn = max(1.8, min(5.4, cop_carnot))
-    return round(elec_kw * cop_dyn, 3)
+    lwt = float(sample.get("pdc_supply_temp_c") if sample.get("pdc_supply_temp_c") is not None else 25.0)
+    oat = float(sample.get("external_temp_c") if sample.get("external_temp_c") is not None else 5.0)
+    t_suc_raw = sample.get("suction_gas_temp_c")
+    t_cond = (22.86 * math.log(max(5.0, float(p_raw))) - 38.4) if p_raw is not None else (lwt + 3.0)
+    t_evap = min(oat - 3.5, float(t_suc_raw) + 1.5) if t_suc_raw is not None else (oat - 6.5)
+
+    carnot = (t_cond + 273.15) / max(12.0, t_cond - t_evap)
+    eta = 0.48 if m <= 55.0 else (0.44 if m <= 75.0 else 0.39)
+    cop_dyn = max(1.7, min(5.3, carnot * eta))
+    return round(p_el * cop_dyn, 3)
 
 
 def fit_thermal_model(samples: list[dict[str, Any]]) -> dict[str, Any]:

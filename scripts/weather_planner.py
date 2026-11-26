@@ -37,7 +37,7 @@ logger = logging.getLogger("weather_planner")
 WEATHER_CACHE_FILE = Config.DATA_DIR / "weather_forecast.json"
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 P_ATM_MOUNTAIN_HPA = 900.0  # ~950-1000 m mountain altitude barometric reference
-T_EVAP_OFFSET_K = 7.5       # Typical OAT - T_evap depression under steady load
+T_EVAP_OFFSET_K = 6.5       # Steady-state OAT - T_evap depression at 45-55% inverter load
 UA_SAFETY_FACTOR = 1.15     # Conservative 15% safety margin on building heat loss
 
 
@@ -466,10 +466,10 @@ def score_hourly_cop(
     lwt_ref_c: float = 23.5,
 ) -> list[dict[str, Any]]:
     """
-    Scores each hourly forecast slot with bias-corrected OAT, dry Carnot COP,
-    psychrometric frost/defrost penalty, solar gain bonus, and net effective COP.
+    Scores each hourly forecast slot with bias-corrected OAT, EN 14511-calibrated
+    dry Carnot COP, continuous psychrometric frost/precipitation degradation
+    (Vocale et al. / EnergyPlus envelope), solar gain bonus, and net effective COP.
     """
-    t_cond_k = (float(lwt_ref_c) + 5.0) + 273.15
     scored: list[dict[str, Any]] = []
 
     for rec in hourly_records:
@@ -483,22 +483,43 @@ def score_hourly_cop(
         solar = float(rec.get("solar_wm2") or 0.0)
         wmo = int(rec.get("wmo_code") or 0)
 
-        t_evap = t_corr - T_EVAP_OFFSET_K
-        t_evap_k = t_evap + 273.15
-        dt_k = max(12.0, t_cond_k - t_evap_k)
-        cop_dry = max(1.7, min(5.4, 0.44 * (t_cond_k / dt_k)))
+        # EN 14511 Vitocal 111.A16 Carnot-pinch COP with pressure-ratio efficiency decay:
+        # A7/W35 dry=4.36, A2/W35@85%RH net=3.32, A-7/W35 net~2.79 (EN14511: 4.37, 3.32, 2.72)
+        lift_pinch = max(14.0, (float(lwt_ref_c) - t_corr) + 8.0)
+        eta_comp = max(0.38, min(0.51, 0.505 - 0.0025 * max(0.0, lift_pinch - 36.0)))
+        cop_dry = max(1.7, min(5.2, eta_comp * ((float(lwt_ref_c) + 276.15) / lift_pinch)))
 
-        if t_evap < -0.5:
+        t_evap = t_corr - T_EVAP_OFFSET_K
+        if t_evap < 0.0:
             delta_w = max(0.0, _mixing_ratio_g_kg(t_corr, rh) - _mixing_ratio_g_kg(t_evap, 100.0))
         else:
             delta_w = 0.0
 
-        precip_extra = 0.18 if ((precip >= 0.2 or snow >= 0.05) and -2.0 <= t_corr <= 3.5) else 0.0
-        frost_loss_frac = min(0.32, float(frost_penalty_scale) * (0.11 * delta_w + precip_extra))
-        solar_bonus = min(0.06, (max(0.0, solar) / 500.0) * 0.06) if solar > 100.0 else 0.0
+        # Literature frosting envelope peak in [-2.0, +2.5] C, tapering cleanly outside
+        if delta_w > 0.0:
+            if -2.0 <= t_corr <= 2.5:
+                f_env = 1.25
+            elif t_corr > 2.5:
+                f_env = max(0.50, 1.25 - 0.25 * (t_corr - 2.5))
+            else:
+                f_env = max(0.75, 1.25 - 0.06 * (-2.0 - t_corr))
+            frost_base = 0.082 * delta_w * f_env
+        else:
+            frost_base = 0.0
+
+        # Continuous precipitation penalty (wet snow vs light liquid rain, zero binary cliff)
+        if snow > 0.0 or (precip > 0.0 and t_corr <= 1.2):
+            precip_loss = min(0.09, 0.05 * snow + 0.025 * min(3.0, precip))
+        elif precip > 0.0 and 1.2 < t_corr <= 3.5:
+            precip_loss = min(0.035, 0.012 * precip)
+        else:
+            precip_loss = 0.0
+
+        frost_loss_frac = min(0.26, float(frost_penalty_scale) * (frost_base + precip_loss))
+        solar_bonus = min(0.05, (max(0.0, solar) / 500.0) * 0.05) if solar > 100.0 else 0.0
         cop_net = round(cop_dry * (1.0 - frost_loss_frac) * (1.0 + solar_bonus), 2)
 
-        frost_risk = "ALTO" if frost_loss_frac >= 0.14 else ("MEDIO" if frost_loss_frac >= 0.06 else "BASSO")
+        frost_risk = "ALTO" if frost_loss_frac >= 0.14 else ("MEDIO" if frost_loss_frac >= 0.07 else "BASSO")
         scored.append({
             "time_local": str(rec["time_local"]),
             "temp_raw_c": round(float(raw_t), 1),
@@ -638,10 +659,13 @@ def project_indoor_temp(
     """
     ua_eff = max(0.05, float(ua_building_c_24h_per_k)) * UA_SAFETY_FACTOR
     hour_oat_map: dict[str, float] = {}
+    hour_wind_map: dict[str, float] = {}
     for s in scored_hourly:
         dt = _parse_local_hour(s["time_local"], rome_tz)
         if dt is not None:
-            hour_oat_map[dt.strftime("%Y-%m-%d %H")] = float(s["temp_c"])
+            k_hm = dt.strftime("%Y-%m-%d %H")
+            hour_oat_map[k_hm] = float(s["temp_c"])
+            hour_wind_map[k_hm] = float(s.get("wind_kmh") or 0.0)
 
     cur_t = float(t_in_c)
     min_t = cur_t
@@ -659,7 +683,9 @@ def project_indoor_temp(
             break
         key = cursor.strftime("%Y-%m-%d %H")
         oat_h = hour_oat_map.get(key, float(fallback_oat_c) - 2.0)
-        loss_h = (ua_eff / 24.0) * max(0.5, cur_t - oat_h) * frac
+        wind_h = hour_wind_map.get(key, 0.0)
+        wind_mult = 1.0 + min(0.15, max(0.0, wind_h - 15.0) * 0.008)
+        loss_h = (ua_eff * wind_mult / 24.0) * max(0.5, cur_t - oat_h) * frac
         cur_t -= loss_h
         min_t = min(min_t, cur_t)
         cursor = cursor + timedelta(hours=frac)
@@ -756,30 +782,10 @@ def evaluate_weather_plan(
     today_win = find_best_window_for_date(scored, today_str, cfg, rome_tz) if scored else None
     tomorrow_win = find_best_window_for_date(scored, tomorrow_str, cfg, rome_tz) if scored else None
 
-    # Lock active window during HEATING_SYNC so it doesn't shift mid-cycle
-    if cur_state == "HEATING_SYNC" and st.get("active_window_start_local") and st.get("active_window_end_local"):
-        eff_start = str(st["active_window_start_local"])
-        eff_end = str(st["active_window_end_local"])
-    elif today_win and cfg.get("weather_dynamic_window_enabled", True):
-        eff_start = today_win["start_hhmm"]
-        eff_end = today_win["end_hhmm"]
-    else:
-        eff_start = static_start
-        eff_end = static_end
-
-    cur_min = now_local.hour * 60 + now_local.minute
-    eff_start_min = _hhmm_to_min(eff_start)
-    eff_end_min = _hhmm_to_min(eff_end)
-    in_window_now = eff_start_min <= cur_min <= eff_end_min
-    remaining_min = max(0, eff_end_min - cur_min) if in_window_now else 0
-
     # Target start tomorrow for overnight simulation
     tom_start_hhmm = tomorrow_win["start_hhmm"] if tomorrow_win else static_start
     tom_h, tom_m = [int(x) for x in tom_start_hhmm.split(":")]
     tom_target_dt = tomorrow_dt.replace(hour=tom_h, minute=tom_m, second=0, microsecond=0)
-    if cur_min < eff_start_min and cur_state in ("IDLE", "ARMED"):
-        # Before today's window starts, project to today's window start first? No, also track overnight to tomorrow's window
-        pass
 
     tin_ref = float(t_in_c) if t_in_c is not None else t_min
     oat_fallback = float(current_oat_c) if current_oat_c is not None else 4.0
@@ -795,6 +801,100 @@ def evaluate_weather_plan(
         t_min_c=t_min,
     )
 
+    cur_min = now_local.hour * 60 + now_local.minute
+    win_hours = max(1, min(9, int(cfg.get("weather_window_hours") or 5)))
+    search_start_h = _hhmm_to_min(str(cfg.get("weather_search_start") or "09:00")) // 60
+    static_start_h = _hhmm_to_min(static_start) // 60
+    min_gain = float(cfg.get("weather_min_cop_gain") if cfg.get("weather_min_cop_gain") is not None else 0.08)
+    lock_before_min = int(cfg.get("window_lock_before_start_minutes") or 90)
+
+    def _window_avg_cop(w_start: str, w_end: str) -> Optional[float]:
+        h0 = _hhmm_to_min(w_start) // 60
+        h1 = max(h0 + 1, (_hhmm_to_min(w_end) + 59) // 60)
+        vals = []
+        for s in scored:
+            dt_s = _parse_local_hour(s["time_local"], rome_tz)
+            if dt_s is not None and dt_s.strftime("%Y-%m-%d") == today_str and h0 <= dt_s.hour < h1:
+                vals.append(float(s["cop_net"]))
+        return round(sum(vals) / len(vals), 2) if vals else None
+
+    window_locked = False
+    was_postponed_now = False
+    horizon_guard_notes: list[str] = []
+
+    # Lock active window during HEATING_SYNC so it doesn't shift mid-cycle
+    if cur_state == "HEATING_SYNC" and st.get("active_window_start_local") and st.get("active_window_end_local"):
+        eff_start = str(st["active_window_start_local"])
+        eff_end = str(st["active_window_end_local"])
+        window_locked = True
+    else:
+        if today_win and cfg.get("weather_dynamic_window_enabled", True):
+            eff_start = today_win["start_hhmm"]
+            eff_end = today_win["end_hhmm"]
+        else:
+            eff_start = static_start
+            eff_end = static_end
+
+        # Layer 1: Emergency-Ceiling Guard (never postpone start past when T_in would drop <= T_emerg + 0.2 C)
+        emerg_ceiling_triggered = False
+        if cur_state == "ARMED" or tin_ref <= (t_min + 0.15):
+            eff_start_h = _hhmm_to_min(eff_start) // 60
+            tin_map_chk = proj.get("hourly_tin_map") or {}
+            first_danger_h: Optional[int] = None
+            for h_chk in range(now_local.hour + 1, eff_start_h + 1):
+                t_chk = tin_map_chk.get(f"{today_str}T{h_chk:02d}:00")
+                if t_chk is not None and float(t_chk) <= (t_emerg + 0.2):
+                    first_danger_h = h_chk
+                    break
+            if first_danger_h is not None:
+                safe_h = max(search_start_h, min(static_start_h, first_danger_h - 1))
+                if safe_h < eff_start_h:
+                    emerg_ceiling_triggered = True
+                    eff_start = f"{safe_h:02d}:00"
+                    eff_end = f"{min(23, safe_h + win_hours):02d}:00"
+                    horizon_guard_notes.append(
+                        f"Guardia Emergenza: T_casa ({tin_ref:.1f}°C) toccherebbe ≤{t_emerg + 0.2:.1f}°C alle {first_danger_h:02d}:00 → avvio anticipato/bloccato a {eff_start}–{eff_end}."
+                    )
+
+        # Layer 2 & 3: Anti-Chasing-Horizon Lock & Asymmetric Postponement Guard
+        comm_date = st.get("committed_window_date")
+        comm_start = st.get("committed_window_start")
+        comm_end = st.get("committed_window_end")
+        postponed_today = (st.get("window_postponed_date") == today_str)
+        if comm_date == today_str and comm_start and comm_end:
+            comm_start_min = _hhmm_to_min(str(comm_start))
+            eff_start_min_cand = _hhmm_to_min(eff_start)
+            if cur_min >= (comm_start_min - lock_before_min):
+                # Within lock horizon: freeze committed window (only allow Emergency-Ceiling pull earlier)
+                if not (emerg_ceiling_triggered and eff_start_min_cand < comm_start_min):
+                    eff_start = str(comm_start)
+                    eff_end = str(comm_end)
+                    window_locked = True
+                    horizon_guard_notes.append(
+                        f"Finestra bloccata 🔒 ({eff_start}–{eff_end}): entro {lock_before_min}m dall'avvio non slitta più."
+                    )
+            elif eff_start_min_cand > comm_start_min:
+                # Before lock horizon: allow postponing at most once/day and only on strong COP gain
+                comm_cop = _window_avg_cop(str(comm_start), str(comm_end))
+                cand_cop = _window_avg_cop(eff_start, eff_end)
+                req_gain = max(0.14, 2.0 * min_gain)
+                if not postponed_today and comm_cop is not None and cand_cop is not None and (cand_cop - comm_cop) >= req_gain:
+                    was_postponed_now = True
+                    horizon_guard_notes.append(
+                        f"Posticipo controllato {comm_start}→{eff_start} (+{cand_cop - comm_cop:.2f} COP; bloccati ulteriori rinvii oggi)."
+                    )
+                else:
+                    eff_start = str(comm_start)
+                    eff_end = str(comm_end)
+                    horizon_guard_notes.append(
+                        f"Anti-Slittamento: mantenuta finestra {eff_start}–{eff_end} (miglioramento insufficiente o rinvio già usato oggi)."
+                    )
+
+    eff_start_min = _hhmm_to_min(eff_start)
+    eff_end_min = _hhmm_to_min(eff_end)
+    in_window_now = eff_start_min <= cur_min <= eff_end_min
+    remaining_min = max(0, eff_end_min - cur_min) if in_window_now else 0
+
     # Decision evaluation
     short_cycle_action = "normal"
     extended_end_hhmm: Optional[str] = None
@@ -806,8 +906,8 @@ def evaluate_weather_plan(
 
     if cache_data.get("available") and today_win:
         trace.append(
-            f"Finestra Oggi: {eff_start}–{eff_end} (COP netto stimato {today_win['avg_cop_net']:.2f}, "
-            f"OAT {today_win['avg_temp_c']:+.1f}°C, RH {today_win['avg_rh_pct']}%, Brina {today_win['frost_risk']}"
+            f"Finestra Oggi: {eff_start}–{eff_end}" + (" 🔒" if window_locked else "")
+            + f" (COP netto stimato {today_win['avg_cop_net']:.2f}, OAT {today_win['avg_temp_c']:+.1f}°C, RH {today_win['avg_rh_pct']}%, Brina {today_win['frost_risk']}"
             + (f", +{today_win['cop_gain_vs_static']:.2f} vs statica" if today_win.get("is_dynamic_shifted") else ", allineata a statica")
             + ")."
         )
@@ -816,6 +916,7 @@ def evaluate_weather_plan(
             f"Finestra Attiva (statica): {eff_start}–{eff_end}. "
             + (cache_data.get("fallback_reason") or "Dati meteo non disponibili.")
         )
+    trace.extend(horizon_guard_notes)
 
     if tomorrow_win:
         trace.append(
@@ -991,6 +1092,10 @@ def evaluate_weather_plan(
         "evaluated_local": now_local.strftime("%d/%m %H:%M"),
         "effective_window_start": eff_start,
         "effective_window_end": eff_end,
+        "window_locked": window_locked,
+        "was_postponed_now": was_postponed_now,
+        "committed_window_start": eff_start,
+        "committed_window_end": eff_end,
         "in_window_now": in_window_now,
         "remaining_window_min": remaining_min,
         "today_window": today_win,

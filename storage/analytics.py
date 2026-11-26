@@ -8,6 +8,7 @@ Computes customizable metrics over any window (X hours):
 - Anti-frost safety margin evaluation
 """
 from datetime import datetime, timezone, timedelta
+import math
 from typing import Any, Optional
 
 
@@ -236,15 +237,16 @@ def analyze_telemetry_period(
         p_cond = float(ref.get("hot_gas_pressure_bar") or 17.0)
         p_factor = max(0.72, min(1.25, 0.82 + 0.18 * ((p_cond - 14.0) / 6.0)))
         p1_kw = 0.045 if (ref.get("primary_pump_rotation_percent") or 0) > 0 else 0.0
-        p_el = 0.55 + 2.55 * (mod / 100.0) * p_factor + p1_kw + gf_kw
+        p_el = 0.28 + 2.95 * (mod / 100.0) * p_factor + p1_kw + gf_kw
         lwt = float(ref.get("pdc_supply_temp_c") or 25.0)
         oat = float(ref.get("external_temp_c") if ref.get("external_temp_c") is not None else 5.0)
-        t_suc = float(ref.get("suction_gas_temp_c") if ref.get("suction_gas_temp_c") is not None else (oat - 5.0))
-        t_cond = lwt + 1.2
-        t_evap = min(oat - 3.5, t_suc + 1.5)
+        t_suc_raw = ref.get("suction_gas_temp_c")
+        p_raw = ref.get("hot_gas_pressure_bar")
+        t_cond = (22.86 * math.log(max(5.0, float(p_raw))) - 38.4) if p_raw is not None else (lwt + 3.0)
+        t_evap = min(oat - 3.5, float(t_suc_raw) + 1.5) if t_suc_raw is not None else (oat - 6.5)
         carnot = (t_cond + 273.15) / max(12.0, t_cond - t_evap)
-        eta = 0.44 if mod <= 55 else (0.41 if mod <= 75 else 0.37)
-        dyn_cop = max(1.7, min(5.2, carnot * eta))
+        eta = 0.48 if mod <= 55 else (0.44 if mod <= 75 else 0.39)
+        dyn_cop = max(1.7, min(5.3, carnot * eta))
         integ_elec_kwh += p_el * dt_h
         integ_thermal_kwh += (p_el * dyn_cop) * dt_h
 

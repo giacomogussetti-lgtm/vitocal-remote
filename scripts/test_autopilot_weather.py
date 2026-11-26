@@ -473,6 +473,130 @@ def test_12_thermal_model_convergence_and_changelog(cfg_file: Path, st_file: Pat
     assert any("UA:" in c for c in m3["history"][-1]["changes"])
 
 
+def test_13_en14511_calibration_and_continuous_precip(cfg_file: Path, st_file: Path, wx_file: Path) -> None:
+    # EN 14511 Vitocal 111.A16 checkpoints at W35: A7/W35 (~4.37-4.50), A2/W35 (~3.32), A-7/W35 (~2.72)
+    pts = [
+        {"time_local": "2026-11-27T12:00", "temp_raw_c": 7.0, "rh_pct": 70, "precip_mm": 0.0, "snowfall_cm": 0.0, "solar_wm2": 0.0},
+        {"time_local": "2026-11-27T13:00", "temp_raw_c": 2.0, "rh_pct": 85, "precip_mm": 0.0, "snowfall_cm": 0.0, "solar_wm2": 0.0},
+        {"time_local": "2026-11-27T14:00", "temp_raw_c": -7.0, "rh_pct": 80, "precip_mm": 0.0, "snowfall_cm": 0.0, "solar_wm2": 0.0},
+    ]
+    res_w35 = wp.score_hourly_cop(pts, lwt_ref_c=35.0)
+    assert 4.20 <= res_w35[0]["cop_dry"] <= 4.55, f"A7/W35 out of EN14511 range: {res_w35[0]['cop_dry']}"
+    assert 3.15 <= res_w35[1]["cop_net"] <= 3.50, f"A2/W35 out of EN14511 range: {res_w35[1]['cop_net']}"
+    assert 2.55 <= res_w35[2]["cop_net"] <= 2.95, f"A-7/W35 out of EN14511 range: {res_w35[2]['cop_net']}"
+
+    # Continuous rain check: 0.4 mm light rain at +2.8C must NOT cause an artificial -0.36 COP jump vs +2.4C dry
+    rain_pts = [
+        {"time_local": "2026-11-27T16:00", "temp_raw_c": 2.8, "rh_pct": 97, "precip_mm": 0.4, "snowfall_cm": 0.0, "solar_wm2": 0.0},
+        {"time_local": "2026-11-27T17:00", "temp_raw_c": 2.4, "rh_pct": 97, "precip_mm": 0.0, "snowfall_cm": 0.0, "solar_wm2": 0.0},
+    ]
+    res_rain = wp.score_hourly_cop(rain_pts, lwt_ref_c=23.0)
+    assert abs(res_rain[0]["cop_net"] - res_rain[1]["cop_net"]) <= 0.12, (
+        f"Binary rain cliff still present: {res_rain[0]['cop_net']} vs {res_rain[1]['cop_net']}"
+    )
+
+
+def test_14_horizon_lock_and_emergency_ceiling_guard(cfg_file: Path, st_file: Path, wx_file: Path) -> None:
+    tz = _rome_tz()
+    # Part A: 10:00 inside 90-min pre-start lock of committed 11:00-16:00 -> must NOT chase 13:00-18:00
+    t_a_local = datetime(2026, 11, 27, 10, 0, tzinfo=tz)
+    t_a_utc = t_a_local.astimezone(timezone.utc)
+    cfg = dict(autopilot.DEFAULT_CONFIG, enabled=True, weather_dynamic_window_enabled=True, window_lock_before_start_minutes=90)
+    autopilot.save_config(cfg)
+    autopilot.save_state({
+        "state": "ARMED",
+        "state_since_utc": (t_a_utc - timedelta(hours=3)).isoformat(),
+        "committed_window_date": "2026-11-27",
+        "committed_window_start": "11:00",
+        "committed_window_end": "16:00",
+    })
+    hourly_a = _make_hourly_series(
+        t_a_local.replace(hour=0),
+        48,
+        day1_temp_fn=lambda h: 8.0 if 13 <= h <= 17 else 1.5,
+        day1_rh_fn=lambda h: 55 if 13 <= h <= 17 else 90,
+        solar_fn=lambda h, d1: 450.0 if 13 <= h <= 17 else 0.0,
+    )
+    _write_weather_cache(wx_file, t_a_utc, hourly_a)
+    res_a = autopilot.run_autopilot_tick(
+        _sample(t_a_utc, t_in=7.4, oat=2.0),
+        dry_run=True,
+        now_utc_override=t_a_utc,
+        weather_cache_file=wx_file,
+    )
+    assert res_a["weather_plan"]["window_locked"] is True
+    assert res_a["weather_plan"]["effective_window_start"] == "11:00"
+    assert res_a["weather_plan"]["effective_window_end"] == "16:00"
+
+    # Part B: Emergency-Ceiling Guard: at 02:30 with T_in=7.2C and cold morning (proj <= 7.0C before 13:00),
+    # must NOT postpone start past static 11:00 even if 13:00-18:00 looks slightly warmer
+    t_b_local = datetime(2026, 11, 28, 2, 30, tzinfo=tz)
+    t_b_utc = t_b_local.astimezone(timezone.utc)
+    autopilot.save_state({
+        "state": "ARMED",
+        "state_since_utc": (t_b_utc - timedelta(hours=4)).isoformat(),
+    })
+    hourly_b = _make_hourly_series(
+        t_b_local.replace(hour=0),
+        48,
+        day1_temp_fn=lambda h: 5.0 if 13 <= h <= 17 else -2.0,
+        day1_rh_fn=lambda h: 65 if 13 <= h <= 17 else 92,
+    )
+    _write_weather_cache(wx_file, t_b_utc, hourly_b)
+    res_b = autopilot.run_autopilot_tick(
+        _sample(t_b_utc, t_in=7.2, oat=0.0),
+        dry_run=True,
+        now_utc_override=t_b_utc,
+        weather_cache_file=wx_file,
+    )
+    assert res_b["weather_plan"]["effective_window_start"] <= "11:00", (
+        f"Emergency ceiling failed, postponed to {res_b['weather_plan']['effective_window_start']}"
+    )
+
+
+def test_15_min_cycle_end_temp_extension(cfg_file: Path, st_file: Path, wx_file: Path) -> None:
+    tz = _rome_tz()
+    t1_local = datetime(2026, 11, 27, 16, 5, tzinfo=tz)
+    t1_utc = t1_local.astimezone(timezone.utc)
+    cfg = dict(autopilot.DEFAULT_CONFIG, enabled=True, min_cycle_end_temp_c=8.2, max_cycle_minutes=300)
+    autopilot.save_config(cfg)
+    autopilot.save_state({
+        "state": "HEATING_SYNC",
+        "state_since_utc": (t1_utc - timedelta(minutes=300)).isoformat(),
+        "cycle_started_utc": (t1_utc - timedelta(minutes=300)).isoformat(),
+        "active_window_start_local": "11:00",
+        "active_window_end_local": "16:00",
+        "min_end_temp_extended": False,
+        "calculated_target_lwt_c": 24.0,
+        "calculated_pdc_setpoint_c": 14,
+        "target_pdc_setpoint_c": 14,
+    })
+    hourly = _make_hourly_series(t1_local.replace(hour=0), 48, lambda h: 3.0, lambda h: 75)
+    _write_weather_cache(wx_file, t1_utc, hourly)
+
+    # At 16:05 (300m elapsed) T_in=7.9 < 8.2 -> must extend window +60 min (to 17:05) and keep HEATING_SYNC
+    res1 = autopilot.run_autopilot_tick(
+        _sample(t1_utc, t_in=7.9, oat=3.0, buf=23.5),
+        dry_run=True,
+        now_utc_override=t1_utc,
+        weather_cache_file=wx_file,
+    )
+    assert res1["state"] == "HEATING_SYNC", f"Expected min-end-temp extension, got {res1['state']}"
+    assert res1["min_end_temp_extended"] is True
+    assert res1["active_window_end_local"] == "17:05"
+
+    # At 17:06 (361m elapsed) with T_in=8.3 -> stops cleanly into PUFFER_DRAIN
+    t2_local = datetime(2026, 11, 27, 17, 6, tzinfo=tz)
+    t2_utc = t2_local.astimezone(timezone.utc)
+    res2 = autopilot.run_autopilot_tick(
+        _sample(t2_utc, t_in=8.3, oat=3.0, buf=23.5),
+        dry_run=True,
+        now_utc_override=t2_utc,
+        weather_cache_file=wx_file,
+    )
+    assert res2["state"] == "PUFFER_DRAIN", f"Expected PUFFER_DRAIN after extension cap, got {res2['state']}"
+
+
 def main() -> int:
     print("=" * 72)
     print("  VITOCAL REMOTE - TEST SUITE METEO & CASI LIMITE AUTOPILOTA")
@@ -490,10 +614,13 @@ def main() -> int:
         ("10. Fallback offline / Secrets mancanti", test_10_offline_missing_secrets_fallback),
         ("11. Privacy cache JSON, verifica OAT & self-tuning bias", test_11_privacy_and_calibration),
         ("12. Convergenza Bayesiana & changelog thermal_model.json", test_12_thermal_model_convergence_and_changelog),
+        ("13. Calibrazione EN 14511 (111.A16) & pioggia continua", test_13_en14511_calibration_and_continuous_precip),
+        ("14. Blocco finestra anti-slittamento & guardia emergenza", test_14_horizon_lock_and_emergency_ceiling_guard),
+        ("15. Estensione T_min fine ciclo (8.2°C -> +60m)", test_15_min_cycle_end_temp_extension),
     ]
     for title, fn in cases:
         _run_case(title, fn)
-    print("\n[✓] TUTTI I 12 TEST SUPERATI CON SUCCESSO!")
+    print("\n[✓] TUTTI I 15 TEST SUPERATI CON SUCCESSO!")
     print("=" * 72)
     return 0
 

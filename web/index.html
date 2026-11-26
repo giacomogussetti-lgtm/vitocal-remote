@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
   <!-- CSS Stylesheet -->
-  <link rel="stylesheet" href="css/styles.css?v=18">
+  <link rel="stylesheet" href="css/styles.css?v=19">
 
   <!-- Chart.js & Continuous Time Date Adapter (Offline First & PWA Ready) -->
   <script src="js/chart.min.js"></script>
@@ -52,6 +52,20 @@
         <span id="autopilotSynopticText">🤖 AUTOPILOTA: DISATTIVATO (Tocca per attivare)</span>
         <span style="font-size: 0.85rem;">›</span>
       </div>
+
+      <!-- Collapsible Next-Window & Mini-Forecast Drawer -->
+      <details class="synoptic-kpi-drawer synoptic-weather-drawer" id="synopticWeatherDrawer">
+        <summary class="synoptic-kpi-summary">
+          <span id="synopticWeatherSummaryText">☀️ Finestra target: caricamento previsioni...</span>
+          <span class="synoptic-kpi-arrow">▾</span>
+        </summary>
+        <div class="synoptic-weather-content" id="synopticWeatherContent">
+          <div class="syn-wx-verdict" id="synWxVerdict">In attesa di piano meteo...</div>
+          <div class="syn-wx-pair" id="synWxPair"></div>
+          <div class="ap-weather-hourly-strip" id="synWxMiniStrip" style="margin-top: 6px;"></div>
+          <button type="button" class="btn-mini-tool" id="btnSynWxOpenCommands" style="margin-top: 8px; width: 100%;">⚙️ Apri Ragionamento Completo &amp; Parametri Autopilota ›</button>
+        </div>
+      </details>
 
       <!-- Collapsible Quick Metric Cards (Hidden by default) -->
       <details class="synoptic-kpi-drawer" id="synopticKpiDrawer">
@@ -479,6 +493,14 @@
               <div class="cmd-inline-field">
                 <label for="apWeatherRefreshH">Refresh Meteo (h)</label>
                 <input type="number" id="apWeatherRefreshH" class="form-input" min="1" max="12" step="1" value="3">
+              </div>
+              <div class="cmd-inline-field">
+                <label for="apMinEndTemp" class="label-with-help">T Min Fine Ciclo (°C) <button type="button" class="help-info-btn" data-help-key="ap_min_end_temp" aria-label="Spiegazione T Min Fine Ciclo">i</button></label>
+                <input type="number" id="apMinEndTemp" class="form-input" min="0.0" max="15.0" step="0.1" value="8.2">
+              </div>
+              <div class="cmd-inline-field">
+                <label for="apWinLockMin" class="label-with-help">Blocco Pre-Avvio (min) <button type="button" class="help-info-btn" data-help-key="ap_window_lock" aria-label="Spiegazione Blocco Finestra">i</button></label>
+                <input type="number" id="apWinLockMin" class="form-input" min="15" max="240" step="15" value="90">
               </div>
             </div>
           </div>
@@ -1103,11 +1125,11 @@
   <div id="toast"></div>
 
   <!-- Scripts -->
-  <script src="js/synoptic.js?v=18"></script>
-  <script src="js/charts.js?v=18"></script>
-  <script src="js/analytics.js?v=18"></script>
-  <script src="js/commands.js?v=18"></script>
-  <script src="js/help.js?v=18"></script>
-  <script src="js/app.js?v=18"></script>
+  <script src="js/synoptic.js?v=19"></script>
+  <script src="js/charts.js?v=19"></script>
+  <script src="js/analytics.js?v=19"></script>
+  <script src="js/commands.js?v=19"></script>
+  <script src="js/help.js?v=19"></script>
+  <script src="js/app.js?v=19"></script>
 </body>
 </html>

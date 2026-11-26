@@ -82,6 +82,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "prearm_emergency_margin_c": 0.4,
     "weather_defer_enabled": True,
     "weather_arbitrage_cop_delta": 0.25,
+    "window_lock_before_start_minutes": 90,
+    "min_cycle_end_temp_c": 8.2,
 }
 
 DEFAULT_STATE: dict[str, Any] = {
@@ -114,6 +116,11 @@ DEFAULT_STATE: dict[str, Any] = {
     "active_window_end_local": None,
     "weather_deferred_date": None,
     "armed_by_prearm": False,
+    "committed_window_date": None,
+    "committed_window_start": None,
+    "committed_window_end": None,
+    "window_postponed_date": None,
+    "min_end_temp_extended": False,
     "weather_plan": None,
     "api_usage": {
         "date_utc": None,
@@ -823,6 +830,12 @@ def run_autopilot_tick(
             cache_file=weather_cache_file,
         )
         st["weather_plan"] = weather_plan
+        today_str_loc = now_local.strftime("%Y-%m-%d")
+        st["committed_window_date"] = today_str_loc
+        st["committed_window_start"] = weather_plan.get("committed_window_start") or weather_plan.get("effective_window_start")
+        st["committed_window_end"] = weather_plan.get("committed_window_end") or weather_plan.get("effective_window_end")
+        if weather_plan.get("was_postponed_now"):
+            st["window_postponed_date"] = today_str_loc
     except Exception as wp_err:
         logger.warning("Valutazione weather_planner fallita (fallback statico): %s", wp_err)
 
@@ -991,6 +1004,7 @@ def run_autopilot_tick(
                         st["active_window_start_local"] = run_win_start
                         st["active_window_end_local"] = run_win_end
                         st["weather_deferred_date"] = None
+                        st["min_end_temp_extended"] = False
                         st["target_pdc_setpoint_c"] = regime_sp
                         st["calculated_pdc_setpoint_c"] = start_sp
                         st["calculated_target_lwt_c"] = start_lwt
@@ -1013,6 +1027,7 @@ def run_autopilot_tick(
                     st["active_window_start_local"] = run_win_start
                     st["active_window_end_local"] = run_win_end
                     st["weather_deferred_date"] = None
+                    st["min_end_temp_extended"] = False
                     st["target_pdc_setpoint_c"] = regime_sp
                     st["calculated_pdc_setpoint_c"] = start_sp
                     st["calculated_target_lwt_c"] = start_lwt
@@ -1165,6 +1180,45 @@ def run_autopilot_tick(
         active_win_end = str(st.get("active_window_end_local") or eff_win_end)
         stop_window = (not is_emerg_cycle) and _is_past_cop_window_end(now_local, cfg, end_override=active_win_end)
 
+        min_end_t = float(cfg.get("min_cycle_end_temp_c") or 0.0)
+        hard_cap_min = float(cfg["max_cycle_minutes"]) + 60.0
+        cur_local_min = now_local.hour * 60 + now_local.minute
+        if (
+            (stop_window or stop_max_dur)
+            and not stop_target
+            and min_end_t > 0.0
+            and t_in_f < min_end_t
+            and not bool(st.get("min_end_temp_extended"))
+            and elapsed_min < hard_cap_min
+            and cur_local_min < _hhmm_to_minutes("18:30")
+        ):
+            ext_end_min = min(_hhmm_to_minutes("18:30"), max(_hhmm_to_minutes(active_win_end), cur_local_min) + 60)
+            new_end = f"{ext_end_min // 60:02d}:{ext_end_min % 60:02d}"
+            st["active_window_end_local"] = new_end
+            st["min_end_temp_extended"] = True
+            stop_window = False
+            stop_max_dur = False
+            if not dry_run:
+                v_conn = ViessmannConnector()
+                v_conn.connect()
+                active_win_start = str(st.get("active_window_start_local") or eff_win_start)
+                v_conn.set_heating_schedule_simple(
+                    days=[_weekday_code(now_local)],
+                    start=_round_hhmm_10m(active_win_start, round_up=False),
+                    end=_round_hhmm_10m(new_end, round_up=True),
+                    mode="reduced",
+                    clear=False,
+                )
+                record_api_usage(v_reads=2, v_writes=1, event_label="ap_min_end_ext", state_dict=st)
+                st["last_action_utc"] = now_iso
+            st["last_action_reason"] = (
+                f"Estensione T_min fine ciclo: casa ancora a {t_in_f:.1f}°C (<{min_end_t:.1f}°C), "
+                f"estendo finestra fino alle {new_end} (+max 60 min)."
+            )
+
+        if bool(st.get("min_end_temp_extended")) and elapsed_min >= hard_cap_min:
+            stop_max_dur = True
+
         if stop_target or stop_max_dur or stop_window:
             why = "Target raggiunto" if stop_target else ("Durata max raggiunta" if stop_max_dur else f"Fine finestra COP ({active_win_end})")
             if not dry_run:
@@ -1200,6 +1254,7 @@ def run_autopilot_tick(
             st["armed_by_prearm"] = False
             st["active_window_start_local"] = None
             st["active_window_end_local"] = None
+            st["min_end_temp_extended"] = False
             st["soft_curve_trim_k"] = 0
             st["soft_curve_last_trim_utc"] = None
             st["cycle_defrost_episodes"] = 0

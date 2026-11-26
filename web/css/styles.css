@@ -2403,3 +2403,50 @@ nav.bottom-nav {
   background: rgba(239, 68, 68, 0.2);
   color: #fca5a5;
 }
+
+/* Synoptic Expandable Next-Window & Mini-Forecast Drawer */
+.synoptic-weather-drawer {
+  margin-top: 6px;
+}
+
+.synoptic-weather-content {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+.syn-wx-verdict {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #bae6fd;
+  margin-bottom: 6px;
+}
+
+.syn-wx-pair {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+@media (max-width: 440px) {
+  .syn-wx-pair {
+    grid-template-columns: 1fr;
+  }
+}
+
+.syn-wx-chip {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.syn-wx-chip strong {
+  font-size: 0.72rem;
+  color: #38bdf8;
+}

@@ -1,5 +1,5 @@
 {
-  "updated_utc": "2026-11-26T00:58:36.608072+00:00",
+  "updated_utc": "2026-11-26T01:21:53.809576+00:00",
   "cycles_observed": 3,
   "defrost_episodes_observed": 6,
   "defrost_steady_observed": 5,
@@ -9,23 +9,23 @@
     8.9
   ],
   "confidence_pct": 43,
-  "k_rad_kw_per_k": 0.372,
+  "k_rad_kw_per_k": 0.413,
   "inverter_min_mod_pct": 38.6,
-  "p_min_continuous_kw_ref": 4.54,
+  "p_min_continuous_kw_ref": 5.18,
   "defrost_lwt_drop_p90_k": 9.5,
   "defrost_buf_drop_p90_k": 4.7,
-  "ua_building_c_24h_per_k": 0.173,
+  "ua_building_c_24h_per_k": 0.179,
   "alpha_heat_c_h_per_k": 0.0161,
   "bphe_safe_outlet_min_c": 12.0,
   "diagnostics": {
     "k_rad_kw_per_k": {
       "prior": 0.344,
-      "raw_observed": 0.399,
-      "value": 0.372,
+      "raw_observed": 0.481,
+      "value": 0.413,
       "n_obs": 3,
       "prior_weight": 3.0,
       "data_weight_pct": 50,
-      "spread_iqr": 0.192,
+      "spread_iqr": 0.081,
       "status": "In convergenza"
     },
     "inverter_min_mod_pct": {
@@ -40,12 +40,12 @@
     },
     "p_min_continuous_kw_ref": {
       "prior": 3.8,
-      "raw_observed": 5.28,
-      "value": 4.54,
+      "raw_observed": 6.57,
+      "value": 5.18,
       "n_obs": 3,
       "prior_weight": 3.0,
       "data_weight_pct": 50,
-      "spread_iqr": 0.12,
+      "spread_iqr": 0.2,
       "status": "In convergenza"
     },
     "defrost_lwt_drop_p90_k": {
@@ -70,12 +70,12 @@
     },
     "ua_building_c_24h_per_k": {
       "prior": 0.17,
-      "raw_observed": 0.175,
-      "value": 0.173,
+      "raw_observed": 0.186,
+      "value": 0.179,
       "n_obs": 4,
       "prior_weight": 3.0,
       "data_weight_pct": 57,
-      "spread_iqr": 0.075,
+      "spread_iqr": 0.092,
       "status": "In convergenza"
     },
     "alpha_heat_c_h_per_k": {
@@ -90,9 +90,9 @@
     }
   },
   "last_deltas": {
-    "k_rad_kw_per_k": 0.0,
+    "k_rad_kw_per_k": -0.015,
     "inverter_min_mod_pct": 0.0,
-    "p_min_continuous_kw_ref": 0.0,
+    "p_min_continuous_kw_ref": -0.3,
     "defrost_lwt_drop_p90_k": 0.0,
     "ua_building_c_24h_per_k": 0.0,
     "alpha_heat_c_h_per_k": 0.0
@@ -119,6 +119,55 @@
       },
       "changes": [
         "Nessuna variazione (parametri stabili)"
+      ]
+    },
+    {
+      "ts_utc": "2026-11-26T01:21:14.645387+00:00",
+      "cycles_observed": 3,
+      "defrost_steady_observed": 5,
+      "standby_segments_observed": 4,
+      "confidence_pct": 43,
+      "k_rad_kw_per_k": 0.428,
+      "inverter_min_mod_pct": 38.6,
+      "defrost_lwt_drop_p90_k": 9.5,
+      "ua_building_c_24h_per_k": 0.179,
+      "alpha_heat_c_h_per_k": 0.0161,
+      "deltas": {
+        "k_rad_kw_per_k": 0.056,
+        "inverter_min_mod_pct": 0.0,
+        "p_min_continuous_kw_ref": 0.94,
+        "defrost_lwt_drop_p90_k": 0.0,
+        "ua_building_c_24h_per_k": 0.006,
+        "alpha_heat_c_h_per_k": 0.0
+      },
+      "changes": [
+        "k_rad: 0.372 → 0.428 (+0.056)",
+        "P_min: 4.54 → 5.48 (+0.94)",
+        "UA: 0.173 → 0.179 (+0.006)"
+      ]
+    },
+    {
+      "ts_utc": "2026-11-26T01:21:53.809576+00:00",
+      "cycles_observed": 3,
+      "defrost_steady_observed": 5,
+      "standby_segments_observed": 4,
+      "confidence_pct": 43,
+      "k_rad_kw_per_k": 0.413,
+      "inverter_min_mod_pct": 38.6,
+      "defrost_lwt_drop_p90_k": 9.5,
+      "ua_building_c_24h_per_k": 0.179,
+      "alpha_heat_c_h_per_k": 0.0161,
+      "deltas": {
+        "k_rad_kw_per_k": -0.015,
+        "inverter_min_mod_pct": 0.0,
+        "p_min_continuous_kw_ref": -0.3,
+        "defrost_lwt_drop_p90_k": 0.0,
+        "ua_building_c_24h_per_k": 0.0,
+        "alpha_heat_c_h_per_k": 0.0
+      },
+      "changes": [
+        "k_rad: 0.428 → 0.413 (-0.015)",
+        "P_min: 5.48 → 5.18 (-0.30)"
       ]
     }
   ]

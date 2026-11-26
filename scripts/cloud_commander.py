@@ -259,6 +259,8 @@ def _validate_autopilot_params(params: dict[str, Any], force_enable: bool = Fals
         "prearm_max_above_tmin_c": (0.1, 2.0, float),
         "prearm_emergency_margin_c": (0.1, 1.5, float),
         "weather_arbitrage_cop_delta": (0.05, 1.5, float),
+        "window_lock_before_start_minutes": (15, 240, int),
+        "min_cycle_end_temp_c": (0.0, 15.0, float),
     }
     for key, (lo, hi, caster) in bounds.items():
         if params.get(key) is not None:

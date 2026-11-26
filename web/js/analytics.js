@@ -151,8 +151,16 @@ function computePeriodAnalytics(samples, hoursRequested = 24, costPerKwh = 0.25,
     const isDef = String(s.compressor_phase || "").toLowerCase().includes("defrost");
     if (isDef) return { pElecKw: 1.35 + gfKw, pThermalKw: -3.5, isDefrost: true };
     const mod = Number(s.compressor_modulation_percent) || 0;
-    const pEl = 0.55 + 2.55 * (mod / 100.0) + 0.045 + gfKw;
-    return { pElecKw: pEl, pThermalKw: pEl * 3.1, isDefrost: false };
+    const pCond = s.hot_gas_pressure_bar != null ? Number(s.hot_gas_pressure_bar) : 17.0;
+    const pFac = Math.max(0.72, Math.min(1.25, 0.82 + 0.18 * ((pCond - 14.0) / 6.0)));
+    const p1Kw = (Number(s.primary_pump_rotation_percent) || 0) > 0 ? 0.045 : 0.0;
+    const pEl = 0.28 + 2.95 * (mod / 100.0) * pFac + p1Kw + gfKw;
+    const eta = mod <= 55 ? 0.48 : (mod <= 75 ? 0.44 : 0.39);
+    const lwt = s.pdc_supply_temp_c != null ? Number(s.pdc_supply_temp_c) : 25.0;
+    const oat = s.external_temp_c != null ? Number(s.external_temp_c) : 5.0;
+    const carnot = (lwt + 276.15) / Math.max(12.0, (lwt + 3.0) - (oat - 6.5));
+    const cop = Math.max(1.7, Math.min(5.3, carnot * eta));
+    return { pElecKw: pEl, pThermalKw: pEl * cop, isDefrost: false };
   };
   const pwrFn = (typeof window !== "undefined" && typeof window.estimateSamplePower === "function")
     ? window.estimateSamplePower

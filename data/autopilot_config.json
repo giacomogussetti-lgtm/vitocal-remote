@@ -50,5 +50,7 @@
   "prearm_max_above_tmin_c": 0.6,
   "prearm_emergency_margin_c": 0.4,
   "weather_defer_enabled": true,
-  "weather_arbitrage_cop_delta": 0.25
+  "weather_arbitrage_cop_delta": 0.25,
+  "window_lock_before_start_minutes": 90,
+  "min_cycle_end_temp_c": 8.2
 }
