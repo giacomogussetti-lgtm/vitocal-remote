@@ -5,7 +5,7 @@
   "cycle_started_utc": null,
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-26T01:50:59.947981+00:00",
+  "last_eval_utc": "2026-11-26T01:55:37.384823+00:00",
   "last_action_utc": "2026-11-24T15:27:28.128903+00:00",
   "last_action_reason": "Richiesta calore confermata da 30 min (T=7.5°C). Attesa finestra COP / emergenza.",
   "indoor_slope_c_per_h": -0.047,
@@ -64,11 +64,12 @@
   "committed_window_end": "14:00",
   "window_postponed_date": null,
   "min_end_temp_extended": false,
+  "min_end_ext_count": 0,
   "weather_plan": {
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "26/11 02:50",
+    "evaluated_local": "26/11 02:55",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": false,
@@ -77,6 +78,8 @@
     "committed_window_end": "14:00",
     "in_window_now": false,
     "remaining_window_min": 0,
+    "next_hour_cop_net": 4.57,
+    "next_hour_label": "Oggi 03:00",
     "today_window": {
       "start_hhmm": "11:00",
       "end_hhmm": "16:00",
@@ -119,10 +122,10 @@
       "start_tin_c": 7.2,
       "min_tin_c": 6.05,
       "end_tin_c": 6.05,
-      "hours_simulated": 30.2,
+      "hours_simulated": 30.1,
       "target_local": "27/11 09:00",
-      "first_below_tmin_local": "26/11 03:50",
-      "first_below_safe_local": "26/11 03:50"
+      "first_below_tmin_local": "26/11 03:55",
+      "first_below_safe_local": "26/11 03:55"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -135,7 +138,7 @@
       "Finestra Oggi: 09:00–14:00 (COP netto stimato 4.23, OAT +2.8°C, RH 97%, Brina ALTO, allineata a statica).",
       "Guardia Emergenza: T_casa (7.2°C) toccherebbe ≤7.0°C alle 08:00 → avvio anticipato/bloccato a 09:00–14:00.",
       "Finestra Domani: 09:00–14:00 (COP netto 4.67, OAT +2.7°C, RH 86%, Brina MEDIO).",
-      "Proiezione casa fino a domani 09:00 (30.2h, UA×1.15=0.206): 7.2°C → 6.0°C (min 6.0°C vs pavimento sicurezza 7.2°C)."
+      "Proiezione casa fino a domani 09:00 (30.1h, UA×1.15=0.206): 7.2°C → 6.0°C (min 6.0°C vs pavimento sicurezza 7.2°C)."
     ],
     "assumptions": {
       "ua_raw_c_24h_k": 0.179,
@@ -158,12 +161,12 @@
   },
   "api_usage": {
     "date_utc": "2026-11-26",
-    "viessmann_reads": 48,
+    "viessmann_reads": 50,
     "viessmann_writes": 0,
-    "bticino_reads": 48,
+    "bticino_reads": 50,
     "bticino_writes": 0,
     "cronjob_patches": 0,
-    "github_runs": 24,
+    "github_runs": 25,
     "recent_events": [
       {
         "ts": "2026-11-25T02:01:15.861400+00:00",
@@ -1310,6 +1313,13 @@
         "vr": 2,
         "br": 2,
         "gh": 1
+      },
+      {
+        "ts": "2026-11-26T01:55:37.383138+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
       }
     ]
   },
@@ -1320,8 +1330,8 @@
     "inverter_min_mod_pct": 38.6,
     "defrost_lwt_drop_p90_k": 9.5,
     "ua_building_c_24h_per_k": 0.179,
-    "recommended_target_lwt_c": 26.2,
+    "recommended_target_lwt_c": 22.7,
     "pred_autonomy_hours": 69.7,
-    "updated_utc": "2026-11-26T01:21:53.809576+00:00"
+    "updated_utc": "2026-11-26T01:52:15.012022+00:00"
   }
 }
