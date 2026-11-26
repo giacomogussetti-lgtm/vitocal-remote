@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
   <!-- CSS Stylesheet -->
-  <link rel="stylesheet" href="css/styles.css?v=19">
+  <link rel="stylesheet" href="css/styles.css?v=20">
 
   <!-- Chart.js & Continuous Time Date Adapter (Offline First & PWA Ready) -->
   <script src="js/chart.min.js"></script>
@@ -47,25 +47,27 @@
   <main>
     <!-- TAB 1: SINOTTICO SCADA & STATO LIVE -->
     <section id="tab-synoptic" class="tab-content active">
-      <!-- Autopilot Quick Status Banner (Top) -->
-      <div id="autopilotSynopticBanner" class="pump-banner inactive" style="cursor: pointer; margin-top: 2px; padding: 8px 12px; font-size: 0.76rem;" title="Tocca per gestire Autopilota">
-        <span id="autopilotSynopticText">🤖 AUTOPILOTA: DISATTIVATO (Tocca per attivare)</span>
-        <span style="font-size: 0.85rem;">›</span>
-      </div>
-
-      <!-- Collapsible Next-Window & Mini-Forecast Drawer -->
-      <details class="synoptic-kpi-drawer synoptic-weather-drawer" id="synopticWeatherDrawer">
-        <summary class="synoptic-kpi-summary">
-          <span id="synopticWeatherSummaryText">☀️ Finestra target: caricamento previsioni...</span>
-          <span class="synoptic-kpi-arrow">▾</span>
-        </summary>
-        <div class="synoptic-weather-content" id="synopticWeatherContent">
-          <div class="syn-wx-verdict" id="synWxVerdict">In attesa di piano meteo...</div>
-          <div class="syn-wx-pair" id="synWxPair"></div>
-          <div class="ap-weather-hourly-strip" id="synWxMiniStrip" style="margin-top: 6px;"></div>
-          <button type="button" class="btn-mini-tool" id="btnSynWxOpenCommands" style="margin-top: 8px; width: 100%;">⚙️ Apri Ragionamento Completo &amp; Parametri Autopilota ›</button>
+      <!-- Unified Autopilot Full-Auto Banner (with Nested Target Window & Mini-Forecast Drawer) -->
+      <div id="autopilotSynopticBanner" class="pump-banner inactive synoptic-ap-unified" style="margin-top: 2px;">
+        <div id="autopilotSynopticHeader" class="synoptic-ap-top-row" role="button" tabindex="0" title="Tocca per gestire Autopilota">
+          <span id="autopilotSynopticText">🤖 AUTOPILOTA: DISATTIVATO (Tocca per attivare)</span>
+          <span class="synoptic-ap-chevron">›</span>
         </div>
-      </details>
+
+        <!-- Nested Next-Window & Mini-Forecast Drawer (visible when Full-Auto is active) -->
+        <details class="synoptic-weather-nested" id="synopticWeatherDrawer" style="display: none;">
+          <summary class="synoptic-weather-nested-summary">
+            <span id="synopticWeatherSummaryText">☀️ Finestra target: caricamento previsioni...</span>
+            <span class="synoptic-kpi-arrow">▾</span>
+          </summary>
+          <div class="synoptic-weather-content" id="synopticWeatherContent">
+            <div class="syn-wx-verdict" id="synWxVerdict">In attesa di piano meteo...</div>
+            <div class="syn-wx-pair" id="synWxPair"></div>
+            <div class="ap-weather-hourly-strip" id="synWxMiniStrip" style="margin-top: 6px;"></div>
+            <button type="button" class="btn-mini-tool" id="btnSynWxOpenCommands" style="margin-top: 8px; width: 100%;">⚙️ Apri Ragionamento Completo &amp; Parametri Autopilota ›</button>
+          </div>
+        </details>
+      </div>
 
       <!-- Collapsible Quick Metric Cards (Hidden by default) -->
       <details class="synoptic-kpi-drawer" id="synopticKpiDrawer">
@@ -1125,11 +1127,11 @@
   <div id="toast"></div>
 
   <!-- Scripts -->
-  <script src="js/synoptic.js?v=19"></script>
-  <script src="js/charts.js?v=19"></script>
-  <script src="js/analytics.js?v=19"></script>
-  <script src="js/commands.js?v=19"></script>
-  <script src="js/help.js?v=19"></script>
-  <script src="js/app.js?v=19"></script>
+  <script src="js/synoptic.js?v=20"></script>
+  <script src="js/charts.js?v=20"></script>
+  <script src="js/analytics.js?v=20"></script>
+  <script src="js/commands.js?v=20"></script>
+  <script src="js/help.js?v=20"></script>
+  <script src="js/app.js?v=20"></script>
 </body>
 </html>

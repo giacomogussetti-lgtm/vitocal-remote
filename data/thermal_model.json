@@ -1,5 +1,5 @@
 {
-  "updated_utc": "2026-11-26T01:21:53.809576+00:00",
+  "updated_utc": "2026-11-26T01:52:15.012022+00:00",
   "cycles_observed": 3,
   "defrost_episodes_observed": 6,
   "defrost_steady_observed": 5,
@@ -70,12 +70,12 @@
     },
     "ua_building_c_24h_per_k": {
       "prior": 0.17,
-      "raw_observed": 0.186,
+      "raw_observed": 0.185,
       "value": 0.179,
       "n_obs": 4,
       "prior_weight": 3.0,
       "data_weight_pct": 57,
-      "spread_iqr": 0.092,
+      "spread_iqr": 0.091,
       "status": "In convergenza"
     },
     "alpha_heat_c_h_per_k": {
@@ -90,9 +90,9 @@
     }
   },
   "last_deltas": {
-    "k_rad_kw_per_k": -0.015,
+    "k_rad_kw_per_k": 0.0,
     "inverter_min_mod_pct": 0.0,
-    "p_min_continuous_kw_ref": -0.3,
+    "p_min_continuous_kw_ref": 0.0,
     "defrost_lwt_drop_p90_k": 0.0,
     "ua_building_c_24h_per_k": 0.0,
     "alpha_heat_c_h_per_k": 0.0

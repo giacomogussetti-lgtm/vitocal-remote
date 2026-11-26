@@ -35,7 +35,7 @@
   "soft_curve_cooldown_minutes": 45,
   "anti_seize_days": 4,
   "adaptive_model_enabled": true,
-  "adaptive_model_apply_targets": false,
+  "adaptive_model_apply_targets": true,
   "weather_planner_enabled": true,
   "weather_dynamic_window_enabled": true,
   "weather_search_start": "09:00",

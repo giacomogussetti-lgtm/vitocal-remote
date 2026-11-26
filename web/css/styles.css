@@ -2404,15 +2404,66 @@ nav.bottom-nav {
   color: #fca5a5;
 }
 
-/* Synoptic Expandable Next-Window & Mini-Forecast Drawer */
-.synoptic-weather-drawer {
-  margin-top: 6px;
+/* Unified Autopilot Banner with Nested Next-Window & Mini-Forecast Drawer */
+.synoptic-ap-unified {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0 !important;
+  gap: 0;
+  overflow: hidden;
+}
+
+.synoptic-ap-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 0.76rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.synoptic-ap-chevron {
+  font-size: 0.9rem;
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+
+.synoptic-weather-nested {
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 23, 42, 0.42);
+  text-align: left;
+  font-weight: 400;
+}
+
+.synoptic-weather-nested-summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #bae6fd;
+  cursor: pointer;
+  user-select: none;
+}
+
+.synoptic-weather-nested-summary::-webkit-details-marker {
+  display: none;
+}
+
+.synoptic-weather-nested[open] .synoptic-kpi-arrow {
+  transform: rotate(180deg);
 }
 
 .synoptic-weather-content {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(56, 189, 248, 0.2);
+  padding: 8px 12px 10px;
+  border-top: 1px solid rgba(56, 189, 248, 0.18);
+  color: var(--text-main);
 }
 
 .syn-wx-verdict {

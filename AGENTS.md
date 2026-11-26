@@ -296,10 +296,12 @@ vitocal remote/
 
 ---
 
-## 4. PROCEDURA DI AVVIO E RIPRESA LAVORO
-Se l'utente apre una nuova chat e chiede di continuare:
-1. Leggi questo `AGENTS.md` e `PROJECT_STATUS.md`.
-2. Verifica che i connettori `api/viessmann.py` e `api/bticino.py` siano integri.
-3. Se l'utente vuole avviare l'app desktop: invitalo a cliccare su `avvia_gestionale.bat`.
-4. Se l'utente vuole avviare l'app mobile Android: invitalo a cliccare su `avvia_app_mobile.bat` o lanciare `python web_server.py`.
-5. Mantieni sempre la sincronizzazione tra modifiche al codice e documentazione.
+## 4. PROCEDURA DI AVVIO E RIPRESA LAVORO (REGOLA OBBLIGATORIA NUOVO GIORNO)
+Se l'utente apre una nuova chat (specialmente in un nuovo giorno) e chiede di continuare o analizzare l'impianto:
+1. Leggi questo `AGENTS.md`, `PROJECT_STATUS.md`, `.agents/rules/thermodynamic-rigor-and-telemetry-audit.md` e `.agents/skills/vitocal-thermodynamic-tuning/SKILL.md`.
+2. **PRIMA di proporre o commentare strategie**: esegui `git pull --rebase origin main`, `python scripts/audit_strategy.py --hours 168` e `python scripts/thermal_model.py --write`.
+3. **Audit Obbligatorio del Modello LWT Intelligente (`adaptive_model_apply_targets = true`, attivo dal 26/11/2026) & Estensione Meteo-Aware (`min_cycle_end_temp_c = 8.2 °C`)**:
+   - **Perché è stato introdotto**: simulazioni su parametri reali (`k_rad = 0.413`, `α = 0.0161`, `UA = 0.179`, EN 14511 `111.A16`) hanno dimostrato che lavorare `6–7h` dolci a `LWT 23.0 °C` consuma `-7%..-13%` in meno in bolletta rispetto a comprimere in `3.5–4h` a `26.5–28.5 °C`. Pertanto `recommend_operating_targets` mantiene LWT bassa (`22.5–23.5 °C`) a `OAT ≥ 0 °C`, scala verso `26.5 °C` solo su gelo reale (`OAT ≤ -2..-8 °C`), e calcola il pavimento anti-ON/OFF su `ref_tin_end = min(T_max, T_in + 0.8)` (`>= 1.15 * P_min(OAT) / k_rad`) per proteggere da stacchi alle `OAT` miti (es. `+8 °C` → `≥ 24.2 °C`). Inoltre, in `HEATING_SYNC` l'estensione `+60 min` (fino a 2 step, tetto `18:30` / `420 min`, uscita anticipata appena `T ≥ 8.2 °C`) è subordinata al meteo (estende se evita emergenza notturna o se COP ora extra è entro `0.25` da domani; altrimenti spegne pulito).
+   - **Cosa verificare OGNI nuovo giorno sui log reali**: (a) che la casa assorba abbastanza potenza a LWT bassa (`22.5–24.0 °C`) senza stacchi ON/OFF compressore a `38–42%` (`7209` `BUF ≥ Target + 2.7 K` & `EWT ≥ Target`); (b) che `LWT_min` in defrost resti `≥ 12.0 °C` con `heatingRod = +0s`; (c) che le estensioni meteo-aware migliorino `kWhₑ/°C` ed evitino emergenze. Se si osservano stacchi ON/OFF prematuri o peggioramento rispetto alla baseline 21/11 e 24/11, **dichiararlo apertamente e fare rollback immediato** (`adaptive_model_apply_targets = false` o rialzo `min_target_lwt_c`).
+4. Verifica che i connettori `api/viessmann.py` e `api/bticino.py` siano integri e mantieni sempre sincronizzati codice, `AGENTS.md` e `PROJECT_STATUS.md`.
+5. Se l'utente vuole avviare l'app desktop o mobile locale: `avvia_gestionale.bat` / `avvia_app_mobile.bat` (`python web_server.py`).

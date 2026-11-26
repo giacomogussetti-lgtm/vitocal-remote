@@ -1085,6 +1085,15 @@ def evaluate_weather_plan(
         "tin_projection_mae_c": cal.get("tin_projection_mae_c"),
     }
 
+    # Upcoming hour net COP for weather-aware extension decisions during HEATING_SYNC
+    next_hour_cop_net: Optional[float] = None
+    next_hour_label: Optional[str] = None
+    if hourly_preview:
+        idx_nh = 1 if (now_local.minute >= 35 and len(hourly_preview) > 1) else 0
+        if hourly_preview[idx_nh].get("cop_net") is not None:
+            next_hour_cop_net = float(hourly_preview[idx_nh]["cop_net"])
+            next_hour_label = f"{hourly_preview[idx_nh].get('day_tag', '')} {hourly_preview[idx_nh].get('hh', '')}".strip()
+
     plan_result = {
         "available": bool(cache_data.get("available")),
         "source": cache_data.get("source"),
@@ -1098,6 +1107,8 @@ def evaluate_weather_plan(
         "committed_window_end": eff_end,
         "in_window_now": in_window_now,
         "remaining_window_min": remaining_min,
+        "next_hour_cop_net": next_hour_cop_net,
+        "next_hour_label": next_hour_label,
         "today_window": today_win,
         "tomorrow_window": tomorrow_win,
         "projection_to_tomorrow": {

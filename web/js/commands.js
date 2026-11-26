@@ -1156,9 +1156,9 @@ function updateCronQuotaPreview() {
 }
 
 function bindAutopilotButtons() {
-  const synBanner = document.getElementById("autopilotSynopticBanner");
-  if (synBanner) {
-    synBanner.addEventListener("click", () => {
+  const synHeader = document.getElementById("autopilotSynopticHeader") || document.getElementById("autopilotSynopticBanner");
+  if (synHeader) {
+    synHeader.addEventListener("click", () => {
       const cmdTabBtn = document.querySelector('.nav-item[data-tab="tab-commands"]');
       if (cmdTabBtn) cmdTabBtn.click();
     });
@@ -1659,11 +1659,18 @@ function renderSelfTuningAuditUI(st, tm, wf) {
 }
 
 function renderSynopticWeatherDrawer(cfg, st, wf) {
+  const drawerEl = document.getElementById("synopticWeatherDrawer");
   const sumEl = document.getElementById("synopticWeatherSummaryText");
   const verdictEl = document.getElementById("synWxVerdict");
   const pairEl = document.getElementById("synWxPair");
   const stripEl = document.getElementById("synWxMiniStrip");
   if (!sumEl || !verdictEl || !pairEl || !stripEl) return;
+
+  const isAutoEnabled = Boolean(cfg && cfg.enabled);
+  if (drawerEl) {
+    drawerEl.style.display = isAutoEnabled ? "" : "none";
+  }
+  if (!isAutoEnabled) return;
 
   const wp = (st && st.weather_plan) || (wf && wf.plan) || null;
   const effStart = (st && st.active_window_start_local) || (wp && wp.effective_window_start) || (cfg && cfg.cop_window_start) || "11:00";

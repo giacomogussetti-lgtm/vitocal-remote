@@ -144,10 +144,10 @@ const HELP_CATALOG = {
     tip: "La tabella Open-Meteo vs Sonda OAT ti permette di verificare ora per ora quanto 'sgarra' la previsione rispetto al sensore fisico esterno della tua Vitocal."
   },
   ap_min_end_temp: {
-    title: "🌡️ T Minima Fine Ciclo (°C)",
-    what: "Temperatura minima che casa deve aver raggiunto prima di spegnere il ciclo alla chiusura della finestra COP o al raggiungimento dei 300 minuti.",
-    impact: "Se si parte da molto freddo (es. emergenza a 6.8 °C), in 300 minuti la casa arriva solo a ~7.9–8.0 °C riducendo l'autonomia prima del riavvio. Se T_casa è sotto questa soglia (default 8.2 °C), il ciclo viene esteso una volta fino a +60 min (max 18:30) per completare la carica del massetto.",
-    tip: "8.0–8.3 °C assicura abbastanza isteresi fino al giorno successivo senza tirare troppo tardi la sera."
+    title: "🌡️ T Minima Fine Ciclo (°C) — Estensione Meteo-Aware",
+    what: "Temperatura minima di fine ciclo se arrivi a chiusura finestra COP o a 300 minuti partendo da freddo (es. emergenza 6.8 °C). Estende a step di +60 min (max 2 step, tetto 420 min / 18:30) e chiude appena tocchi questa soglia.",
+    impact: "L'estensione è guidata dal meteo: viene concessa se fermarsi ora rischia un'emergenza notturna oppure se il COP dell'ora extra è entro 0.25 da domani; se invece la notte è sicura e domani ha COP molto migliore, il ciclo si ferma pulito senza sprecare corrente serale.",
+    tip: "8.2 °C garantisce ottima isteresi e consente di tenere la LWT bassa (22.5–23.5 °C) con +7–13% di risparmio rispetto ad alzare la mandata."
   },
   ap_window_lock: {
     title: "🔒 Blocco Finestra Pre-Avvio (min)",

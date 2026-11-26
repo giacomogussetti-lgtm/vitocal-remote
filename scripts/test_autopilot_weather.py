@@ -567,6 +567,7 @@ def test_15_min_cycle_end_temp_extension(cfg_file: Path, st_file: Path, wx_file:
         "active_window_start_local": "11:00",
         "active_window_end_local": "16:00",
         "min_end_temp_extended": False,
+        "min_end_ext_count": 0,
         "calculated_target_lwt_c": 24.0,
         "calculated_pdc_setpoint_c": 14,
         "target_pdc_setpoint_c": 14,
@@ -574,7 +575,7 @@ def test_15_min_cycle_end_temp_extension(cfg_file: Path, st_file: Path, wx_file:
     hourly = _make_hourly_series(t1_local.replace(hour=0), 48, lambda h: 3.0, lambda h: 75)
     _write_weather_cache(wx_file, t1_utc, hourly)
 
-    # At 16:05 (300m elapsed) T_in=7.9 < 8.2 -> must extend window +60 min (to 17:05) and keep HEATING_SYNC
+    # At 16:05 (300m elapsed) T_in=7.9 < 8.2 -> extends window +60 min (to 17:05) and keeps HEATING_SYNC
     res1 = autopilot.run_autopilot_tick(
         _sample(t1_utc, t_in=7.9, oat=3.0, buf=23.5),
         dry_run=True,
@@ -583,18 +584,131 @@ def test_15_min_cycle_end_temp_extension(cfg_file: Path, st_file: Path, wx_file:
     )
     assert res1["state"] == "HEATING_SYNC", f"Expected min-end-temp extension, got {res1['state']}"
     assert res1["min_end_temp_extended"] is True
+    assert res1["min_end_ext_count"] == 1
     assert res1["active_window_end_local"] == "17:05"
 
-    # At 17:06 (361m elapsed) with T_in=8.3 -> stops cleanly into PUFFER_DRAIN
-    t2_local = datetime(2026, 11, 27, 17, 6, tzinfo=tz)
+    # Regression test for stop_max_dur bug: 6 min later (306m elapsed, T_in=8.0 < 8.2) MUST stay in HEATING_SYNC!
+    t_mid_local = datetime(2026, 11, 27, 16, 11, tzinfo=tz)
+    t_mid_utc = t_mid_local.astimezone(timezone.utc)
+    res_mid = autopilot.run_autopilot_tick(
+        _sample(t_mid_utc, t_in=8.0, oat=3.0, buf=23.5),
+        dry_run=True,
+        now_utc_override=t_mid_utc,
+        weather_cache_file=wx_file,
+    )
+    assert res_mid["state"] == "HEATING_SYNC", f"Bug regression: stopped early at 306m ({res_mid['last_action_reason']})"
+
+    # Early clean exit during extension: at 16:30 (325m elapsed) T_in reaches 8.2 C -> stops cleanly without wasting extra 35m
+    t2_local = datetime(2026, 11, 27, 16, 30, tzinfo=tz)
     t2_utc = t2_local.astimezone(timezone.utc)
     res2 = autopilot.run_autopilot_tick(
-        _sample(t2_utc, t_in=8.3, oat=3.0, buf=23.5),
+        _sample(t2_utc, t_in=8.2, oat=3.0, buf=23.5),
         dry_run=True,
         now_utc_override=t2_utc,
         weather_cache_file=wx_file,
     )
-    assert res2["state"] == "PUFFER_DRAIN", f"Expected PUFFER_DRAIN after extension cap, got {res2['state']}"
+    assert res2["state"] == "PUFFER_DRAIN", f"Expected early clean exit at 8.2C in extension, got {res2['state']}"
+
+
+def test_16_weather_aware_extension_gate_and_second_step(cfg_file: Path, st_file: Path, wx_file: Path) -> None:
+    tz = _rome_tz()
+    t1_local = datetime(2026, 11, 27, 16, 5, tzinfo=tz)
+    t1_utc = t1_local.astimezone(timezone.utc)
+    cfg = dict(autopilot.DEFAULT_CONFIG, enabled=True, min_cycle_end_temp_c=8.2, max_cycle_minutes=300, weather_arbitrage_cop_delta=0.25)
+    autopilot.save_config(cfg)
+
+    # Part A: Cold/wet evening (16:00-18:00 = -2C, RH 92%) + mild night (+4.0C -> genuinely safe >= 7.2C) + sunny tomorrow (+6.5C)
+    # With T_in=8.0 (<8.2), night is safe AND tomorrow COP is much better -> MUST refuse extension & stop cleanly!
+    autopilot.save_state({
+        "state": "HEATING_SYNC",
+        "state_since_utc": (t1_utc - timedelta(minutes=300)).isoformat(),
+        "cycle_started_utc": (t1_utc - timedelta(minutes=300)).isoformat(),
+        "active_window_start_local": "11:00",
+        "active_window_end_local": "16:00",
+        "min_end_temp_extended": False,
+        "min_end_ext_count": 0,
+        "calculated_target_lwt_c": 23.5,
+        "calculated_pdc_setpoint_c": 14,
+        "target_pdc_setpoint_c": 14,
+    })
+    hourly_a = _make_hourly_series(
+        t1_local.replace(hour=0),
+        48,
+        day1_temp_fn=lambda h: -2.0 if 16 <= h <= 18 else 4.0,
+        day1_rh_fn=lambda h: 92 if 16 <= h <= 18 else 75,
+        day2_temp_fn=lambda h: 6.5 if 11 <= h <= 15 else 4.0,
+        day2_rh_fn=lambda h: 62 if 11 <= h <= 15 else 75,
+    )
+    _write_weather_cache(wx_file, t1_utc, hourly_a)
+    res_a = autopilot.run_autopilot_tick(
+        _sample(t1_utc, t_in=8.0, oat=-2.0, buf=23.0),
+        dry_run=True,
+        now_utc_override=t1_utc,
+        weather_cache_file=wx_file,
+    )
+    assert res_a["state"] == "PUFFER_DRAIN", f"Expected refusal of bad-COP extension when night is safe, got {res_a['state']}"
+    assert "domani COP migliore" in res_a["last_action_reason"]
+
+    # Part B: Freezing night (-9C) puts night at risk (proj < 7.2C) -> MUST allow extension (even 2nd step up to 18:05!)
+    t_b_local = datetime(2026, 11, 27, 17, 5, tzinfo=tz)
+    t_b_utc = t_b_local.astimezone(timezone.utc)
+    autopilot.save_state({
+        "state": "HEATING_SYNC",
+        "state_since_utc": (t_b_utc - timedelta(minutes=360)).isoformat(),
+        "cycle_started_utc": (t_b_utc - timedelta(minutes=360)).isoformat(),
+        "active_window_start_local": "11:00",
+        "active_window_end_local": "17:00",
+        "min_end_temp_extended": True,
+        "min_end_ext_count": 1,
+        "calculated_target_lwt_c": 24.5,
+        "calculated_pdc_setpoint_c": 15,
+        "target_pdc_setpoint_c": 15,
+    })
+    hourly_b = _make_hourly_series(
+        t_b_local.replace(hour=0),
+        48,
+        day1_temp_fn=lambda h: -2.0 if 16 <= h <= 18 else -9.0,
+        day1_rh_fn=lambda h: 90,
+        day2_temp_fn=lambda h: 4.0 if 11 <= h <= 15 else -8.0,
+        day2_rh_fn=lambda h: 70,
+    )
+    _write_weather_cache(wx_file, t_b_utc, hourly_b)
+    res_b = autopilot.run_autopilot_tick(
+        _sample(t_b_utc, t_in=7.6, oat=-2.0, buf=24.0),
+        dry_run=True,
+        now_utc_override=t_b_utc,
+        weather_cache_file=wx_file,
+    )
+    assert res_b["state"] == "HEATING_SYNC", f"Expected 2nd extension to prevent freezing night emergency, got {res_b['state']}"
+    assert res_b["min_end_ext_count"] == 2
+    assert res_b["active_window_end_local"] == "18:05"
+
+
+def test_17_smart_cold_lwt_and_anti_onoff_floor(cfg_file: Path, st_file: Path, wx_file: Path) -> None:
+    from scripts import thermal_model as tm
+    cfg = dict(autopilot.DEFAULT_CONFIG, enabled=True, adaptive_model_apply_targets=True)
+    model = {
+        "k_rad_kw_per_k": 0.413,
+        "p_min_continuous_kw_ref": 5.18,
+        "defrost_lwt_drop_p90_k": 9.5,
+        "ua_building_c_24h_per_k": 0.179,
+        "alpha_heat_c_h_per_k": 0.0161,
+        "bphe_safe_outlet_min_c": 12.0,
+    }
+    # 1) Mild OAT (+8 C): P_min(OAT) is high -> anti-ON/OFF floor must lift LWT >= 23.8 C to prevent short-cycling
+    r_mild = tm.recommend_operating_targets(model, t_in=7.5, oat=8.0, cfg=cfg)
+    assert r_mild["anti_onoff_floor_c"] >= 23.8, f"Mild-OAT anti-ON/OFF floor too low: {r_mild}"
+    assert r_mild["recommended_target_lwt_c"] >= 23.8
+
+    # 2) Cool OAT (+2 C) with cold start (6.8 C): SCOP-first -> must NOT spike to 26.5 C, stay gentle (<= 23.5 C)
+    r_cool_cold = tm.recommend_operating_targets(model, t_in=6.8, oat=2.0, cfg=cfg)
+    assert 22.5 <= r_cool_cold["recommended_target_lwt_c"] <= 23.5, f"Cool-OAT LWT spiked unnecessarily: {r_cool_cold}"
+
+    # 3) Real frost (OAT -4 C -> -8 C): must scale progressively up toward 26.5 C so house doesn't stall
+    r_frost4 = tm.recommend_operating_targets(model, t_in=6.8, oat=-4.0, cfg=cfg)
+    r_frost8 = tm.recommend_operating_targets(model, t_in=6.8, oat=-8.0, cfg=cfg)
+    assert r_frost4["recommended_target_lwt_c"] > r_cool_cold["recommended_target_lwt_c"], f"Expected frost ramp at -4C: {r_frost4}"
+    assert r_frost8["recommended_target_lwt_c"] >= 25.5, f"Expected strong frost ramp at -8C: {r_frost8}"
 
 
 def main() -> int:
@@ -616,11 +730,13 @@ def main() -> int:
         ("12. Convergenza Bayesiana & changelog thermal_model.json", test_12_thermal_model_convergence_and_changelog),
         ("13. Calibrazione EN 14511 (111.A16) & pioggia continua", test_13_en14511_calibration_and_continuous_precip),
         ("14. Blocco finestra anti-slittamento & guardia emergenza", test_14_horizon_lock_and_emergency_ceiling_guard),
-        ("15. Estensione T_min fine ciclo (8.2°C -> +60m)", test_15_min_cycle_end_temp_extension),
+        ("15. Estensione T_min fine ciclo, fix 306m & uscita 8.2°C", test_15_min_cycle_end_temp_extension),
+        ("16. Gate meteo estensione (rifiuto vs 2° step anti-gelo)", test_16_weather_aware_extension_gate_and_second_step),
+        ("17. LWT intelligente su gelo + guardia anti-ON/OFF", test_17_smart_cold_lwt_and_anti_onoff_floor),
     ]
     for title, fn in cases:
         _run_case(title, fn)
-    print("\n[✓] TUTTI I 15 TEST SUPERATI CON SUCCESSO!")
+    print(f"\n[✓] TUTTI I {len(cases)} TEST SUPERATI CON SUCCESSO!")
     print("=" * 72)
     return 0
 

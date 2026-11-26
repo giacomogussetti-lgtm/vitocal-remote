@@ -391,25 +391,38 @@ def recommend_operating_targets(
     alpha_heat = float(model.get("alpha_heat_c_h_per_k") or PRIOR_MODEL["alpha_heat_c_h_per_k"])
     bphe_min_c = float(model.get("bphe_safe_outlet_min_c") or 12.0)
 
-    # 1. Anti-ON/OFF floor: Buffer must dissipate >= 1.15 * P_min(OAT) to keep inverter modulating smoothly above floor
+    # 1. Anti-ON/OFF floor: Buffer must dissipate >= 1.15 * P_min(OAT) ALL THE WAY through the cycle.
+    # Evaluate against expected end-of-cycle indoor temp (t_in + 0.8 C, capped at t_max) so that
+    # even as the room warms up and (LWT - T_in) narrows, the radiant floor still absorbs P_min(OAT)
+    # without tripping WO1C saturation cutoff (param 7209) at mild OAT (+4..+10 C).
+    t_max = float(cfg.get("t_max_c") or 8.8)
+    t_min_cfg = float(cfg.get("t_min_c") or 7.5)
+    min_end_t = float(cfg.get("min_cycle_end_temp_c") or 8.2)
+    ref_tin_end = min(t_max, float(t_in) + 0.8)
     p_min_at_oat = p_min_ref * max(0.72, min(1.30, 1.0 + 0.025 * (float(oat) - 4.0)))
     dt_anti_onoff = (p_min_at_oat * 1.15) / max(0.18, k_rad)
-    t_buf_anti_onoff = float(t_in) + max(float(cfg.get("defrost_min_delta_k") or 13.5), dt_anti_onoff)
+    t_buf_anti_onoff = ref_tin_end + max(float(cfg.get("defrost_min_delta_k") or 13.5), dt_anti_onoff)
 
     # 2. BPHE Defrost thermal reserve floor (active when OAT <= defrost_guard_oat_max_c + 1.5 C)
     oat_frost_lim = float(cfg.get("defrost_guard_oat_max_c") or 5.5)
     t_buf_bphe_safe = bphe_min_c + lwt_drop if float(oat) <= oat_frost_lim + 1.5 else float(cfg.get("defrost_min_safe_lwt_c") or 22.0)
     t_buf_bphe_safe = max(float(cfg.get("defrost_min_safe_lwt_c") or 22.0), t_buf_bphe_safe)
 
-    # 3. Direct sensor-calibrated cold-weather hysteresis requirement:
-    # Required indoor rise rate (C/h) to lift T_in -> T_max within max_cycle_minutes, accounting for
-    # building losses during the cycle (and mild frost derating in humid zone).
-    t_max = float(cfg.get("t_max_c") or 8.8)
-    cycle_h = max(2.0, float(cfg.get("max_cycle_minutes") or 300) / 60.0)
+    # 3. Cold-weather thermal demand (SCOP-first: prefer longer gentle low-LWT cycles over high LWT):
+    # alpha_heat is calibrated on NET indoor rise at reference OAT ~ +5 C, so only extra heat loss
+    # below +5 C is added (no double-counting). When starting cold (< t_min), use the adaptive
+    # duration budget (+1.5h extension) targeting min_end_t (8.2 C) so LWT stays low (~22.5-24 C)
+    # for OAT >= 0 C and scales progressively toward max_target_lwt_c (26.5 C) only on real frost (OAT <= -2..-8 C).
+    base_cycle_h = max(2.0, float(cfg.get("max_cycle_minutes") or 300) / 60.0)
     est_loss_24h = max(0.2, ua * max(1.0, float(t_in) - float(oat)))
-    # In humid frost band (0..5.5 C), allow gentle 0.90x rise target so inverter stays in low-frost 40-55% zone
-    frost_temper = 0.90 if (0.5 <= float(oat) <= oat_frost_lim) else 1.0
-    req_rise_rate_c_h = (((t_max - float(t_in)) * frost_temper) / cycle_h) + (est_loss_24h / 24.0)
+    extra_cold_loss_c_h = (ua / 24.0) * max(0.0, 5.0 - float(oat))
+    if float(t_in) < t_min_cfg - 0.15:
+        target_end_c = max(min_end_t, float(t_in) + 1.3)
+        eff_cycle_h = base_cycle_h + 1.5
+    else:
+        target_end_c = min(t_max, max(min_end_t, float(t_in) + 1.1))
+        eff_cycle_h = base_cycle_h + (0.5 if float(oat) < 0.0 else 0.0)
+    req_rise_rate_c_h = (max(0.4, target_end_c - float(t_in)) / eff_cycle_h) + extra_cold_loss_c_h
     t_buf_cold_demand = float(t_in) + (req_rise_rate_c_h / max(0.008, alpha_heat))
 
     # Optimal buffer target balances all 3 physical constraints while keeping modulation low (~40-55%)

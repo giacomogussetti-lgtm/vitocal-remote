@@ -66,7 +66,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "soft_curve_cooldown_minutes": 45,
     "anti_seize_days": 4,
     "adaptive_model_enabled": True,
-    "adaptive_model_apply_targets": False,
+    "adaptive_model_apply_targets": True,
     "weather_planner_enabled": True,
     "weather_dynamic_window_enabled": True,
     "weather_search_start": "09:00",
@@ -121,6 +121,7 @@ DEFAULT_STATE: dict[str, Any] = {
     "committed_window_end": None,
     "window_postponed_date": None,
     "min_end_temp_extended": False,
+    "min_end_ext_count": 0,
     "weather_plan": None,
     "api_usage": {
         "date_utc": None,
@@ -1005,6 +1006,7 @@ def run_autopilot_tick(
                         st["active_window_end_local"] = run_win_end
                         st["weather_deferred_date"] = None
                         st["min_end_temp_extended"] = False
+                        st["min_end_ext_count"] = 0
                         st["target_pdc_setpoint_c"] = regime_sp
                         st["calculated_pdc_setpoint_c"] = start_sp
                         st["calculated_target_lwt_c"] = start_lwt
@@ -1028,6 +1030,7 @@ def run_autopilot_tick(
                     st["active_window_end_local"] = run_win_end
                     st["weather_deferred_date"] = None
                     st["min_end_temp_extended"] = False
+                    st["min_end_ext_count"] = 0
                     st["target_pdc_setpoint_c"] = regime_sp
                     st["calculated_pdc_setpoint_c"] = start_sp
                     st["calculated_target_lwt_c"] = start_lwt
@@ -1172,55 +1175,121 @@ def run_autopilot_tick(
                     st["last_action_reason"] = f"[DRY-RUN] {why_trim} -> SP={candidate_sp}°C (LWT={candidate_lwt}°C)"
                     soft_trimmed_now = True
 
+        ext_count = int(st.get("min_end_ext_count") or (1 if st.get("min_end_temp_extended") else 0))
+        min_end_t = float(cfg.get("min_cycle_end_temp_c") or 0.0)
+        base_max_min = float(cfg["max_cycle_minutes"])
+        effective_max_min = base_max_min + (60.0 * ext_count)
+        hard_cap_min = base_max_min + 120.0
+
         stop_target = (t_in_f >= float(cfg["t_max_c"])) and not soft_trimmed_now
         if cfg.get("soft_curve_tuning_enabled") and t_in_f < float(cfg["t_max_c"]) + 0.2:
             if abs(int(st.get("soft_curve_trim_k") or 0)) < int(cfg.get("soft_curve_max_shift_delta_k") or 2):
                 stop_target = False
-        stop_max_dur = elapsed_min >= float(cfg["max_cycle_minutes"])
+
+        # Early clean exit while running inside a min-end-temp extension once min_end_t (e.g. 8.2 C) is reached
+        stop_ext_target = (
+            ext_count > 0
+            and min_end_t > 0.0
+            and t_in_f >= min_end_t
+            and (elapsed_min >= base_max_min or _is_past_cop_window_end(now_local, cfg, end_override=eff_win_end))
+        )
+        if stop_ext_target:
+            stop_target = True
+
+        stop_max_dur = elapsed_min >= effective_max_min
         active_win_end = str(st.get("active_window_end_local") or eff_win_end)
         stop_window = (not is_emerg_cycle) and _is_past_cop_window_end(now_local, cfg, end_override=active_win_end)
 
-        min_end_t = float(cfg.get("min_cycle_end_temp_c") or 0.0)
-        hard_cap_min = float(cfg["max_cycle_minutes"]) + 60.0
         cur_local_min = now_local.hour * 60 + now_local.minute
+        ext_refusal_note = None
         if (
             (stop_window or stop_max_dur)
             and not stop_target
             and min_end_t > 0.0
             and t_in_f < min_end_t
-            and not bool(st.get("min_end_temp_extended"))
+            and ext_count < 2
             and elapsed_min < hard_cap_min
             and cur_local_min < _hhmm_to_minutes("18:30")
         ):
-            ext_end_min = min(_hhmm_to_minutes("18:30"), max(_hhmm_to_minutes(active_win_end), cur_local_min) + 60)
-            new_end = f"{ext_end_min // 60:02d}:{ext_end_min % 60:02d}"
-            st["active_window_end_local"] = new_end
-            st["min_end_temp_extended"] = True
-            stop_window = False
-            stop_max_dur = False
-            if not dry_run:
-                v_conn = ViessmannConnector()
-                v_conn.connect()
-                active_win_start = str(st.get("active_window_start_local") or eff_win_start)
-                v_conn.set_heating_schedule_simple(
-                    days=[_weekday_code(now_local)],
-                    start=_round_hhmm_10m(active_win_start, round_up=False),
-                    end=_round_hhmm_10m(new_end, round_up=True),
-                    mode="reduced",
-                    clear=False,
-                )
-                record_api_usage(v_reads=2, v_writes=1, event_label="ap_min_end_ext", state_dict=st)
-                st["last_action_utc"] = now_iso
-            st["last_action_reason"] = (
-                f"Estensione T_min fine ciclo: casa ancora a {t_in_f:.1f}°C (<{min_end_t:.1f}°C), "
-                f"estendo finestra fino alle {new_end} (+max 60 min)."
-            )
+            # Weather-aware extension gate: extend +60 min (up to 2x, max 18:30 / +120m) ONLY IF:
+            # (A) stopping now risks falling below safe_floor before tomorrow's window, OR
+            # (B) the upcoming extra hour's COP is within arbitrage tolerance of tomorrow's COP
+            # (fallback when weather unavailable: allow 1 unconditional +60 min step).
+            wx_avail = bool(weather_plan.get("available"))
+            safe_floor = float(cfg["t_emergency_c"]) + float(cfg.get("prearm_emergency_margin_c") or 0.4)
+            proj_min = (weather_plan.get("projection_to_tomorrow") or {}).get("min_tin_c")
+            next_h_cop = weather_plan.get("next_hour_cop_net")
+            tom_cop = (weather_plan.get("tomorrow_window") or {}).get("avg_cop_net")
+            arb_delta = float(cfg.get("weather_arbitrage_cop_delta") or 0.25)
 
-        if bool(st.get("min_end_temp_extended")) and elapsed_min >= hard_cap_min:
-            stop_max_dur = True
+            night_at_risk = (proj_min is not None and float(proj_min) < safe_floor)
+            cop_extra_ok = (
+                next_h_cop is None
+                or tom_cop is None
+                or float(next_h_cop) >= (float(tom_cop) - arb_delta)
+            )
+            allow_ext = (night_at_risk or cop_extra_ok) if wx_avail else (ext_count == 0)
+
+            if allow_ext:
+                ext_count += 1
+                ext_end_min = min(_hhmm_to_minutes("18:30"), max(_hhmm_to_minutes(active_win_end), cur_local_min) + 60)
+                new_end = f"{ext_end_min // 60:02d}:{ext_end_min % 60:02d}"
+                st["active_window_end_local"] = new_end
+                st["min_end_temp_extended"] = True
+                st["min_end_ext_count"] = ext_count
+                stop_window = False
+                stop_max_dur = False
+                why_ext = (
+                    f"evita emergenza notte (min {float(proj_min):.1f}°C < {safe_floor:.1f}°C)"
+                    if night_at_risk
+                    else (
+                        f"COP ora extra buono ({float(next_h_cop):.2f} vs dom {float(tom_cop):.2f})"
+                        if (next_h_cop is not None and tom_cop is not None)
+                        else "fallback meteo"
+                    )
+                )
+                if not dry_run:
+                    v_conn = ViessmannConnector()
+                    v_conn.connect()
+                    active_win_start = str(st.get("active_window_start_local") or eff_win_start)
+                    v_conn.set_heating_schedule_simple(
+                        days=[_weekday_code(now_local)],
+                        start=_round_hhmm_10m(active_win_start, round_up=False),
+                        end=_round_hhmm_10m(new_end, round_up=True),
+                        mode="reduced",
+                        clear=False,
+                    )
+                    # Also extend BTicino manual timer so Grundfos stays ON through extension + drain
+                    b_conn = BTicinoConnector()
+                    rem_bt_min = max(75, int((base_max_min + 60.0 * ext_count) - elapsed_min) + int(cfg["puffer_drain_minutes"]))
+                    b_conn.set_thermostat_setpoint(
+                        float(cfg["bticino_force_on_temp_c"]),
+                        mode="manual",
+                        duration_minutes=rem_bt_min,
+                    )
+                    record_api_usage(v_reads=2, v_writes=1, b_reads=1, b_writes=1, event_label="ap_min_end_ext", state_dict=st)
+                    st["last_action_utc"] = now_iso
+                st["last_action_reason"] = (
+                    f"Estensione #{ext_count} T_min fine ciclo: casa a {t_in_f:.1f}°C (<{min_end_t:.1f}°C), "
+                    f"estendo fino alle {new_end} ({why_ext}; chiusura anticipata appena ≥{min_end_t:.1f}°C)."
+                )
+            else:
+                ext_refusal_note = (
+                    f"stop preferito a estensione: notte sicura (min {float(proj_min):.1f}°C ≥ {safe_floor:.1f}°C) "
+                    f"e domani COP migliore ({float(tom_cop):.2f} vs {float(next_h_cop):.2f})"
+                )
 
         if stop_target or stop_max_dur or stop_window:
-            why = "Target raggiunto" if stop_target else ("Durata max raggiunta" if stop_max_dur else f"Fine finestra COP ({active_win_end})")
+            if stop_ext_target:
+                why = f"Target minimo fine ciclo raggiunto ({t_in_f:.1f}°C ≥ {min_end_t:.1f}°C in estensione)"
+            elif stop_target:
+                why = "Target raggiunto"
+            elif stop_max_dur:
+                why = f"Durata max raggiunta ({int(effective_max_min)}m)"
+            else:
+                why = f"Fine finestra COP ({active_win_end})"
+            if ext_refusal_note:
+                why = f"{why} — {ext_refusal_note}"
             if not dry_run:
                 ok, msg = _apply_stop_pdc_keep_drain(cfg)
                 record_api_usage(v_reads=2, v_writes=1, b_reads=1, b_writes=1, event_label="ap_stop_pdc_drain", state_dict=st)
@@ -1255,6 +1324,7 @@ def run_autopilot_tick(
             st["active_window_start_local"] = None
             st["active_window_end_local"] = None
             st["min_end_temp_extended"] = False
+            st["min_end_ext_count"] = 0
             st["soft_curve_trim_k"] = 0
             st["soft_curve_last_trim_utc"] = None
             st["cycle_defrost_episodes"] = 0
