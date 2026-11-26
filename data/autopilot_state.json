@@ -5,8 +5,8 @@
   "cycle_started_utc": "2026-11-26T08:01:19.186928+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-26T13:01:23.608405+00:00",
-  "last_action_utc": "2026-11-26T13:01:23.608405+00:00",
+  "last_eval_utc": "2026-11-26T13:01:48.094434+00:00",
+  "last_action_utc": "2026-11-26T13:01:48.094434+00:00",
   "last_action_reason": "Estensione #1 T_min fine ciclo: casa a 7.9°C (<8.2°C), estendo fino alle 15:01 (evita emergenza notte (min 7.1°C < 7.2°C); chiusura anticipata appena ≥8.2°C).",
   "indoor_slope_c_per_h": 0.154,
   "calculated_target_lwt_c": 21.9,
@@ -20,7 +20,7 @@
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": 0,
   "soft_curve_last_trim_utc": null,
-  "last_grundfos_run_utc": "2026-11-26T13:01:23.608405+00:00",
+  "last_grundfos_run_utc": "2026-11-26T13:01:48.094434+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
@@ -3581,14 +3581,14 @@
         "gh": 1
       },
       {
-        "ts": "2026-11-26T13:01:23.605085+00:00",
+        "ts": "2026-11-26T13:01:48.090137+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
         "gh": 1
       },
       {
-        "ts": "2026-11-26T13:01:26.931308+00:00",
+        "ts": "2026-11-26T13:01:52.221329+00:00",
         "lbl": "ap_min_end_ext",
         "vr": 2,
         "vw": 1,

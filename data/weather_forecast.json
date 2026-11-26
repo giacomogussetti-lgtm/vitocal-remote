@@ -806,7 +806,7 @@
     "frost_penalty_scale": 0.92,
     "tin_proj_samples_matched": 5,
     "tin_projection_mae_c": 0.66,
-    "calibrated_utc": "2026-11-26T13:01:23.626780+00:00"
+    "calibrated_utc": "2026-11-26T13:01:48.122903+00:00"
   },
   "calibration_history": [
     {
@@ -1555,7 +1555,7 @@
       "pred_tin_c": 7.6
     },
     {
-      "created_utc": "2026-11-26T13:01:23.608405+00:00",
+      "created_utc": "2026-11-26T13:01:48.094434+00:00",
       "target_local": "2026-11-26T20:00",
       "pred_tin_c": 7.69
     }
