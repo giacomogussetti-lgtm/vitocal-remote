@@ -806,7 +806,7 @@
     "frost_penalty_scale": 0.93,
     "tin_proj_samples_matched": 5,
     "tin_projection_mae_c": 0.31,
-    "calibrated_utc": "2026-11-26T11:31:08.589018+00:00"
+    "calibrated_utc": "2026-11-26T11:31:33.849766+00:00"
   },
   "calibration_history": [
     {
@@ -1840,7 +1840,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 90.0,
-      "tin_proj_c": 6.86,
+      "tin_proj_c": 6.87,
       "in_window": true
     },
     {
@@ -2011,8 +2011,8 @@
     },
     "projection_to_tomorrow": {
       "start_tin_c": 7.7,
-      "min_tin_c": 6.86,
-      "end_tin_c": 6.86,
+      "min_tin_c": 6.87,
+      "end_tin_c": 6.87,
       "hours_simulated": 20.5,
       "target_local": "27/11 09:00",
       "first_below_tmin_local": "26/11 19:31",
