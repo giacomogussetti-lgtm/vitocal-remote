@@ -2232,6 +2232,16 @@ nav.bottom-nav {
   color: #a7f3d0;
 }
 
+.ap-hour-tin.is-heat {
+  color: #fbbf24;
+  font-weight: 700;
+}
+
+.ap-hour-tin.is-now {
+  color: #e2e8f0;
+  font-weight: 700;
+}
+
 .ap-assumptions-box {
   background: rgba(15, 23, 42, 0.6);
   border: 1px dashed rgba(148, 163, 184, 0.35);
@@ -2500,4 +2510,161 @@ nav.bottom-nav {
 .syn-wx-chip strong {
   font-size: 0.72rem;
   color: #38bdf8;
+}
+
+/* Live WO1C 7209 Anti-Cutoff Margin Gauge */
+.wo1c-margin-card {
+  margin-top: 8px;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid #334155;
+  border-radius: 11px;
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  transition: border-color 0.25s, background-color 0.25s;
+}
+
+.wo1c-margin-card.is-standby {
+  padding: 6px 11px;
+  opacity: 0.84;
+}
+
+.wo1c-margin-card.tone-safe {
+  border-color: rgba(16, 185, 129, 0.52);
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.09), rgba(15, 23, 42, 0.92));
+}
+
+.wo1c-margin-card.tone-warn {
+  border-color: rgba(245, 158, 11, 0.68);
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.12), rgba(15, 23, 42, 0.92));
+}
+
+.wo1c-margin-card.tone-danger {
+  border-color: rgba(239, 68, 68, 0.82);
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.16), rgba(15, 23, 42, 0.94));
+}
+
+.wo1c-margin-card.tone-defrost {
+  border-color: rgba(56, 189, 248, 0.72);
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.13), rgba(15, 23, 42, 0.92));
+}
+
+.wo1c-margin-card.tone-pause {
+  border-color: rgba(192, 132, 252, 0.65);
+  background: linear-gradient(180deg, rgba(168, 85, 247, 0.12), rgba(15, 23, 42, 0.92));
+}
+
+.wo1c-margin-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.wo1c-margin-badge {
+  font-size: 0.64rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.wo1c-margin-badge.tone-idle { background: rgba(148, 163, 184, 0.16); color: #94a3b8; }
+.wo1c-margin-badge.tone-safe { background: rgba(16, 185, 129, 0.22); color: #6ee7b7; }
+.wo1c-margin-badge.tone-warn { background: rgba(245, 158, 11, 0.24); color: #fde68a; }
+.wo1c-margin-badge.tone-danger { background: rgba(239, 68, 68, 0.28); color: #fecaca; }
+.wo1c-margin-badge.tone-defrost { background: rgba(56, 189, 248, 0.22); color: #bae6fd; }
+.wo1c-margin-badge.tone-pause { background: rgba(168, 85, 247, 0.22); color: #e9d5ff; }
+
+.wo1c-margin-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wo1c-margin-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wo1c-margin-bar-bg {
+  flex: 1;
+  height: 9px;
+  border-radius: 6px;
+  background: #1e293b;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.wo1c-margin-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.wo1c-margin-bar-fill.tone-safe { background: linear-gradient(90deg, #10b981, #34d399); }
+.wo1c-margin-bar-fill.tone-warn { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.wo1c-margin-bar-fill.tone-danger { background: linear-gradient(90deg, #f97316, #ef4444); }
+.wo1c-margin-bar-fill.tone-defrost { background: linear-gradient(90deg, #0284c7, #38bdf8); }
+.wo1c-margin-bar-fill.tone-pause { background: linear-gradient(90deg, #9333ea, #c084fc); }
+
+.wo1c-margin-pct {
+  font-size: 0.74rem;
+  font-weight: 800;
+  min-width: 38px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-main);
+}
+
+.wo1c-margin-summary {
+  font-size: 0.69rem;
+  line-height: 1.38;
+  color: #cbd5e1;
+}
+
+.wo1c-margin-chips {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+@media (max-width: 440px) {
+  .wo1c-margin-chips {
+    grid-template-columns: 1fr;
+  }
+}
+
+.wo1c-chip {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(51, 65, 85, 0.8);
+  border-radius: 7px;
+  padding: 5px 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wo1c-chip-lbl {
+  font-size: 0.59rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.wo1c-chip strong {
+  font-size: 0.74rem;
+  color: #f8fafc;
+}
+
+.wo1c-chip small {
+  font-size: 0.61rem;
+  color: #94a3b8;
 }

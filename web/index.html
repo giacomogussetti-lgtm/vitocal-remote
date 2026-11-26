@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
   <!-- CSS Stylesheet -->
-  <link rel="stylesheet" href="css/styles.css?v=20">
+  <link rel="stylesheet" href="css/styles.css?v=21">
 
   <!-- Chart.js & Continuous Time Date Adapter (Offline First & PWA Ready) -->
   <script src="js/chart.min.js"></script>
@@ -67,6 +67,43 @@
             <button type="button" class="btn-mini-tool" id="btnSynWxOpenCommands" style="margin-top: 8px; width: 100%;">⚙️ Apri Ragionamento Completo &amp; Parametri Autopilota ›</button>
           </div>
         </details>
+      </div>
+
+      <!-- Live WO1C 7209 Anti-Cutoff Margin Gauge (Expanded when PdC is active/paused; compact 1-line pill in Standby) -->
+      <div id="wo1cCutoffMarginCard" class="wo1c-margin-card is-standby">
+        <div class="wo1c-margin-head">
+          <span class="label-with-help">
+            <span id="wo1cMarginTitle">🛡️ Margine Anti-Stacco WO1C (7209)</span>
+            <button type="button" class="help-info-btn" data-help-key="wo1c_cutoff_margin" aria-label="Spiegazione indicatore Anti-Stacco">i</button>
+          </span>
+          <span id="wo1cMarginBadge" class="wo1c-margin-badge tone-idle">IN STANDBY</span>
+        </div>
+        <div id="wo1cMarginBody" class="wo1c-margin-body" style="display: none;">
+          <div class="wo1c-margin-bar-wrap">
+            <div class="wo1c-margin-bar-bg">
+              <div id="wo1cMarginBarFill" class="wo1c-margin-bar-fill" style="width: 0%;"></div>
+            </div>
+            <span id="wo1cMarginPct" class="wo1c-margin-pct">--%</span>
+          </div>
+          <div id="wo1cMarginSummary" class="wo1c-margin-summary">In attesa dati live...</div>
+          <div class="wo1c-margin-chips">
+            <div class="wo1c-chip">
+              <span class="wo1c-chip-lbl" id="wo1cChipBufLbl">Testa Puffer (BUF)</span>
+              <strong id="wo1cChipBuf">--</strong>
+              <small id="wo1cChipBufSub">--</small>
+            </div>
+            <div class="wo1c-chip">
+              <span class="wo1c-chip-lbl" id="wo1cChipEwtLbl">Fondo / Ritorno (EWT)</span>
+              <strong id="wo1cChipEwt">--</strong>
+              <small id="wo1cChipEwtSub">--</small>
+            </div>
+            <div class="wo1c-chip">
+              <span class="wo1c-chip-lbl" id="wo1cChipModLbl">Inverter &amp; Trend PI</span>
+              <strong id="wo1cChipMod">--</strong>
+              <small id="wo1cChipModSub">--</small>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Collapsible Quick Metric Cards (Hidden by default) -->
@@ -1127,11 +1164,11 @@
   <div id="toast"></div>
 
   <!-- Scripts -->
-  <script src="js/synoptic.js?v=20"></script>
-  <script src="js/charts.js?v=20"></script>
-  <script src="js/analytics.js?v=20"></script>
-  <script src="js/commands.js?v=20"></script>
-  <script src="js/help.js?v=20"></script>
-  <script src="js/app.js?v=20"></script>
+  <script src="js/synoptic.js?v=21"></script>
+  <script src="js/charts.js?v=21"></script>
+  <script src="js/analytics.js?v=21"></script>
+  <script src="js/commands.js?v=21"></script>
+  <script src="js/help.js?v=21"></script>
+  <script src="js/app.js?v=21"></script>
 </body>
 </html>

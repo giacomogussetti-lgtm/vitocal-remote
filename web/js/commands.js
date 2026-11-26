@@ -1523,15 +1523,23 @@ function renderWeatherBrainUI(cfg, st, wf) {
   const hourly = (wf && Array.isArray(wf.hourly_preview)) ? wf.hourly_preview : [];
   if (hourly.length) {
     stripEl.innerHTML = hourly.map(h => {
-      const tinTxt = h.tin_proj_c != null ? `🏠 ${Number(h.tin_proj_c).toFixed(1)}°` : "";
+      const tMode = String(h.tin_mode || "cool");
+      const isHeat = (tMode === "heat" || tMode === "heat_est");
+      const tinTxt = h.tin_proj_c != null
+        ? (isHeat ? `🔥 ${Number(h.tin_proj_c).toFixed(1)}°↑` : `🏠 ${Number(h.tin_proj_c).toFixed(1)}°`)
+        : "";
+      const tinCls = isHeat ? " is-heat" : (tMode === "now" ? " is-now" : "");
+      const modeTip = tMode === "heat"
+        ? "ciclo riscaldamento attivo"
+        : (tMode === "heat_est" ? "ciclo riscaldamento stimato" : (tMode === "now" ? "T casa live" : "standby"));
       const rainTxt = h.precip_mm > 0.1 ? `💧${Number(h.precip_mm).toFixed(1)}` : "";
       return `
-        <div class="ap-hour-pill ${h.in_window ? "in-window" : ""}" title="${escapeHtmlSafe(h.day_tag)} ${escapeHtmlSafe(h.hh)} · Brina ${escapeHtmlSafe(h.frost_risk)}">
+        <div class="ap-hour-pill ${h.in_window ? "in-window" : ""}" title="${escapeHtmlSafe(h.day_tag)} ${escapeHtmlSafe(h.hh)} · Brina ${escapeHtmlSafe(h.frost_risk)} · T casa: ${modeTip}">
           <span class="ap-hour-time">${escapeHtmlSafe(h.day_tag)} ${escapeHtmlSafe(h.hh)}</span>
           <span>${escapeHtmlSafe(h.icon || "🌤️")} ${Number(h.temp_c) >= 0 ? "+" : ""}${Number(h.temp_c).toFixed(1)}°</span>
           <span>RH ${h.rh_pct}% ${rainTxt}</span>
           <span class="ap-hour-cop">COP ${Number(h.cop_net).toFixed(2)}</span>
-          ${tinTxt ? `<span class="ap-hour-tin">${tinTxt}</span>` : ""}
+          ${tinTxt ? `<span class="ap-hour-tin${tinCls}">${tinTxt}</span>` : ""}
         </div>`;
     }).join("");
   } else {
@@ -1694,17 +1702,22 @@ function renderSynopticWeatherDrawer(cfg, st, wf) {
   }
   pairEl.innerHTML = chips.join("") || '<span class="cmd-muted-note">Previsioni orarie in caricamento...</span>';
 
-  const hourly = (wf && Array.isArray(wf.hourly_preview)) ? wf.hourly_preview.slice(0, 12) : [];
+  const hourly = (wf && Array.isArray(wf.hourly_preview)) ? wf.hourly_preview.slice(0, 14) : [];
   if (hourly.length) {
     stripEl.innerHTML = hourly.map(h => {
-      const tinTxt = h.tin_proj_c != null ? `🏠 ${Number(h.tin_proj_c).toFixed(1)}°` : "";
+      const tMode = String(h.tin_mode || "cool");
+      const isHeat = (tMode === "heat" || tMode === "heat_est");
+      const tinTxt = h.tin_proj_c != null
+        ? (isHeat ? `🔥 ${Number(h.tin_proj_c).toFixed(1)}°↑` : `🏠 ${Number(h.tin_proj_c).toFixed(1)}°`)
+        : "";
+      const tinCls = isHeat ? " is-heat" : (tMode === "now" ? " is-now" : "");
       return `
         <div class="ap-hour-pill ${h.in_window ? "in-window" : ""}">
           <span class="ap-hour-time">${escapeHtmlSafe(h.day_tag)} ${escapeHtmlSafe(h.hh)}</span>
           <span>${escapeHtmlSafe(h.icon || "🌤️")} ${Number(h.temp_c) >= 0 ? "+" : ""}${Number(h.temp_c).toFixed(1)}°</span>
           <span>RH ${h.rh_pct}%</span>
           <span class="ap-hour-cop">COP ${Number(h.cop_net).toFixed(2)}</span>
-          ${tinTxt ? `<span class="ap-hour-tin">${tinTxt}</span>` : ""}
+          ${tinTxt ? `<span class="ap-hour-tin${tinCls}">${tinTxt}</span>` : ""}
         </div>`;
     }).join("");
   } else {

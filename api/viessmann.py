@@ -31,21 +31,33 @@ def compute_wo1c_lwt(oat_c: float, t_ref: float, slope: float = 0.6, shift: floa
 
 
 def compute_inverse_setpoint_for_target_lwt(
-    target_lwt_c: float, oat_c: float, slope: float = 0.6, shift: float = 0.0
+    target_lwt_c: float,
+    oat_c: float,
+    slope: float = 0.6,
+    shift: float = 0.0,
+    min_lwt_floor_c: Optional[float] = None,
 ) -> int:
     """
     Finds integer room setpoint (10..30 C) whose WO1C variant2 curve produces
     an LWT closest to target_lwt_c at the given OAT, slope, and shift.
+    When min_lwt_floor_c is provided, never rounds down below (min_lwt_floor_c - 0.15 C)
+    so BPHE defrost reserve and anti-ON/OFF floor are strictly respected.
     """
-    best_t = 12
+    best_t: Optional[int] = None
     best_err = float("inf")
+    floor_tol = (float(min_lwt_floor_c) - 0.15) if min_lwt_floor_c is not None else None
     for t_ref in range(10, 31):
         lwt = compute_wo1c_lwt(oat_c, float(t_ref), slope, shift)
+        if floor_tol is not None and lwt < floor_tol:
+            continue
         err = abs(lwt - float(target_lwt_c))
         if err < best_err:
             best_err = err
             best_t = t_ref
-    return best_t
+    if best_t is not None:
+        return best_t
+    # Fallback if even max setpoint is below floor
+    return 30 if floor_tol is not None else 12
 
 
 class ViessmannConnector:

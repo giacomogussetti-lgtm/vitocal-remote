@@ -251,6 +251,12 @@ const HELP_CATALOG = {
     impact: "Un aumento delle ore della resistenza (S1/S2) segnala uso del backup elettrico ad alto consumo (sotto i 0 °C o durante emergenze/sbrinamenti).",
     tip: "Se noti cicli con S1/S2 in crescita, controlla i dettagli nella scheda Grafici ed esegui un audit dei log."
   },
+  wo1c_cutoff_margin: {
+    title: "🛡️ Indicatore Live Anti-Stacco WO1C (7209 / 7203)",
+    what: "Misura in tempo reale quanto il puffer 200L è vicino allo spegnimento automatico del compressore per carica completa (parametro WO1C 7209), combinando 3 grandezze fisiche verificate sui log reali: Testa Puffer (BUF vs Target + 2.5 K), Fondo/Ritorno (EWT vs Target) e Spinta/Trend PI (Mod % e velocità di salita °C/min).",
+    impact: "Sulla Vitotronic WO1C lo stacco 7209 NON avviene sul solo picco di BUF se il ritorno EWT resta freddo sotto Target, ma scatta quando l'intero puffer si satura testa-fondo (BUF ≥ Target + 2.1..2.7 K E EWT ≥ Target − 0.2 K). Durante la pausa 7203 l'indicatore si trasforma automaticamente nel conto alla rovescia verso la riaccensione (BUF ≤ Target − 5.0 K), e durante il defrost mostra il margine di sicurezza BPHE (LWT ≥ 12 °C / BUF ≥ 17 °C).",
+    tip: "Se in marcia vedi l'indicatore salire spesso sul giallo/rosso subito dopo uno sbrinamento con Mod > 65%, significa che il Target LWT è troppo basso per assorbire il picco di recupero del PI sul pavimento: in quel caso conviene alzare di +0.5..+1.0 °C il pavimento LWT minimo."
+  },
   sync_pat: {
     title: "🔑 GitHub Personal Access Token (PAT)",
     what: "Token personale memorizzato solo nel browser/telefono (mai nel codice pubblico) che autorizza la PWA a lanciare i workflow GitHub Actions via 4G/5G.",

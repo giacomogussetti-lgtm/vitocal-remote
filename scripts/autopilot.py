@@ -40,7 +40,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "cop_window_start": "11:00",
     "cop_window_end": "16:00",
     "target_lwt_delta_k": 15.5,
-    "min_target_lwt_c": 22.5,
+    "min_target_lwt_c": 23.5,
     "max_target_lwt_c": 26.5,
     "max_cycle_minutes": 300,
     "puffer_drain_minutes": 25,
@@ -54,11 +54,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "cron_active_minutes": 1,
     "soft_start_enabled": True,
     "soft_start_step_minutes": 25,
-    "soft_start_min_lwt_c": 21.8,
+    "soft_start_min_lwt_c": 22.8,
     "defrost_guard_enabled": True,
     "defrost_trim_threshold_count": 2,
     "defrost_guard_oat_max_c": 5.5,
-    "defrost_min_safe_lwt_c": 22.0,
+    "defrost_min_safe_lwt_c": 23.0,
     "defrost_min_delta_k": 13.5,
     "inverter_min_mod_pct": 38,
     "soft_curve_tuning_enabled": True,
@@ -616,7 +616,10 @@ def _apply_start_heating(
         or active_end_hhmm != str(cfg.get("cop_window_end", "16:00"))
     ):
         s10 = _round_hhmm_10m(active_start_hhmm, round_up=False)
-        e10 = _round_hhmm_10m(active_end_hhmm, round_up=True)
+        # Add +10 min buffer on WO1C hardware schedule end to absorb ~3-5 min WO1C internal clock drift
+        # (Autopilot still issues explicit set_mode('standby') at exact end of cycle).
+        end_buf_min = min(23 * 60 + 50, _hhmm_to_minutes(active_end_hhmm) + 10)
+        e10 = _round_hhmm_10m(f"{end_buf_min // 60:02d}:{end_buf_min % 60:02d}", round_up=True)
         if e10 > s10:
             v_conn.set_heating_schedule_simple(
                 days=[today_code],
@@ -792,14 +795,19 @@ def run_autopilot_tick(
         regime_sp = int(st.get("target_pdc_setpoint_c") or pdc_setpoint)
     else:
         target_lwt = _clamp_target_lwt(ref_tin, cfg, oat=float(oat), model=tm_model)
+        min_lwt_floor = float(cfg.get("min_target_lwt_c") or 23.5)
         regime_sp = compute_inverse_setpoint_for_target_lwt(
             target_lwt_c=target_lwt,
             oat_c=float(oat),
             slope=float(curve_slope),
             shift=float(curve_shift),
+            min_lwt_floor_c=min_lwt_floor,
         )
+        # Keep calculated_target_lwt_c aligned with actual curve LWT of chosen integer setpoint
+        actual_regime_lwt = compute_wo1c_lwt(float(oat), float(regime_sp), float(curve_slope), float(curve_shift))
+        target_lwt = max(target_lwt, actual_regime_lwt) if actual_regime_lwt >= min_lwt_floor - 0.15 else target_lwt
         pdc_setpoint = regime_sp
-        st["calculated_target_lwt_c"] = target_lwt
+        st["calculated_target_lwt_c"] = round(actual_regime_lwt, 1)
         st["calculated_pdc_setpoint_c"] = pdc_setpoint
         st["target_pdc_setpoint_c"] = regime_sp
 
@@ -959,8 +967,8 @@ def run_autopilot_tick(
                 start_sp = regime_sp
                 start_lwt = target_lwt
                 if cfg.get("soft_start_enabled", True) and buf_temp is not None and float(buf_temp) < target_lwt - 5.0:
-                    # Configurable Soft-Start floor (default 21.8 C) ensures safe BPHE thermal reserve on early defrosts
-                    ss_floor = float(cfg.get("soft_start_min_lwt_c") or 21.8)
+                    # Configurable Soft-Start floor (default 22.8 C) ensures safe BPHE thermal reserve on early defrosts
+                    ss_floor = float(cfg.get("soft_start_min_lwt_c") or 22.8)
                     oat_frost_lim = float(cfg.get("defrost_guard_oat_max_c") or 5.5)
                     soft_lwt_cap = max(ss_floor, min(target_lwt, float(buf_temp) + 10.5))
                     soft_sp = compute_inverse_setpoint_for_target_lwt(
@@ -968,10 +976,12 @@ def run_autopilot_tick(
                         oat_c=float(oat),
                         slope=float(curve_slope),
                         shift=float(curve_shift),
+                        min_lwt_floor_c=ss_floor,
                     )
-                    # Start at most 1-2 C below regime_sp (never below floor in humid/cold air)
+                    # Start at most 1-2 C below regime_sp and NEVER below soft_sp (which guarantees LWT >= ss_floor)
                     max_drop = 1 if (regime_sp <= 13 and float(oat) <= oat_frost_lim) else 2
-                    start_sp = max(12, max(regime_sp - max_drop, min(regime_sp, soft_sp)))
+                    start_sp = max(soft_sp, max(regime_sp - max_drop, 12))
+                    start_sp = min(regime_sp, start_sp)
                     start_lwt = compute_wo1c_lwt(float(oat), float(start_sp), float(curve_slope), float(curve_shift))
 
                 if not dry_run:
@@ -1113,7 +1123,7 @@ def run_autopilot_tick(
             # Configurable Hydraulic & Defrost-BPHE safety floor (no hardcoded magic numbers):
             # Defaults (22.0 C / +13.5 K) keep BPHE outlet LWT >= 13-14 C during reverse-cycle defrost
             # and stay above the measured inverter minimum continuous floor (~38%).
-            bphe_floor = float(cfg.get("defrost_min_safe_lwt_c") or 22.0)
+            bphe_floor = float(cfg.get("defrost_min_safe_lwt_c") or 23.0)
             min_dt_rad = float(cfg.get("defrost_min_delta_k") or 13.5)
             min_safe_lwt = max(bphe_floor, t_in_f + min_dt_rad)
             candidate_sp = max(11, pdc_setpoint - 1)
@@ -1201,9 +1211,16 @@ def run_autopilot_tick(
         stop_window = (not is_emerg_cycle) and _is_past_cop_window_end(now_local, cfg, end_override=active_win_end)
 
         cur_local_min = now_local.hour * 60 + now_local.minute
+        active_win_end_min = _hhmm_to_minutes(active_win_end)
+        # Pre-trigger extension 15 min BEFORE schedule/duration expiry so WO1C internal clock drift
+        # (~3-5 min ahead) never switches active_program -> standby and causes an avoidable stop/restart!
+        ext_lead_min = 15
+        near_window_end = (not is_emerg_cycle) and (cur_local_min >= active_win_end_min - ext_lead_min)
+        near_max_dur = elapsed_min >= (effective_max_min - float(ext_lead_min))
+
         ext_refusal_note = None
         if (
-            (stop_window or stop_max_dur)
+            (stop_window or stop_max_dur or near_window_end or near_max_dur)
             and not stop_target
             and min_end_t > 0.0
             and t_in_f < min_end_t
@@ -1232,7 +1249,7 @@ def run_autopilot_tick(
 
             if allow_ext:
                 ext_count += 1
-                ext_end_min = min(_hhmm_to_minutes("18:30"), max(_hhmm_to_minutes(active_win_end), cur_local_min) + 60)
+                ext_end_min = min(_hhmm_to_minutes("18:30"), max(active_win_end_min, cur_local_min) + 60)
                 new_end = f"{ext_end_min // 60:02d}:{ext_end_min % 60:02d}"
                 st["active_window_end_local"] = new_end
                 st["min_end_temp_extended"] = True
@@ -1252,10 +1269,12 @@ def run_autopilot_tick(
                     v_conn = ViessmannConnector()
                     v_conn.connect()
                     active_win_start = str(st.get("active_window_start_local") or eff_win_start)
+                    hw_ext_end_min = min(23 * 60 + 50, ext_end_min + 10)
+                    hw_ext_end = f"{hw_ext_end_min // 60:02d}:{hw_ext_end_min % 60:02d}"
                     v_conn.set_heating_schedule_simple(
                         days=[_weekday_code(now_local)],
                         start=_round_hhmm_10m(active_win_start, round_up=False),
-                        end=_round_hhmm_10m(new_end, round_up=True),
+                        end=_round_hhmm_10m(hw_ext_end, round_up=True),
                         mode="reduced",
                         clear=False,
                     )
@@ -1269,11 +1288,14 @@ def run_autopilot_tick(
                     )
                     record_api_usage(v_reads=2, v_writes=1, b_reads=1, b_writes=1, event_label="ap_min_end_ext", state_dict=st)
                     st["last_action_utc"] = now_iso
+                lead_tag = " (anticipo anti-stacco fascia)" if not (
+                    _is_past_cop_window_end(now_local, cfg, end_override=active_win_end) or elapsed_min >= effective_max_min
+                ) else ""
                 st["last_action_reason"] = (
-                    f"Estensione #{ext_count} T_min fine ciclo: casa a {t_in_f:.1f}°C (<{min_end_t:.1f}°C), "
+                    f"Estensione #{ext_count} T_min fine ciclo{lead_tag}: casa a {t_in_f:.1f}°C (<{min_end_t:.1f}°C), "
                     f"estendo fino alle {new_end} ({why_ext}; chiusura anticipata appena ≥{min_end_t:.1f}°C)."
                 )
-            else:
+            elif stop_window or stop_max_dur:
                 ext_refusal_note = (
                     f"stop preferito a estensione: notte sicura (min {float(proj_min):.1f}°C ≥ {safe_floor:.1f}°C) "
                     f"e domani COP migliore ({float(tom_cop):.2f} vs {float(next_h_cop):.2f})"

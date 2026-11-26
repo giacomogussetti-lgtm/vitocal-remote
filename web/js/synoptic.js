@@ -66,6 +66,7 @@ function renderSynoptic(data) {
     : renderSynopticLandscape(m);
 
   svg.innerHTML = sharedDefs + body;
+  renderWo1cCutoffMargin(lastSynopticData);
 }
 
 function extractSynopticMetrics(d) {
@@ -753,3 +754,332 @@ function svgBackupHeaterBlock(x, y, w, h, m) {
     </g>
   `;
 }
+
+// =========================================================================
+// LIVE WO1C ANTI-STACCO (7209) & HYSTERESIS (7203) / DEFROST BPHE GAUGE
+// Calibrated on real 21/11, 24/11 & 26/11 Vitocal 111-S peaks & cutoffs:
+//   - 7209 cutoff occurs when BOTH BUF >= Target + 2.1..2.7 K AND EWT >= Target - 0.2 K
+//   - 7203 restart occurs when BUF <= Target - 5.0 K
+//   - Defrost BPHE guard: LWT >= 12.0 C, BUF >= 17.0 C
+// =========================================================================
+function computeWo1cCutoffMargin(d, samplesList) {
+  if (!d) return { mode: "standby" };
+
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const progLower = String(d.active_program || "standby").toLowerCase();
+  const phaseLower = String(d.compressor_phase || "off").toLowerCase();
+  const modNum = d.compressor_modulation_percent != null ? Number(d.compressor_modulation_percent) : 0;
+  const compActive = (d.compressor_active === 1) || (modNum > 0);
+  const isDefrost = phaseLower.includes("defrost");
+
+  const buf = d.buffer_temp_c != null ? Number(d.buffer_temp_c) : null;
+  const ewt = d.pdc_return_temp_c != null ? Number(d.pdc_return_temp_c) : null;
+  const lwt = d.pdc_supply_temp_c != null ? Number(d.pdc_supply_temp_c) : null;
+
+  const apSt = (typeof cmdState !== "undefined" && cmdState.lastAutopilotState) ? cmdState.lastAutopilotState : null;
+  let targetLwt = d.target_supply_temp_c != null ? Number(d.target_supply_temp_c) : null;
+  if (targetLwt == null && typeof computeVitocalTargetLwt === "function") {
+    targetLwt = computeVitocalTargetLwt(d, progLower === "standby");
+  }
+  if (targetLwt == null && apSt && apSt.calculated_target_lwt_c != null) {
+    targetLwt = Number(apSt.calculated_target_lwt_c);
+  }
+
+  // Standby: PdC off and outside active heating schedule
+  if (!compActive && progLower === "standby") {
+    return {
+      mode: "standby",
+      title: "🛡️ Margine Anti-Stacco WO1C (7209)",
+      badge: "IN STANDBY (attivo in marcia)",
+      tone: "idle",
+    };
+  }
+
+  // Compute real trend over the last 2.5 - 10 min from telemetry history
+  let dBufPerMin = null;
+  let dEwtPerMin = null;
+  let dModPerMin = null;
+  if (Array.isArray(samplesList) && samplesList.length >= 2 && d.timestamp_utc) {
+    const nowMs = new Date(d.timestamp_utc).getTime();
+    if (!isNaN(nowMs)) {
+      let ref = null;
+      for (let i = samplesList.length - 2; i >= 0; i--) {
+        const s = samplesList[i];
+        if (!s || !s.timestamp_utc) continue;
+        const tMs = new Date(s.timestamp_utc).getTime();
+        if (isNaN(tMs)) continue;
+        const dtMin = (nowMs - tMs) / 60000.0;
+        if (dtMin >= 2.5 && dtMin <= 12.0) {
+          ref = { s, dtMin };
+          break;
+        }
+        if (dtMin > 12.0) break;
+      }
+      if (ref && ref.dtMin > 0) {
+        if (buf != null && ref.s.buffer_temp_c != null) {
+          dBufPerMin = (buf - Number(ref.s.buffer_temp_c)) / ref.dtMin;
+        }
+        if (ewt != null && ref.s.pdc_return_temp_c != null) {
+          dEwtPerMin = (ewt - Number(ref.s.pdc_return_temp_c)) / ref.dtMin;
+        }
+        if (ref.s.compressor_modulation_percent != null) {
+          dModPerMin = (modNum - Number(ref.s.compressor_modulation_percent)) / ref.dtMin;
+        }
+      }
+    }
+  }
+
+  // Case A: Defrost active -> Show live BPHE safety reserve (LWT >= 12 C, BUF >= 17 C)
+  if (isDefrost) {
+    const lwtMarg = lwt != null ? (lwt - 12.0) : null;
+    const bufMarg = buf != null ? (buf - 17.0) : null;
+    const stressPct = lwt != null ? Math.round(clamp((22.0 - lwt) / 10.0, 0.08, 1.0) * 100) : 50;
+    let tone = "defrost";
+    let badge = "❄️ DEFROST · BPHE OK";
+    let summary = "Sbrinamento in corso: riserva termica scambiatore BPHE nella fascia sicura.";
+    if ((lwtMarg != null && lwtMarg < 0.5) || (bufMarg != null && bufMarg < -1.0)) {
+      tone = "danger";
+      badge = "🔴 DEFROST · BPHE CRITICO";
+      summary = "Acqua BPHE vicina/sotto soglia 12 °C: possibile intervento resistenza o stress termico.";
+    } else if ((lwtMarg != null && lwtMarg < 2.0) || (bufMarg != null && bufMarg < 0.5)) {
+      tone = "warn";
+      badge = "⚠️ DEFROST · BPHE IN CALO";
+      summary = "Sbrinamento profondo: monitorare LWT minima (soglia sicurezza ≥ 12.0 °C).";
+    }
+    return {
+      mode: "defrost",
+      title: "❄️ Riserva BPHE Sbrinamento (Live)",
+      badge,
+      tone,
+      pct: stressPct,
+      pctLabel: lwt != null ? `${lwt.toFixed(1)}°` : "--",
+      summary,
+      chips: [
+        {
+          lbl: "Mandata BPHE (LWT)",
+          val: lwt != null ? `${lwt.toFixed(1)}° / min 12.0°` : "--",
+          sub: lwtMarg != null ? `Marg. ${lwtMarg >= 0 ? "+" : ""}${lwtMarg.toFixed(1)} K` : "Soglia guardia 12.0 °C",
+        },
+        {
+          lbl: "Puffer 200L (BUF)",
+          val: buf != null ? `${buf.toFixed(1)}° / min 17.0°` : "--",
+          sub: bufMarg != null ? `Marg. ${bufMarg >= 0 ? "+" : ""}${bufMarg.toFixed(1)} K` : "Riserva accumulo",
+        },
+        {
+          lbl: "Fase & Ritorno",
+          val: `Mod ${modNum.toFixed(0)}% · Defrost`,
+          sub: ewt != null ? `EWT ${ewt.toFixed(1)}°C · P1 ${d.primary_pump_rotation_percent ?? 0}%` : "Inversione 4-vie",
+        },
+      ],
+    };
+  }
+
+  // Case B: Paused / Off / Preparing inside active heating schedule -> WO1C 7203 restart countdown
+  if (!compActive && progLower !== "standby") {
+    const restartThr = targetLwt != null ? (targetLwt - 5.0) : null;
+    const distRestart = (buf != null && restartThr != null) ? (buf - restartThr) : null;
+    const coolPct = (buf != null && targetLwt != null)
+      ? Math.round(clamp(((targetLwt + 2.5) - buf) / 7.5, 0.05, 1.0) * 100)
+      : 50;
+    let etaTxt = "";
+    if (distRestart != null && distRestart > 0 && dBufPerMin != null && dBufPerMin < -0.05) {
+      const mins = Math.max(1, Math.round(distRestart / (-dBufPerMin)));
+      if (mins <= 45) etaTxt = ` · riavvio stimato ~${mins} min`;
+    }
+    const isPrep = phaseLower === "preparing";
+    return {
+      mode: "pause",
+      title: isPrep ? "⏳ Avviamento Compressore WO1C" : "⏸️ Pausa Isteresi WO1C (7203)",
+      badge: isPrep ? "AVVIAMENTO..." : "PAUSA 7203",
+      tone: "pause",
+      pct: isPrep ? 96 : coolPct,
+      pctLabel: distRestart != null ? `${distRestart <= 0 ? "0.0" : distRestart.toFixed(1)} K` : "--",
+      summary: isPrep
+        ? "Puffer sceso a soglia 7203: compressore in fase di preparazione / riavvio."
+        : (distRestart != null && restartThr != null
+          ? `Stacco per puffer saturo: riaccensione WO1C prevista a BUF ≤ ${restartThr.toFixed(1)} °C (mancano ${Math.max(0, distRestart).toFixed(1)} K${etaTxt}).`
+          : "Compressore in pausa termostatica all'interno della fascia attiva."),
+      chips: [
+        {
+          lbl: "Puffer (BUF) → Riavvio",
+          val: (buf != null && restartThr != null) ? `${buf.toFixed(1)}° → ${restartThr.toFixed(1)}°` : "--",
+          sub: distRestart != null ? `Restano ${Math.max(0, distRestart).toFixed(1)} K (7203)` : "Isteresi −5.0 K",
+        },
+        {
+          lbl: "Fondo / Ritorno (EWT)",
+          val: (ewt != null && targetLwt != null) ? `${ewt.toFixed(1)}° / Tgt ${targetLwt.toFixed(1)}°` : "--",
+          sub: (ewt != null && targetLwt != null) ? `Δ ${(ewt - targetLwt) >= 0 ? "+" : ""}${(ewt - targetLwt).toFixed(1)} K` : "--",
+        },
+        {
+          lbl: "Scarico Puffer",
+          val: dBufPerMin != null ? `${dBufPerMin >= 0 ? "+" : ""}${dBufPerMin.toFixed(2)} °C/m` : "In attesa trend",
+          sub: d.grundfos_pump_active === 1 ? "Grundfos ON (scarica casa)" : "Grundfos OFF",
+        },
+      ],
+    };
+  }
+
+  // Case C: Active Heating -> Dual-sensor WO1C 7209 Cutoff Proximity Gauge
+  if (buf == null || targetLwt == null) {
+    return {
+      mode: "heating",
+      title: "🛡️ Margine Anti-Stacco WO1C (7209)",
+      badge: "IN MARCIA",
+      tone: "safe",
+      pct: 25,
+      pctLabel: "--%",
+      summary: "Compressore attivo; in attesa di sonde Puffer/Target per calcolare il margine 7209.",
+      chips: [
+        { lbl: "Testa Puffer (BUF)", val: buf != null ? `${buf.toFixed(1)} °C` : "--", sub: "--" },
+        { lbl: "Fondo / Ritorno (EWT)", val: ewt != null ? `${ewt.toFixed(1)} °C` : "--", sub: "--" },
+        { lbl: "Inverter & Trend PI", val: `Mod ${modNum.toFixed(0)}%`, sub: "--" },
+      ],
+    };
+  }
+
+  const cutoffBuf = targetLwt + 2.5; // Real verified 7209 top threshold (+2.1..+2.7 K)
+  const cutoffEwt = targetLwt;       // Real verified 7209 bottom threshold (-0.2..+0.1 K)
+  const marginBuf = cutoffBuf - buf;
+  const marginEwt = ewt != null ? (cutoffEwt - ewt) : null;
+
+  const satBuf = clamp((buf - (targetLwt - 3.0)) / 5.5, 0, 1);
+  const satEwt = ewt != null ? clamp((ewt - (targetLwt - 5.0)) / 5.0, 0, 1) : satBuf * 0.85;
+  let satFrac = (satBuf * 0.55) + (satEwt * 0.45);
+
+  // PI wind-up urgency: if buffer is already above target while modulation is still high and rising
+  const piLagPush = (buf > targetLwt && modNum >= 65 && (dBufPerMin == null || dBufPerMin > 0.03));
+  if (piLagPush) satFrac = Math.min(1.0, satFrac + 0.08);
+
+  // Key verified physical invariant (21/11 11:51 & 24/11 13:25): if EWT is still well below Target,
+  // bottom of puffer is absorbing heat and WO1C does NOT trip 7209 yet -> cap below red!
+  if (marginEwt != null && marginEwt > 0.65) {
+    satFrac = Math.min(satFrac, 0.76);
+  }
+  // Dual saturation imminent (24/11 14:11, 26/11 11:53 & 13:02): both top and bottom near limit!
+  if (marginBuf <= 0.8 && (marginEwt == null || marginEwt <= 0.35)) {
+    satFrac = Math.max(satFrac, 0.88);
+  }
+  const satPct = Math.round(clamp(satFrac, 0.04, 1.0) * 100);
+
+  // Optional ETA to cutoff when climbing toward saturation
+  let etaStr = "";
+  if (satPct >= 55 && dBufPerMin != null && dBufPerMin > 0.05 && marginBuf > 0) {
+    const etaBuf = marginBuf / dBufPerMin;
+    const etaEwt = (marginEwt != null && marginEwt > 0 && dEwtPerMin != null && dEwtPerMin > 0.03)
+      ? (marginEwt / dEwtPerMin)
+      : null;
+    const etaMin = etaEwt != null ? Math.max(etaBuf, etaEwt) : etaBuf;
+    if (etaMin <= 30) {
+      etaStr = ` · limite in ~${Math.max(1, Math.round(etaMin))} min se Mod non cala`;
+    }
+  }
+
+  let tone = "safe";
+  let badge = "🟢 MARGINE AMPIO";
+  let summary = `Lontano dallo stacco 7209: testa ${marginBuf.toFixed(1)} K sotto soglia${marginEwt != null ? `, fondo ${marginEwt.toFixed(1)} K sotto target` : ""}.`;
+
+  if (satPct >= 85 || (marginBuf <= 0.8 && (marginEwt == null || marginEwt <= 0.35))) {
+    tone = "danger";
+    badge = "🔴 RISCHIO STACCO 7209";
+    summary = `Puffer quasi saturo testa-fondo (BUF ${marginBuf >= 0 ? "+" : ""}${marginBuf.toFixed(1)} K, EWT ${marginEwt != null ? (marginEwt >= 0 ? "+" : "") + marginEwt.toFixed(1) + " K" : "--"})${etaStr}.`;
+  } else if (satPct >= 62 || marginBuf <= 1.4 || piLagPush) {
+    tone = "warn";
+    badge = piLagPush ? "🟡 ATTENZIONE (PI ALTO)" : "🟡 IN AVVICINAMENTO";
+    if (marginEwt != null && marginEwt > 0.65) {
+      summary = `Testa calda (marg. ${marginBuf.toFixed(1)} K) ma fondo ancora ricettivo (EWT −${marginEwt.toFixed(1)} K): se il PI frena evita lo stacco${etaStr}.`;
+    } else {
+      summary = `Puffer vicino al target (BUF marg. ${marginBuf.toFixed(1)} K${marginEwt != null ? `, EWT ${marginEwt.toFixed(1)} K` : ""})${etaStr}.`;
+    }
+  }
+
+  const dBufTxt = dBufPerMin != null ? `${dBufPerMin >= 0 ? "+" : ""}${dBufPerMin.toFixed(2)}°/m` : "trend --";
+  const dModTxt = dModPerMin != null && Math.abs(dModPerMin) >= 0.3 ? ` (${dModPerMin >= 0 ? "+" : ""}${dModPerMin.toFixed(1)}%/m)` : "";
+  let piNote = "Regime";
+  if (modNum <= 45) piNote = "Inverter dolce ✓";
+  else if (dModPerMin != null && dModPerMin <= -0.8) piNote = "PI in frenata ✓";
+  else if (modNum >= 75 && buf >= targetLwt - 1.0) piNote = "PI spinge forte!";
+  else if (lwt != null) piNote = `LWT ${lwt.toFixed(1)}°C`;
+
+  return {
+    mode: "heating",
+    title: "🛡️ Margine Anti-Stacco WO1C (7209)",
+    badge,
+    tone,
+    pct: satPct,
+    pctLabel: `${satPct}%`,
+    summary,
+    chips: [
+      {
+        lbl: "Testa Puffer (BUF)",
+        val: `${buf.toFixed(1)}° / ${cutoffBuf.toFixed(1)}°`,
+        sub: `Marg. ${marginBuf >= 0 ? "+" : ""}${marginBuf.toFixed(1)} K (Tgt ${targetLwt.toFixed(1)}°)`,
+      },
+      {
+        lbl: "Fondo / Ritorno (EWT)",
+        val: ewt != null ? `${ewt.toFixed(1)}° / ${cutoffEwt.toFixed(1)}°` : "--",
+        sub: marginEwt != null
+          ? `Marg. ${marginEwt >= 0 ? "+" : ""}${marginEwt.toFixed(1)} K (${marginEwt > 0.6 ? "assorbe" : "saturo"})`
+          : "Sonda ritorno n.d.",
+      },
+      {
+        lbl: "Inverter & Trend PI",
+        val: `Mod ${modNum.toFixed(0)}%${dModTxt}`,
+        sub: `BUF ${dBufTxt} · ${piNote}`,
+      },
+    ],
+  };
+}
+
+function renderWo1cCutoffMargin(sample) {
+  const card = document.getElementById("wo1cCutoffMarginCard");
+  if (!card) return;
+  const samplesList = (typeof state !== "undefined" && Array.isArray(state.samples)) ? state.samples : [];
+  const info = computeWo1cCutoffMargin(sample, samplesList);
+
+  const titleEl = document.getElementById("wo1cMarginTitle");
+  const badgeEl = document.getElementById("wo1cMarginBadge");
+  const bodyEl = document.getElementById("wo1cMarginBody");
+  const fillEl = document.getElementById("wo1cMarginBarFill");
+  const pctEl = document.getElementById("wo1cMarginPct");
+  const sumEl = document.getElementById("wo1cMarginSummary");
+
+  card.className = `wo1c-margin-card tone-${info.tone || "idle"}${info.mode === "standby" ? " is-standby" : ""}`;
+  if (titleEl) titleEl.textContent = info.title || "🛡️ Margine Anti-Stacco WO1C (7209)";
+  if (badgeEl) {
+    badgeEl.textContent = info.badge || "STANDBY";
+    badgeEl.className = `wo1c-margin-badge tone-${info.tone || "idle"}`;
+  }
+
+  if (info.mode === "standby") {
+    if (bodyEl) bodyEl.style.display = "none";
+    return;
+  }
+
+  if (bodyEl) bodyEl.style.display = "";
+  if (fillEl) {
+    fillEl.style.width = `${Math.max(4, Math.min(100, Number(info.pct || 0)))}%`;
+    fillEl.className = `wo1c-margin-bar-fill tone-${info.tone || "safe"}`;
+  }
+  if (pctEl) pctEl.textContent = info.pctLabel || "--";
+  if (sumEl) sumEl.textContent = info.summary || "--";
+
+  const c = Array.isArray(info.chips) ? info.chips : [];
+  const ids = [
+    ["wo1cChipBufLbl", "wo1cChipBuf", "wo1cChipBufSub"],
+    ["wo1cChipEwtLbl", "wo1cChipEwt", "wo1cChipEwtSub"],
+    ["wo1cChipModLbl", "wo1cChipMod", "wo1cChipModSub"],
+  ];
+  ids.forEach((tri, idx) => {
+    const item = c[idx];
+    if (!item) return;
+    const eL = document.getElementById(tri[0]);
+    const eV = document.getElementById(tri[1]);
+    const eS = document.getElementById(tri[2]);
+    if (eL) eL.textContent = item.lbl;
+    if (eV) eV.textContent = item.val;
+    if (eS) eS.textContent = item.sub;
+  });
+}
+
+window.computeWo1cCutoffMargin = computeWo1cCutoffMargin;
+window.renderWo1cCutoffMargin = renderWo1cCutoffMargin;

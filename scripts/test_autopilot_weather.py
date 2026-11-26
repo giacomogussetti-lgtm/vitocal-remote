@@ -711,6 +711,105 @@ def test_17_smart_cold_lwt_and_anti_onoff_floor(cfg_file: Path, st_file: Path, w
     assert r_frost8["recommended_target_lwt_c"] >= 25.5, f"Expected strong frost ramp at -8C: {r_frost8}"
 
 
+def test_18_ceil_setpoint_floor_and_early_15m_extension(cfg_file: Path, st_file: Path, wx_file: Path) -> None:
+    from api.viessmann import compute_inverse_setpoint_for_target_lwt, compute_wo1c_lwt
+
+    # Part A: Never round below min_lwt_floor_c (regression for 26/11 SP=12 -> 21.4 C bug)
+    sp_37 = compute_inverse_setpoint_for_target_lwt(23.5, oat_c=3.7, slope=0.6, shift=0.0, min_lwt_floor_c=23.5)
+    sp_47 = compute_inverse_setpoint_for_target_lwt(23.5, oat_c=4.7, slope=0.6, shift=0.0, min_lwt_floor_c=23.5)
+    assert sp_37 >= 13 and compute_wo1c_lwt(3.7, sp_37, 0.6, 0.0) >= 23.35, f"SP rounded too low at 3.7C: {sp_37}"
+    assert sp_47 >= 14 and compute_wo1c_lwt(4.7, sp_47, 0.6, 0.0) >= 23.35, f"SP rounded too low at 4.7C: {sp_47}"
+
+    # Part B: Early 15-min extension pre-trigger before WO1C hardware schedule expires (regression for 26/11 13:56 stop)
+    tz = _rome_tz()
+    t_early_local = datetime(2026, 11, 27, 13, 46, tzinfo=tz)  # 14 min before 14:00 window end!
+    t_early_utc = t_early_local.astimezone(timezone.utc)
+    cfg = dict(autopilot.DEFAULT_CONFIG, enabled=True, min_cycle_end_temp_c=8.2, max_cycle_minutes=300)
+    autopilot.save_config(cfg)
+    autopilot.save_state({
+        "state": "HEATING_SYNC",
+        "state_since_utc": (t_early_utc - timedelta(minutes=286)).isoformat(),
+        "cycle_started_utc": (t_early_utc - timedelta(minutes=286)).isoformat(),
+        "active_window_start_local": "09:00",
+        "active_window_end_local": "14:00",
+        "min_end_temp_extended": False,
+        "min_end_ext_count": 0,
+        "calculated_target_lwt_c": 24.4,
+        "calculated_pdc_setpoint_c": 14,
+        "target_pdc_setpoint_c": 14,
+    })
+    hourly = _make_hourly_series(t_early_local.replace(hour=0), 48, lambda h: 4.0, lambda h: 80)
+    _write_weather_cache(wx_file, t_early_utc, hourly)
+    res = autopilot.run_autopilot_tick(
+        _sample(t_early_utc, t_in=7.9, oat=4.5, buf=22.5),
+        dry_run=True,
+        now_utc_override=t_early_utc,
+        weather_cache_file=wx_file,
+    )
+    assert res["state"] == "HEATING_SYNC", f"Expected early extension to keep HEATING_SYNC, got {res['state']}"
+    assert res["min_end_ext_count"] == 1
+    assert res["active_window_end_local"] == "15:00", f"Expected early extension to 15:00, got {res['active_window_end_local']}"
+
+
+def test_19_standby_only_tin_mae_and_full_30h_preview(cfg_file: Path, st_file: Path, wx_file: Path) -> None:
+    tz = _rome_tz()
+    now_local = datetime(2026, 11, 27, 12, 0, tzinfo=tz)
+    now_utc = now_local.astimezone(timezone.utc)
+    cfg = dict(autopilot.DEFAULT_CONFIG, enabled=True)
+    autopilot.save_config(cfg)
+
+    # Prediction made at 06:00 for 12:00 (pred=7.2 C), but compressor ran at 10:00 -> MUST be skipped from standby MAE!
+    # Pure standby prediction made at 00:00 for 06:00 (pred=7.6 C vs actual 7.5 C -> err=0.1 C) + 01:00->07:00 (err=0.1 C)
+    hourly = _make_hourly_series(now_local.replace(hour=0), 48, lambda h: 3.0, lambda h: 80)
+    payload = {
+        "location_label": "Abitazione di Montagna (Zona Climatica E)",
+        "model": "Test Fixture",
+        "fetched_utc": now_utc.isoformat(),
+        "hourly": hourly,
+        "calibration": {},
+        "calibration_history": [],
+        "prediction_history": [
+            {"created_utc": datetime(2026, 11, 27, 0, 0, tzinfo=tz).astimezone(timezone.utc).isoformat(), "target_local": "2026-11-27T06:00", "pred_tin_c": 7.6},
+            {"created_utc": datetime(2026, 11, 27, 1, 0, tzinfo=tz).astimezone(timezone.utc).isoformat(), "target_local": "2026-11-27T07:00", "pred_tin_c": 7.5},
+            {"created_utc": datetime(2026, 11, 27, 6, 0, tzinfo=tz).astimezone(timezone.utc).isoformat(), "target_local": "2026-11-27T12:00", "pred_tin_c": 7.2},
+        ],
+    }
+    wx_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    recent_samples = [
+        _sample(datetime(2026, 11, 27, 6, 0, tzinfo=tz).astimezone(timezone.utc), t_in=7.5, oat=3.0),
+        _sample(datetime(2026, 11, 27, 7, 0, tzinfo=tz).astimezone(timezone.utc), t_in=7.4, oat=3.0),
+        {**_sample(datetime(2026, 11, 27, 10, 0, tzinfo=tz).astimezone(timezone.utc), t_in=7.8, oat=3.0), "compressor_active": 1, "grundfos_pump_active": 1},
+        {**_sample(now_utc, t_in=8.3, oat=3.0), "compressor_active": 1, "grundfos_pump_active": 1},
+    ]
+    st_active = {
+        "state": "HEATING_SYNC",
+        "active_window_start_local": "11:00",
+        "active_window_end_local": "16:00",
+    }
+    plan = wp.evaluate_weather_plan(
+        now_local=now_local,
+        t_in_c=8.3,
+        current_oat_c=3.0,
+        cur_state="HEATING_SYNC",
+        cfg=cfg,
+        thermal_model={"ua_building_c_24h_per_k": 0.18, "alpha_heat_c_h_per_k": 0.0164},
+        recent_samples=recent_samples,
+        st=st_active,
+        dry_run=False,
+        cache_file=wx_file,
+    )
+    # MAE must reflect ONLY the 2 pure standby predictions (0.10 C), NOT the contaminated 12:00 heating point (1.10 C)!
+    assert plan["assumptions"]["tin_projection_mae_c"] == 0.1, f"Standby MAE contaminated: {plan['assumptions']['tin_projection_mae_c']}"
+    saved = json.loads(wx_file.read_text(encoding="utf-8"))
+    hp = saved.get("hourly_preview") or []
+    assert len(hp) == 30, f"Expected 30h preview, got {len(hp)}"
+    assert all(h.get("tin_proj_c") is not None for h in hp), "Found None tin_proj_c in 30h preview!"
+    # Next hour during HEATING_SYNC must rise, NOT cool!
+    assert hp[1]["tin_mode"] == "heat" and hp[1]["tin_proj_c"] > 8.3, f"Expected rising T_in in HEATING_SYNC: {hp[:3]}"
+    # Must NOT have appended a new standby prediction_history record while in HEATING_SYNC
+    assert len(saved.get("prediction_history") or []) == 3, "Should not record standby checkpoint during HEATING_SYNC"
+
+
 def main() -> int:
     print("=" * 72)
     print("  VITOCAL REMOTE - TEST SUITE METEO & CASI LIMITE AUTOPILOTA")
@@ -733,6 +832,8 @@ def main() -> int:
         ("15. Estensione T_min fine ciclo, fix 306m & uscita 8.2°C", test_15_min_cycle_end_temp_extension),
         ("16. Gate meteo estensione (rifiuto vs 2° step anti-gelo)", test_16_weather_aware_extension_gate_and_second_step),
         ("17. LWT intelligente su gelo + guardia anti-ON/OFF", test_17_smart_cold_lwt_and_anti_onoff_floor),
+        ("18. Floor setpoint ceil (no SP=12) & anticipo 15m estensione", test_18_ceil_setpoint_floor_and_early_15m_extension),
+        ("19. MAE T_casa solo standby & preview 30h continua", test_19_standby_only_tin_mae_and_full_30h_preview),
     ]
     for title, fn in cases:
         _run_case(title, fn)

@@ -399,25 +399,35 @@ def calibrate_weather_from_telemetry(
     else:
         frost_penalty_scale = 1.0
 
-    # Check past T_in projection accuracy
+    # Check past T_in standby projection accuracy (strictly exclude intervals with active heating!)
     tin_errors: list[float] = []
     for p_rec in pred_hist:
         if not isinstance(p_rec, dict):
             continue
+        if p_rec.get("state") in ("HEATING_SYNC", "PUFFER_DRAIN"):
+            continue
         t_dt = _parse_local_hour(str(p_rec.get("target_local") or ""), rome_tz)
+        created_dt = _parse_iso(p_rec.get("created_utc"))
         pred_tin = p_rec.get("pred_tin_c")
         if t_dt is None or pred_tin is None or t_dt > now_local:
             continue
+        created_local = created_dt.astimezone(rome_tz) if created_dt is not None else (t_dt - timedelta(hours=6))
+        # Skip if compressor or Grundfos ran during [created_local, t_dt] (not a pure standby cooling span)
+        had_heating = False
         best_tin = None
         best_diff = 1201.0
         for s_dt, s in parsed_samples:
+            if created_local <= s_dt <= t_dt:
+                if (s.get("compressor_active") == 1) or (s.get("grundfos_pump_active") == 1):
+                    had_heating = True
+                    break
             if s.get("indoor_temp_bticino_c") is None:
                 continue
             d = abs((s_dt - t_dt).total_seconds())
             if d < best_diff:
                 best_diff = d
                 best_tin = float(s["indoor_temp_bticino_c"])
-        if best_tin is not None:
+        if not had_heating and best_tin is not None:
             tin_errors.append(abs(best_tin - float(pred_tin)))
 
     tin_mae_c = round(sum(tin_errors) / len(tin_errors), 2) if len(tin_errors) >= 2 else None
@@ -485,9 +495,10 @@ def score_hourly_cop(
 
         # EN 14511 Vitocal 111.A16 Carnot-pinch COP with pressure-ratio efficiency decay:
         # A7/W35 dry=4.36, A2/W35@85%RH net=3.32, A-7/W35 net~2.79 (EN14511: 4.37, 3.32, 2.72)
+        # Upper clamp raised to 6.0 so low radiant LWT (~23.5 C) preserves OAT sensitivity between +3 and +7 C.
         lift_pinch = max(14.0, (float(lwt_ref_c) - t_corr) + 8.0)
         eta_comp = max(0.38, min(0.51, 0.505 - 0.0025 * max(0.0, lift_pinch - 36.0)))
-        cop_dry = max(1.7, min(5.2, eta_comp * ((float(lwt_ref_c) + 276.15) / lift_pinch)))
+        cop_dry = max(1.7, min(6.0, eta_comp * ((float(lwt_ref_c) + 276.15) / lift_pinch)))
 
         t_evap = t_corr - T_EVAP_OFFSET_K
         if t_evap < 0.0:
@@ -1015,7 +1026,7 @@ def evaluate_weather_plan(
     else:
         decision_summary = f"🕒 Fuori finestra ({eff_start}–{eff_end}): attesa ora migliore o emergenza ≤ {t_emerg:.1f}°C"
 
-    # Build compact 30-hour preview for PWA Glass-Box drawer
+    # Build compact 30-hour preview for PWA Glass-Box drawer with full, physically consistent T_casa simulation
     eff_win_hours_today = set(range(eff_start_min // 60, (eff_end_min + 59) // 60))
     tom_win_hours = set(
         range(
@@ -1025,18 +1036,54 @@ def evaluate_weather_plan(
     ) if tomorrow_win else set()
 
     cur_hour_floor = now_local.replace(minute=0, second=0, microsecond=0)
-    hourly_preview: list[dict[str, Any]] = []
-    tin_map = proj.get("hourly_tin_map") or {}
+    t_max_cfg = float(cfg.get("t_max_c") or 8.8)
+    alpha_heat = float((thermal_model or {}).get("alpha_heat_c_h_per_k") or 0.0164)
+    preview_slots = []
     for s in scored:
         s_dt = _parse_local_hour(s["time_local"], rome_tz)
         if s_dt is None or s_dt < cur_hour_floor:
             continue
-        if len(hourly_preview) >= 30:
+        preview_slots.append((s_dt, s))
+        if len(preview_slots) >= 30:
             break
+
+    hourly_preview: list[dict[str, Any]] = []
+    sim_tin = float(tin_ref)
+    tom_cycle_latched = False
+    for idx_p, (s_dt, s) in enumerate(preview_slots):
         d_str = s_dt.strftime("%Y-%m-%d")
         day_tag = "Oggi" if d_str == today_str else ("Dom" if d_str == tomorrow_str else s_dt.strftime("%d/%m"))
-        in_win = (d_str == today_str and s_dt.hour in eff_win_hours_today) or (d_str == tomorrow_str and s_dt.hour in tom_win_hours)
-        h_key = s_dt.strftime("%Y-%m-%dT%H:00")
+        in_today_win = (d_str == today_str and s_dt.hour in eff_win_hours_today)
+        in_tom_win = (d_str == tomorrow_str and s_dt.hour in tom_win_hours)
+        in_win = in_today_win or in_tom_win
+
+        if idx_p == 0:
+            tin_mode = "heat" if cur_state == "HEATING_SYNC" else "now"
+            tin_val = round(sim_tin, 2)
+        else:
+            oat_h = float(s["temp_c"])
+            wind_h = float(s.get("wind_kmh") or 0.0)
+            wind_mult = 1.0 + min(0.15, max(0.0, wind_h - 15.0) * 0.008)
+            is_heating_now = (cur_state == "HEATING_SYNC" and in_today_win)
+            is_armed_today = (cur_state == "ARMED" and in_today_win and not defer_recommended)
+            if in_tom_win and sim_tin <= t_min:
+                tom_cycle_latched = True
+            elif not in_tom_win:
+                tom_cycle_latched = False
+
+            if (is_heating_now or is_armed_today or tom_cycle_latched) and sim_tin < t_max_cfg:
+                extra_cold = (ua_raw / 24.0) * max(0.0, 5.0 - oat_h)
+                gain_h = max(0.05, alpha_heat * max(10.0, lwt_ref - sim_tin) - extra_cold)
+                sim_tin = min(t_max_cfg, sim_tin + gain_h)
+                tin_mode = "heat" if is_heating_now else "heat_est"
+                if sim_tin >= t_max_cfg - 0.02:
+                    tom_cycle_latched = False
+            else:
+                loss_h = (ua_raw * wind_mult / 24.0) * max(0.5, sim_tin - oat_h)
+                sim_tin = max(2.0, sim_tin - loss_h)
+                tin_mode = "cool"
+            tin_val = round(sim_tin, 2)
+
         hourly_preview.append({
             "time_local": s["time_local"],
             "hh": s_dt.strftime("%H:%M"),
@@ -1048,19 +1095,28 @@ def evaluate_weather_plan(
             "frost_risk": s["frost_risk"],
             "precip_mm": s["precip_mm"],
             "solar_wm2": s["solar_wm2"],
-            "tin_proj_c": tin_map.get(h_key),
+            "tin_proj_c": tin_val,
+            "tin_mode": tin_mode,
             "in_window": in_win,
         })
 
-    # Record a future T_in checkpoint (~6h ahead) for future self-tuning error tracking
+    # Record a future standby T_in checkpoint (~6h ahead) ONLY when currently in pure standby (IDLE/ARMED)
+    # and the 6h-ahead slot is also pure standby cooling (never contaminate standby MAE with heating cycles!).
     pred_hist = list(cache_data.get("prediction_history") or [])
-    if not dry_run and len(hourly_preview) >= 7 and hourly_preview[6].get("tin_proj_c") is not None:
+    if (
+        not dry_run
+        and cur_state in ("IDLE", "ARMED")
+        and len(hourly_preview) >= 7
+        and hourly_preview[6].get("tin_mode") == "cool"
+        and hourly_preview[6].get("tin_proj_c") is not None
+    ):
         cp_dt = _parse_local_hour(hourly_preview[6]["time_local"], rome_tz)
         if cp_dt is not None:
             cp_key = cp_dt.strftime("%Y-%m-%dT%H:00")
             if not any(isinstance(p, dict) and p.get("target_local") == cp_key for p in pred_hist):
                 pred_hist.append({
                     "created_utc": now_utc.isoformat(),
+                    "state": cur_state,
                     "target_local": cp_key,
                     "pred_tin_c": hourly_preview[6]["tin_proj_c"],
                 })
