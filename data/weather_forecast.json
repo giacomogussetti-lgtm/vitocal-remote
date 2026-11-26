@@ -806,7 +806,7 @@
     "frost_penalty_scale": 0.93,
     "tin_proj_samples_matched": 5,
     "tin_projection_mae_c": 0.31,
-    "calibrated_utc": "2026-11-26T11:41:27.376737+00:00"
+    "calibrated_utc": "2026-11-26T11:42:36.066626+00:00"
   },
   "calibration_history": [
     {
@@ -1553,7 +1553,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 96.0,
-      "tin_proj_c": 7.66,
+      "tin_proj_c": 7.76,
       "in_window": true
     },
     {
@@ -1567,7 +1567,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 101.0,
-      "tin_proj_c": 7.63,
+      "tin_proj_c": 7.73,
       "in_window": false
     },
     {
@@ -1581,7 +1581,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 82.0,
-      "tin_proj_c": 7.61,
+      "tin_proj_c": 7.7,
       "in_window": false
     },
     {
@@ -1595,7 +1595,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 53.0,
-      "tin_proj_c": 7.58,
+      "tin_proj_c": 7.67,
       "in_window": false
     },
     {
@@ -1609,7 +1609,7 @@
       "frost_risk": "ALTO",
       "precip_mm": 0.0,
       "solar_wm2": 7.0,
-      "tin_proj_c": 7.55,
+      "tin_proj_c": 7.64,
       "in_window": false
     },
     {
@@ -1623,7 +1623,7 @@
       "frost_risk": "ALTO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.51,
+      "tin_proj_c": 7.61,
       "in_window": false
     },
     {
@@ -1637,7 +1637,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.47,
+      "tin_proj_c": 7.57,
       "in_window": false
     },
     {
@@ -1651,7 +1651,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.44,
+      "tin_proj_c": 7.53,
       "in_window": false
     },
     {
@@ -1665,7 +1665,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.4,
+      "tin_proj_c": 7.49,
       "in_window": false
     },
     {
@@ -1679,7 +1679,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.36,
+      "tin_proj_c": 7.45,
       "in_window": false
     },
     {
@@ -1693,7 +1693,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.31,
+      "tin_proj_c": 7.4,
       "in_window": false
     },
     {
@@ -1707,7 +1707,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.27,
+      "tin_proj_c": 7.36,
       "in_window": false
     },
     {
@@ -1721,7 +1721,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.23,
+      "tin_proj_c": 7.32,
       "in_window": false
     },
     {
@@ -1735,7 +1735,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.18,
+      "tin_proj_c": 7.27,
       "in_window": false
     },
     {
@@ -1749,7 +1749,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.13,
+      "tin_proj_c": 7.22,
       "in_window": false
     },
     {
@@ -1763,7 +1763,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.08,
+      "tin_proj_c": 7.17,
       "in_window": false
     },
     {
@@ -1777,7 +1777,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.04,
+      "tin_proj_c": 7.12,
       "in_window": false
     },
     {
@@ -1791,7 +1791,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 6.99,
+      "tin_proj_c": 7.07,
       "in_window": false
     },
     {
@@ -1805,7 +1805,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 6.94,
+      "tin_proj_c": 7.02,
       "in_window": false
     },
     {
@@ -1819,7 +1819,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 4.0,
-      "tin_proj_c": 6.89,
+      "tin_proj_c": 6.97,
       "in_window": false
     },
     {
@@ -1833,7 +1833,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 90.0,
-      "tin_proj_c": 6.87,
+      "tin_proj_c": 6.96,
       "in_window": true
     },
     {
@@ -1953,7 +1953,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "26/11 12:41",
+    "evaluated_local": "26/11 12:42",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": true,
@@ -1961,7 +1961,7 @@
     "committed_window_start": "09:00",
     "committed_window_end": "14:00",
     "in_window_now": true,
-    "remaining_window_min": 79,
+    "remaining_window_min": 78,
     "next_hour_cop_net": 4.55,
     "next_hour_label": "Oggi 13:00",
     "today_window": {
@@ -2003,13 +2003,13 @@
       "is_dynamic_shifted": true
     },
     "projection_to_tomorrow": {
-      "start_tin_c": 7.7,
-      "min_tin_c": 6.87,
-      "end_tin_c": 6.87,
+      "start_tin_c": 7.8,
+      "min_tin_c": 6.96,
+      "end_tin_c": 6.96,
       "hours_simulated": 20.3,
       "target_local": "27/11 09:00",
-      "first_below_tmin_local": "26/11 19:41",
-      "first_below_safe_local": "27/11 02:41"
+      "first_below_tmin_local": "26/11 21:42",
+      "first_below_safe_local": "27/11 04:42"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -2017,11 +2017,11 @@
     "prearm_reason": null,
     "defer_recommended": false,
     "defer_reason": null,
-    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 79m)",
+    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 78m)",
     "decision_trace": [
       "Finestra Oggi: 09:00–14:00 🔒 (COP netto stimato 4.55, OAT +4.0°C, RH 96%, Brina MEDIO, allineata a statica).",
       "Finestra Domani: 09:00–14:00 (COP netto 4.94, OAT +3.3°C, RH 80%, Brina MEDIO).",
-      "Proiezione casa fino a domani 09:00 (20.3h, UA×1.15=0.206): 7.7°C → 6.9°C (min 6.9°C vs pavimento sicurezza 7.2°C)."
+      "Proiezione casa fino a domani 09:00 (20.3h, UA×1.15=0.206): 7.8°C → 7.0°C (min 7.0°C vs pavimento sicurezza 7.2°C)."
     ],
     "assumptions": {
       "ua_raw_c_24h_k": 0.179,
