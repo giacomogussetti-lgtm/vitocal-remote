@@ -806,7 +806,7 @@
     "frost_penalty_scale": 0.92,
     "tin_proj_samples_matched": 5,
     "tin_projection_mae_c": 0.46,
-    "calibrated_utc": "2026-11-26T12:13:29.633966+00:00"
+    "calibrated_utc": "2026-11-26T12:14:47.463363+00:00"
   },
   "calibration_history": [
     {
@@ -1827,7 +1827,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 90.0,
-      "tin_proj_c": 6.96,
+      "tin_proj_c": 6.97,
       "in_window": true
     },
     {
@@ -1961,7 +1961,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "26/11 13:13",
+    "evaluated_local": "26/11 13:14",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": true,
@@ -1969,7 +1969,7 @@
     "committed_window_start": "09:00",
     "committed_window_end": "14:00",
     "in_window_now": true,
-    "remaining_window_min": 47,
+    "remaining_window_min": 46,
     "next_hour_cop_net": 4.56,
     "next_hour_label": "Oggi 13:00",
     "today_window": {
@@ -2012,12 +2012,12 @@
     },
     "projection_to_tomorrow": {
       "start_tin_c": 7.8,
-      "min_tin_c": 6.96,
-      "end_tin_c": 6.96,
+      "min_tin_c": 6.97,
+      "end_tin_c": 6.97,
       "hours_simulated": 19.8,
       "target_local": "27/11 09:00",
-      "first_below_tmin_local": "26/11 22:13",
-      "first_below_safe_local": "27/11 05:13"
+      "first_below_tmin_local": "26/11 22:14",
+      "first_below_safe_local": "27/11 05:14"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -2025,7 +2025,7 @@
     "prearm_reason": null,
     "defer_recommended": false,
     "defer_reason": null,
-    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 47m)",
+    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 46m)",
     "decision_trace": [
       "Finestra Oggi: 09:00–14:00 🔒 (COP netto stimato 4.56, OAT +4.0°C, RH 96%, Brina MEDIO, allineata a statica).",
       "Finestra Domani: 09:00–14:00 (COP netto 4.94, OAT +3.3°C, RH 80%, Brina MEDIO).",
