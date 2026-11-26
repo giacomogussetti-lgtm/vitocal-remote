@@ -806,7 +806,7 @@
     "frost_penalty_scale": 1.0,
     "tin_proj_samples_matched": 0,
     "tin_projection_mae_c": null,
-    "calibrated_utc": "2026-11-26T06:31:06.477349+00:00"
+    "calibrated_utc": "2026-11-26T06:35:42.842972+00:00"
   },
   "calibration_history": [
     {
@@ -1882,7 +1882,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "26/11 07:31",
+    "evaluated_local": "26/11 07:35",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": true,
@@ -1891,8 +1891,8 @@
     "committed_window_end": "14:00",
     "in_window_now": false,
     "remaining_window_min": 0,
-    "next_hour_cop_net": 4.46,
-    "next_hour_label": "Oggi 07:00",
+    "next_hour_cop_net": 4.39,
+    "next_hour_label": "Oggi 08:00",
     "today_window": {
       "start_hhmm": "11:00",
       "end_hhmm": "16:00",
@@ -1935,10 +1935,10 @@
       "start_tin_c": 7.1,
       "min_tin_c": 6.18,
       "end_tin_c": 6.18,
-      "hours_simulated": 25.5,
+      "hours_simulated": 25.4,
       "target_local": "27/11 09:00",
-      "first_below_tmin_local": "26/11 08:31",
-      "first_below_safe_local": "26/11 08:31"
+      "first_below_tmin_local": "26/11 08:35",
+      "first_below_safe_local": "26/11 08:35"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -1952,7 +1952,7 @@
       "Guardia Emergenza: T_casa (7.1°C) toccherebbe ≤7.0°C alle 10:00 → avvio anticipato/bloccato a 09:00–14:00.",
       "Finestra bloccata 🔒 (09:00–14:00): entro 90m dall'avvio non slitta più.",
       "Finestra Domani: 09:00–14:00 (COP netto 4.79, OAT +3.1°C, RH 83%, Brina MEDIO).",
-      "Proiezione casa fino a domani 09:00 (25.5h, UA×1.15=0.206): 7.1°C → 6.2°C (min 6.2°C vs pavimento sicurezza 7.2°C)."
+      "Proiezione casa fino a domani 09:00 (25.4h, UA×1.15=0.206): 7.1°C → 6.2°C (min 6.2°C vs pavimento sicurezza 7.2°C)."
     ],
     "assumptions": {
       "ua_raw_c_24h_k": 0.179,
