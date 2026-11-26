@@ -5,10 +5,10 @@
   "cycle_started_utc": "2026-11-26T08:01:19.186928+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-26T09:31:09.102734+00:00",
+  "last_eval_utc": "2026-11-26T09:31:28.508541+00:00",
   "last_action_utc": "2026-11-26T08:01:19.186928+00:00",
   "last_action_reason": "Avvio ciclo (Finestra Alto COP): Target Acqua 21.9°C (SP=12°C). Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual) | Temperatura Ridotta impostata e verificata con successo: 12 °C | Modalità PdC impostata e verificata: dhwAndHeating",
-  "indoor_slope_c_per_h": 0.106,
+  "indoor_slope_c_per_h": 0.109,
   "calculated_target_lwt_c": 21.9,
   "calculated_pdc_setpoint_c": 12,
   "target_pdc_setpoint_c": 12,
@@ -20,7 +20,7 @@
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": 0,
   "soft_curve_last_trim_utc": null,
-  "last_grundfos_run_utc": "2026-11-26T09:31:09.102734+00:00",
+  "last_grundfos_run_utc": "2026-11-26T09:31:28.508541+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
@@ -119,13 +119,13 @@
       "is_dynamic_shifted": true
     },
     "projection_to_tomorrow": {
-      "start_tin_c": 7.3,
-      "min_tin_c": 6.5,
-      "end_tin_c": 6.5,
+      "start_tin_c": 7.4,
+      "min_tin_c": 6.58,
+      "end_tin_c": 6.58,
       "hours_simulated": 22.5,
       "target_local": "27/11 09:00",
       "first_below_tmin_local": "26/11 11:31",
-      "first_below_safe_local": "26/11 14:31"
+      "first_below_safe_local": "26/11 18:31"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -137,7 +137,7 @@
     "decision_trace": [
       "Finestra Oggi: 09:00–14:00 🔒 (COP netto stimato 4.61, OAT +4.4°C, RH 94%, Brina MEDIO, allineata a statica).",
       "Finestra Domani: 09:00–14:00 (COP netto 4.80, OAT +3.4°C, RH 84%, Brina MEDIO).",
-      "Proiezione casa fino a domani 09:00 (22.5h, UA×1.15=0.206): 7.3°C → 6.5°C (min 6.5°C vs pavimento sicurezza 7.2°C)."
+      "Proiezione casa fino a domani 09:00 (22.5h, UA×1.15=0.206): 7.4°C → 6.6°C (min 6.6°C vs pavimento sicurezza 7.2°C)."
     ],
     "assumptions": {
       "ua_raw_c_24h_k": 0.179,
@@ -160,20 +160,13 @@
   },
   "api_usage": {
     "date_utc": "2026-11-26",
-    "viessmann_reads": 378,
+    "viessmann_reads": 380,
     "viessmann_writes": 4,
-    "bticino_reads": 373,
+    "bticino_reads": 375,
     "bticino_writes": 1,
     "cronjob_patches": 1,
-    "github_runs": 186,
+    "github_runs": 187,
     "recent_events": [
-      {
-        "ts": "2026-11-25T09:31:11.493269+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-25T09:45:53.753762+00:00",
         "lbl": "telemetry_poll",
@@ -2249,6 +2242,13 @@
         "vr": 2,
         "br": 2,
         "gh": 1
+      },
+      {
+        "ts": "2026-11-26T09:31:28.505737+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
       }
     ]
   },
@@ -2259,8 +2259,8 @@
     "inverter_min_mod_pct": 38.6,
     "defrost_lwt_drop_p90_k": 9.5,
     "ua_building_c_24h_per_k": 0.179,
-    "recommended_target_lwt_c": 22.6,
-    "pred_autonomy_hours": 56.2,
+    "recommended_target_lwt_c": 22.7,
+    "pred_autonomy_hours": 54.5,
     "updated_utc": "2026-11-26T01:52:15.012022+00:00"
   }
 }
