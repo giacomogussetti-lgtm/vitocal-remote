@@ -810,6 +810,61 @@ def test_19_standby_only_tin_mae_and_full_30h_preview(cfg_file: Path, st_file: P
     assert len(saved.get("prediction_history") or []) == 3, "Should not record standby checkpoint during HEATING_SYNC"
 
 
+def test_20_counter_audit_fine_shift_and_midwindow_ext_exit(cfg_file: Path, st_file: Path, wx_file: Path) -> None:
+    from api.viessmann import compute_optimal_sp_and_shift_for_target_lwt
+
+    # Part A: (SP, Shift in [-1,0,+1]) hits 23.4 C at OAT=4.7 C instead of coarse 24.4 C jump!
+    sp, sh, lwt = compute_optimal_sp_and_shift_for_target_lwt(
+        target_lwt_c=23.5, oat_c=4.7, slope=0.6, base_shift=0, allowed_shifts=(-1, 0, 1), min_lwt_floor_c=23.5
+    )
+    assert (sp, sh, lwt) == (14, -1, 23.4), f"Expected fine (14, -1, 23.4), got {(sp, sh, lwt)}"
+
+    # Part B: Cycle started mid-window (11:30 inside 11:00-16:00), extended early at 15:46 -> 17:00,
+    # then reaches 8.2 C at 16:15 (elapsed=285m < 300m, past original base_window_end 16:00) -> MUST exit cleanly!
+    tz = _rome_tz()
+    t1_local = datetime(2026, 11, 27, 15, 46, tzinfo=tz)
+    t1_utc = t1_local.astimezone(timezone.utc)
+    start_utc = datetime(2026, 11, 27, 11, 30, tzinfo=tz).astimezone(timezone.utc)
+    cfg = dict(autopilot.DEFAULT_CONFIG, enabled=True, min_cycle_end_temp_c=8.2, max_cycle_minutes=300)
+    autopilot.save_config(cfg)
+    autopilot.save_state({
+        "state": "HEATING_SYNC",
+        "state_since_utc": start_utc.isoformat(),
+        "cycle_started_utc": start_utc.isoformat(),
+        "active_window_start_local": "11:00",
+        "active_window_end_local": "16:00",
+        "base_window_end_local": "16:00",
+        "min_end_temp_extended": False,
+        "min_end_ext_count": 0,
+        "calculated_target_lwt_c": 23.5,
+        "calculated_pdc_setpoint_c": 14,
+        "target_pdc_setpoint_c": 14,
+        "calculated_curve_shift": -1,
+    })
+    hourly = _make_hourly_series(t1_local.replace(hour=0), 48, lambda h: 4.5, lambda h: 75)
+    _write_weather_cache(wx_file, t1_utc, hourly)
+
+    res_ext = autopilot.run_autopilot_tick(
+        _sample(t1_utc, t_in=8.0, oat=4.5, buf=23.0),
+        dry_run=True,
+        now_utc_override=t1_utc,
+        weather_cache_file=wx_file,
+    )
+    assert res_ext["state"] == "HEATING_SYNC" and res_ext["active_window_end_local"] == "17:00"
+    assert res_ext["base_window_end_local"] == "16:00"
+
+    # At 16:15 (elapsed=285m < 300m, but past base_window_end 16:00), T_in reaches 8.2 C -> MUST stop!
+    t2_local = datetime(2026, 11, 27, 16, 15, tzinfo=tz)
+    t2_utc = t2_local.astimezone(timezone.utc)
+    res_exit = autopilot.run_autopilot_tick(
+        _sample(t2_utc, t_in=8.2, oat=4.5, buf=23.5),
+        dry_run=True,
+        now_utc_override=t2_utc,
+        weather_cache_file=wx_file,
+    )
+    assert res_exit["state"] == "PUFFER_DRAIN", f"Expected clean exit at 16:15 on 8.2C, got {res_exit['state']}"
+
+
 def main() -> int:
     print("=" * 72)
     print("  VITOCAL REMOTE - TEST SUITE METEO & CASI LIMITE AUTOPILOTA")
@@ -834,6 +889,7 @@ def main() -> int:
         ("17. LWT intelligente su gelo + guardia anti-ON/OFF", test_17_smart_cold_lwt_and_anti_onoff_floor),
         ("18. Floor setpoint ceil (no SP=12) & anticipo 15m estensione", test_18_ceil_setpoint_floor_and_early_15m_extension),
         ("19. MAE T_casa solo standby & preview 30h continua", test_19_standby_only_tin_mae_and_full_30h_preview),
+        ("20. Fine tuning (SP, Shift) 0.5°C & fix stop_ext mid-window", test_20_counter_audit_fine_shift_and_midwindow_ext_exit),
     ]
     for title, fn in cases:
         _run_case(title, fn)

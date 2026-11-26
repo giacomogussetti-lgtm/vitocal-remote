@@ -60,6 +60,43 @@ def compute_inverse_setpoint_for_target_lwt(
     return 30 if floor_tol is not None else 12
 
 
+def compute_optimal_sp_and_shift_for_target_lwt(
+    target_lwt_c: float,
+    oat_c: float,
+    slope: float = 0.6,
+    base_shift: int = 0,
+    allowed_shifts: tuple[int, ...] = (-1, 0, 1),
+    min_lwt_floor_c: Optional[float] = None,
+) -> tuple[int, int, float]:
+    """
+    Finds the optimal (room_setpoint_int, curve_shift_int, actual_lwt_c) pair while keeping
+    climatic `slope` intact (hardware fail-safe if cloud connectivity drops in freezing weather).
+    Combines 1 C room setpoint steps (~1.5 K LWT) with +/-1 K curve shift (1.0 K LWT) to achieve
+    ~0.3-0.5 C target resolution instead of coarse 1.5 C jumps, preferring base_shift (0) unless
+    a +/-1 shift meaningfully reduces quantization error (> 0.12 C).
+    """
+    floor_tol = (float(min_lwt_floor_c) - 0.15) if min_lwt_floor_c is not None else None
+    best_pair: Optional[tuple[int, int, float]] = None
+    best_cost = float("inf")
+
+    for sh in allowed_shifts:
+        for t_ref in range(10, 31):
+            lwt = compute_wo1c_lwt(oat_c, float(t_ref), slope, float(sh))
+            if floor_tol is not None and lwt < floor_tol:
+                continue
+            err = abs(lwt - float(target_lwt_c))
+            # Small penalty on non-zero shift so shift=0 wins whenever accuracy is comparable
+            cost = err + 0.12 * abs(int(sh) - int(base_shift))
+            if cost < best_cost:
+                best_cost = cost
+                best_pair = (t_ref, int(sh), lwt)
+
+    if best_pair is not None:
+        return best_pair
+    sp_fb = compute_inverse_setpoint_for_target_lwt(target_lwt_c, oat_c, slope, float(base_shift), min_lwt_floor_c)
+    return sp_fb, int(base_shift), compute_wo1c_lwt(oat_c, float(sp_fb), slope, float(base_shift))
+
+
 class ViessmannConnector:
     def __init__(
         self,

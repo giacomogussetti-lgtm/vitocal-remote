@@ -846,7 +846,9 @@ def evaluate_weather_plan(
             eff_start = static_start
             eff_end = static_end
 
-        # Layer 1: Emergency-Ceiling Guard (never postpone start past when T_in would drop <= T_emerg + 0.2 C)
+        # Layer 1: Emergency-Ceiling Guard (never postpone start past when T_in would drop <= T_emerg + 0.1 C;
+        # note proj already uses conservative UA * 1.15, so +0.1 C gives ~3.5-4h extra buffer without prematurely
+        # forcing 09:00 cold/rainy starts when T_in is 7.0 C at -0.025 C/h!)
         emerg_ceiling_triggered = False
         if cur_state == "ARMED" or tin_ref <= (t_min + 0.15):
             eff_start_h = _hhmm_to_min(eff_start) // 60
@@ -854,7 +856,7 @@ def evaluate_weather_plan(
             first_danger_h: Optional[int] = None
             for h_chk in range(now_local.hour + 1, eff_start_h + 1):
                 t_chk = tin_map_chk.get(f"{today_str}T{h_chk:02d}:00")
-                if t_chk is not None and float(t_chk) <= (t_emerg + 0.2):
+                if t_chk is not None and float(t_chk) <= (t_emerg + 0.10):
                     first_danger_h = h_chk
                     break
             if first_danger_h is not None:
@@ -864,7 +866,7 @@ def evaluate_weather_plan(
                     eff_start = f"{safe_h:02d}:00"
                     eff_end = f"{min(23, safe_h + win_hours):02d}:00"
                     horizon_guard_notes.append(
-                        f"Guardia Emergenza: T_casa ({tin_ref:.1f}°C) toccherebbe ≤{t_emerg + 0.2:.1f}°C alle {first_danger_h:02d}:00 → avvio anticipato/bloccato a {eff_start}–{eff_end}."
+                        f"Guardia Emergenza: T_casa ({tin_ref:.1f}°C) toccherebbe ≤{t_emerg + 0.10:.1f}°C alle {first_danger_h:02d}:00 → avvio anticipato/bloccato a {eff_start}–{eff_end}."
                     )
 
         # Layer 2 & 3: Anti-Chasing-Horizon Lock & Asymmetric Postponement Guard
@@ -937,9 +939,9 @@ def evaluate_weather_plan(
         )
 
     trace.append(
-        f"Proiezione casa fino a domani {tom_start_hhmm} ({proj['hours_simulated']:.1f}h, "
+        f"Proiezione prudenziale sicurezza fino a domani {tom_start_hhmm} ({proj['hours_simulated']:.1f}h, "
         f"UA×1.15={proj['ua_effective']:.3f}): {tin_ref:.1f}°C → {proj['end_tin_c']:.1f}°C "
-        f"(min {proj['min_tin_c']:.1f}°C vs pavimento sicurezza {safe_floor_c:.1f}°C)."
+        f"(min {proj['min_tin_c']:.1f}°C vs pavimento sicurezza {safe_floor_c:.1f}°C; pillole orarie su UA reale={proj['ua_raw']:.3f})."
     )
 
     # 1) Anti-Short-Cycle evaluation (when inside window with < min_cycle_minutes remaining)

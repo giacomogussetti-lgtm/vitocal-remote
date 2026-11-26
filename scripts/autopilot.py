@@ -20,6 +20,7 @@ from config import Config
 from api.viessmann import (
     ViessmannConnector,
     compute_inverse_setpoint_for_target_lwt,
+    compute_optimal_sp_and_shift_for_target_lwt,
     compute_wo1c_lwt,
 )
 from api.bticino import BTicinoConnector
@@ -84,6 +85,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "weather_arbitrage_cop_delta": 0.25,
     "window_lock_before_start_minutes": 90,
     "min_cycle_end_temp_c": 8.2,
+    "fine_shift_tuning_enabled": True,
 }
 
 DEFAULT_STATE: dict[str, Any] = {
@@ -97,9 +99,11 @@ DEFAULT_STATE: dict[str, Any] = {
     "last_action_utc": None,
     "last_action_reason": "In attesa di attivazione dalla PWA",
     "indoor_slope_c_per_h": 0.0,
-    "calculated_target_lwt_c": 23.0,
+    "calculated_target_lwt_c": 23.5,
     "calculated_pdc_setpoint_c": 13,
     "target_pdc_setpoint_c": 13,
+    "calculated_curve_shift": 0,
+    "base_window_end_local": None,
     "soft_start_last_step_utc": None,
     "current_cron_interval_min": 5,
     "defrost_detected_today": 0,
@@ -584,6 +588,9 @@ def _apply_start_heating(
     is_emergency: bool,
     active_start_hhmm: Optional[str] = None,
     active_end_hhmm: Optional[str] = None,
+    target_shift: Optional[int] = None,
+    cur_slope: float = 0.6,
+    cur_shift: float = 0.0,
 ) -> tuple[bool, str]:
     """Starts synchronized BTicino Grundfos + Viessmann PdC heating cycle with hardware fail-safes."""
     b_conn = BTicinoConnector()
@@ -598,6 +605,10 @@ def _apply_start_heating(
 
     v_conn = ViessmannConnector()
     v_conn.connect()
+    shift_msg = ""
+    if target_shift is not None and int(target_shift) != int(round(float(cur_shift))):
+        _, shift_msg = v_conn.set_heating_curve(slope=round(float(cur_slope), 1), shift=int(target_shift))
+        shift_msg = f" | {shift_msg}"
     ok_r, msg_r = v_conn.set_reduced_temperature(float(pdc_setpoint))
     ok_n, msg_n = v_conn.set_normal_temperature(float(pdc_setpoint))
 
@@ -630,7 +641,7 @@ def _apply_start_heating(
             )
 
     ok_m, msg_m = v_conn.set_mode("dhwAndHeating")
-    return (ok_r and ok_n and ok_m), f"{msg_b} | {msg_r} | {msg_m}"
+    return (ok_r and ok_n and ok_m), f"{msg_b} | {msg_r}{shift_msg} | {msg_m}"
 
 
 def _apply_stop_pdc_keep_drain(cfg: dict[str, Any]) -> tuple[bool, str]:
@@ -648,20 +659,25 @@ def _apply_stop_pdc_keep_drain(cfg: dict[str, Any]) -> tuple[bool, str]:
     return (ok_m and ok_b), f"{msg_m} | {msg_b}"
 
 
-def _apply_full_idle_shutdown(cfg: dict[str, Any]) -> tuple[bool, str]:
-    """Returns BTicino to frost-guard (hg) and restores Viessmann standby + fail-safe schedule."""
+def _apply_full_idle_shutdown(cfg: dict[str, Any], cur_slope: float = 0.6, cur_shift: float = 0.0) -> tuple[bool, str]:
+    """Returns BTicino to frost-guard (hg) and restores Viessmann standby + fail-safe schedule & shift=0."""
     b_conn = BTicinoConnector()
     ok_b, msg_b = b_conn.set_thermostat_mode("hg")
 
     v_conn = ViessmannConnector()
     v_conn.connect()
     ok_m, msg_m = v_conn.set_mode("standby")
+    if int(round(float(cur_shift))) != 0:
+        v_conn.set_heating_curve(slope=round(float(cur_slope), 1), shift=0)
     v_conn.set_reduced_temperature(12.0)
     v_conn.set_normal_temperature(12.0)
+    # Add +10 min buffer on static fail-safe schedule end to absorb WO1C ~3.5m internal clock drift
+    end_idle_min = min(23 * 60 + 50, _hhmm_to_minutes(str(cfg.get("cop_window_end") or "16:00")) + 10)
+    end_idle_hhmm = _round_hhmm_10m(f"{end_idle_min // 60:02d}:{end_idle_min % 60:02d}", round_up=True)
     v_conn.set_heating_schedule_simple(
         days=["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
         start=str(cfg["cop_window_start"]),
-        end=str(cfg["cop_window_end"]),
+        end=end_idle_hhmm,
         mode="reduced",
         clear=False,
     )
@@ -793,23 +809,35 @@ def run_autopilot_tick(
         target_lwt = float(st["calculated_target_lwt_c"])
         pdc_setpoint = int(st["calculated_pdc_setpoint_c"])
         regime_sp = int(st.get("target_pdc_setpoint_c") or pdc_setpoint)
+        target_shift = int(st.get("calculated_curve_shift") if st.get("calculated_curve_shift") is not None else round(float(curve_shift)))
     else:
         target_lwt = _clamp_target_lwt(ref_tin, cfg, oat=float(oat), model=tm_model)
         min_lwt_floor = float(cfg.get("min_target_lwt_c") or 23.5)
-        regime_sp = compute_inverse_setpoint_for_target_lwt(
-            target_lwt_c=target_lwt,
-            oat_c=float(oat),
-            slope=float(curve_slope),
-            shift=float(curve_shift),
-            min_lwt_floor_c=min_lwt_floor,
-        )
-        # Keep calculated_target_lwt_c aligned with actual curve LWT of chosen integer setpoint
-        actual_regime_lwt = compute_wo1c_lwt(float(oat), float(regime_sp), float(curve_slope), float(curve_shift))
-        target_lwt = max(target_lwt, actual_regime_lwt) if actual_regime_lwt >= min_lwt_floor - 0.15 else target_lwt
+        if cfg.get("fine_shift_tuning_enabled", True):
+            regime_sp, target_shift, actual_regime_lwt = compute_optimal_sp_and_shift_for_target_lwt(
+                target_lwt_c=target_lwt,
+                oat_c=float(oat),
+                slope=float(curve_slope),
+                base_shift=0,
+                allowed_shifts=(-1, 0, 1),
+                min_lwt_floor_c=min_lwt_floor,
+            )
+        else:
+            target_shift = int(round(float(curve_shift)))
+            regime_sp = compute_inverse_setpoint_for_target_lwt(
+                target_lwt_c=target_lwt,
+                oat_c=float(oat),
+                slope=float(curve_slope),
+                shift=float(target_shift),
+                min_lwt_floor_c=min_lwt_floor,
+            )
+            actual_regime_lwt = compute_wo1c_lwt(float(oat), float(regime_sp), float(curve_slope), float(target_shift))
+        target_lwt = round(actual_regime_lwt, 1)
         pdc_setpoint = regime_sp
-        st["calculated_target_lwt_c"] = round(actual_regime_lwt, 1)
+        st["calculated_target_lwt_c"] = target_lwt
         st["calculated_pdc_setpoint_c"] = pdc_setpoint
         st["target_pdc_setpoint_c"] = regime_sp
+        st["calculated_curve_shift"] = target_shift
 
     # Evaluate Weather-Aware Dynamic Window, Anti-Short-Cycle & Predictive Plan (fail-safe wrapped)
     weather_plan: dict[str, Any] = {
@@ -840,9 +868,12 @@ def run_autopilot_tick(
         )
         st["weather_plan"] = weather_plan
         today_str_loc = now_local.strftime("%Y-%m-%d")
-        st["committed_window_date"] = today_str_loc
-        st["committed_window_start"] = weather_plan.get("committed_window_start") or weather_plan.get("effective_window_start")
-        st["committed_window_end"] = weather_plan.get("committed_window_end") or weather_plan.get("effective_window_end")
+        # Only latch daily committed_window from 05:00 onward (or during active heating) so 00:00-04:59
+        # overnight forecasts never prematurely lock in a pessimistic early start for the entire day.
+        if now_local.hour >= 5 or st.get("state") == "HEATING_SYNC":
+            st["committed_window_date"] = today_str_loc
+            st["committed_window_start"] = weather_plan.get("committed_window_start") or weather_plan.get("effective_window_start")
+            st["committed_window_end"] = weather_plan.get("committed_window_end") or weather_plan.get("effective_window_end")
         if weather_plan.get("was_postponed_now"):
             st["window_postponed_date"] = today_str_loc
     except Exception as wp_err:
@@ -963,26 +994,35 @@ def run_autopilot_tick(
                     run_win_end = str(weather_plan["extended_end_hhmm"])
                     trigger_why = f"{trigger_why} + Estensione Anti-Short-Cycle ({run_win_end})"
 
-                # Soft-Start Anti-Overshoot: avoid 14K cold-start error on WO1C PI controller
+                # Soft-Start Anti-Overshoot:
+                # Counter-audit verified on 21/11, 24/11 & 26/11 logs that lowering SP on cold starts does NOT
+                # reduce the 0-20m PI ramp (always 81-88%), and in cold/humid frosting weather (frost_risk MEDIO/ALTO)
+                # holding LWT lower before Defrost #1 (~min 35-40) reduces BPHE reserve. Therefore skip Soft-Start
+                # down-step when frosting risk is MEDIO/ALTO and regime_sp <= 14.
                 start_sp = regime_sp
                 start_lwt = target_lwt
-                if cfg.get("soft_start_enabled", True) and buf_temp is not None and float(buf_temp) < target_lwt - 5.0:
-                    # Configurable Soft-Start floor (default 22.8 C) ensures safe BPHE thermal reserve on early defrosts
+                today_frost_risk = str(((weather_plan.get("today_window") or {}).get("frost_risk")) or "").upper()
+                oat_frost_lim = float(cfg.get("defrost_guard_oat_max_c") or 5.5)
+                skip_ss_for_bphe = (float(oat) <= oat_frost_lim and today_frost_risk in ("MEDIO", "ALTO") and regime_sp <= 14)
+                if (
+                    cfg.get("soft_start_enabled", True)
+                    and not skip_ss_for_bphe
+                    and buf_temp is not None
+                    and float(buf_temp) < target_lwt - 5.0
+                ):
                     ss_floor = float(cfg.get("soft_start_min_lwt_c") or 22.8)
-                    oat_frost_lim = float(cfg.get("defrost_guard_oat_max_c") or 5.5)
                     soft_lwt_cap = max(ss_floor, min(target_lwt, float(buf_temp) + 10.5))
                     soft_sp = compute_inverse_setpoint_for_target_lwt(
                         target_lwt_c=soft_lwt_cap,
                         oat_c=float(oat),
                         slope=float(curve_slope),
-                        shift=float(curve_shift),
+                        shift=float(target_shift),
                         min_lwt_floor_c=ss_floor,
                     )
-                    # Start at most 1-2 C below regime_sp and NEVER below soft_sp (which guarantees LWT >= ss_floor)
                     max_drop = 1 if (regime_sp <= 13 and float(oat) <= oat_frost_lim) else 2
                     start_sp = max(soft_sp, max(regime_sp - max_drop, 12))
                     start_sp = min(regime_sp, start_sp)
-                    start_lwt = compute_wo1c_lwt(float(oat), float(start_sp), float(curve_slope), float(curve_shift))
+                    start_lwt = compute_wo1c_lwt(float(oat), float(start_sp), float(curve_slope), float(target_shift))
 
                 if not dry_run:
                     ok, msg = _apply_start_heating(
@@ -992,15 +1032,19 @@ def run_autopilot_tick(
                         is_emergency=(is_emergency or is_steep_drop),
                         active_start_hhmm=run_win_start,
                         active_end_hhmm=run_win_end,
+                        target_shift=target_shift,
+                        cur_slope=float(curve_slope),
+                        cur_shift=float(curve_shift),
                     )
                     emerg_flag = bool(is_emergency or is_steep_drop)
                     sched_changed = emerg_flag or (
                         run_win_start != str(cfg.get("cop_window_start", "11:00"))
                         or run_win_end != str(cfg.get("cop_window_end", "16:00"))
                     )
+                    shift_changed = int(target_shift) != int(round(float(curve_shift)))
                     record_api_usage(
-                        v_reads=6 if sched_changed else 4,
-                        v_writes=4 if sched_changed else 3,
+                        v_reads=(6 if sched_changed else 4) + (2 if shift_changed else 0),
+                        v_writes=(4 if sched_changed else 3) + (1 if shift_changed else 0),
                         b_reads=1,
                         b_writes=1,
                         event_label="ap_start_heating",
@@ -1014,12 +1058,14 @@ def run_autopilot_tick(
                         st["armed_by_prearm"] = False
                         st["active_window_start_local"] = run_win_start
                         st["active_window_end_local"] = run_win_end
+                        st["base_window_end_local"] = run_win_end
                         st["weather_deferred_date"] = None
                         st["min_end_temp_extended"] = False
                         st["min_end_ext_count"] = 0
                         st["target_pdc_setpoint_c"] = regime_sp
                         st["calculated_pdc_setpoint_c"] = start_sp
                         st["calculated_target_lwt_c"] = start_lwt
+                        st["calculated_curve_shift"] = target_shift
                         st["soft_start_last_step_utc"] = now_iso
                         st["cycle_defrost_episodes"] = 0
                         st["prev_phase_was_defrost"] = False
@@ -1027,7 +1073,8 @@ def run_autopilot_tick(
                         st["soft_curve_last_trim_utc"] = None
                         st["last_action_utc"] = now_iso
                         soft_note = f" (Soft-Start da {start_sp}°C -> regime {regime_sp}°C)" if start_sp < regime_sp else ""
-                        st["last_action_reason"] = f"Avvio ciclo ({trigger_why}): Target Acqua {start_lwt}°C (SP={start_sp}°C){soft_note}. {msg}"
+                        sh_note = f", Shift={target_shift:+d}" if target_shift != 0 else ""
+                        st["last_action_reason"] = f"Avvio ciclo ({trigger_why}): Target Acqua {start_lwt}°C (SP={start_sp}°C{sh_note}){soft_note}. {msg}"
                     else:
                         st["last_action_reason"] = f"Errore avvio ciclo ({trigger_why}): {msg}"
                 else:
@@ -1038,17 +1085,20 @@ def run_autopilot_tick(
                     st["armed_by_prearm"] = False
                     st["active_window_start_local"] = run_win_start
                     st["active_window_end_local"] = run_win_end
+                    st["base_window_end_local"] = run_win_end
                     st["weather_deferred_date"] = None
                     st["min_end_temp_extended"] = False
                     st["min_end_ext_count"] = 0
                     st["target_pdc_setpoint_c"] = regime_sp
                     st["calculated_pdc_setpoint_c"] = start_sp
                     st["calculated_target_lwt_c"] = start_lwt
+                    st["calculated_curve_shift"] = target_shift
                     st["soft_start_last_step_utc"] = now_iso
                     st["cycle_defrost_episodes"] = 0
                     st["prev_phase_was_defrost"] = False
                     st["soft_curve_trim_k"] = 0
-                    st["last_action_reason"] = f"[DRY-RUN] Avvio ({trigger_why}) LWT={start_lwt}°C (SP={start_sp}->{regime_sp}°C)"
+                    sh_note = f",Sh={target_shift:+d}" if target_shift != 0 else ""
+                    st["last_action_reason"] = f"[DRY-RUN] Avvio ({trigger_why}) LWT={start_lwt}°C (SP={start_sp}->{regime_sp}°C{sh_note})"
 
     elif cur_state == "HEATING_SYNC":
         cycle_dt = _parse_iso(st.get("cycle_started_utc")) or now_utc
@@ -1084,7 +1134,7 @@ def run_autopilot_tick(
             buf_caught_up = buf_temp is not None and float(buf_temp) >= (target_lwt - 1.2)
             if step_elapsed >= step_min or (step_elapsed >= 12.0 and buf_caught_up):
                 next_sp = min(regime_sp, pdc_setpoint + 1)
-                next_lwt = compute_wo1c_lwt(float(oat), float(next_sp), float(curve_slope), float(curve_shift))
+                next_lwt = compute_wo1c_lwt(float(oat), float(next_sp), float(curve_slope), float(target_shift))
                 if not dry_run:
                     v_conn = ViessmannConnector()
                     v_conn.connect()
@@ -1127,7 +1177,7 @@ def run_autopilot_tick(
             min_dt_rad = float(cfg.get("defrost_min_delta_k") or 13.5)
             min_safe_lwt = max(bphe_floor, t_in_f + min_dt_rad)
             candidate_sp = max(11, pdc_setpoint - 1)
-            candidate_lwt = compute_wo1c_lwt(float(oat), float(candidate_sp), float(curve_slope), float(curve_shift))
+            candidate_lwt = compute_wo1c_lwt(float(oat), float(candidate_sp), float(curve_slope), float(target_shift))
             # Dual WO1C full-buffer saturation guard (verified on Nov 21 & Nov 24 logs):
             # WO1C trips switch-off (param 7209) when BOTH buffer top exceeds target AND return (EWT / bottom) reaches target.
             buf_safe = (buf_temp is None) or (float(buf_temp) <= candidate_lwt + 1.0)
@@ -1196,12 +1246,15 @@ def run_autopilot_tick(
             if abs(int(st.get("soft_curve_trim_k") or 0)) < int(cfg.get("soft_curve_max_shift_delta_k") or 2):
                 stop_target = False
 
-        # Early clean exit while running inside a min-end-temp extension once min_end_t (e.g. 8.2 C) is reached
+        # Early clean exit while running inside a min-end-temp extension once min_end_t (e.g. 8.2 C) is reached.
+        # Use base_window_end_local (original pre-extension end) because weather_planner locks eff_win_end
+        # to the already-extended active_window_end_local during HEATING_SYNC!
+        base_win_end = str(st.get("base_window_end_local") or cfg.get("cop_window_end") or "16:00")
         stop_ext_target = (
             ext_count > 0
             and min_end_t > 0.0
             and t_in_f >= min_end_t
-            and (elapsed_min >= base_max_min or _is_past_cop_window_end(now_local, cfg, end_override=eff_win_end))
+            and (elapsed_min >= base_max_min or _is_past_cop_window_end(now_local, cfg, end_override=base_win_end))
         )
         if stop_ext_target:
             stop_target = True
@@ -1248,6 +1301,8 @@ def run_autopilot_tick(
             allow_ext = (night_at_risk or cop_extra_ok) if wx_avail else (ext_count == 0)
 
             if allow_ext:
+                if not st.get("base_window_end_local"):
+                    st["base_window_end_local"] = active_win_end
                 ext_count += 1
                 ext_end_min = min(_hhmm_to_minutes("18:30"), max(active_win_end_min, cur_local_min) + 60)
                 new_end = f"{ext_end_min // 60:02d}:{ext_end_min % 60:02d}"
@@ -1330,8 +1385,16 @@ def run_autopilot_tick(
         if drain_min >= float(cfg["puffer_drain_minutes"]) or buf_cold:
             why = f"Puffer scarico ({buf_temp}°C)" if buf_cold else f"Timeout scarico ({drain_min:.0f} min)"
             if not dry_run:
-                ok, msg = _apply_full_idle_shutdown(cfg)
-                record_api_usage(v_reads=6, v_writes=4, b_reads=1, b_writes=1, event_label="ap_idle_shutdown", state_dict=st)
+                ok, msg = _apply_full_idle_shutdown(cfg, cur_slope=float(curve_slope), cur_shift=float(curve_shift))
+                shift_rst = int(round(float(curve_shift))) != 0
+                record_api_usage(
+                    v_reads=6 + (2 if shift_rst else 0),
+                    v_writes=4 + (1 if shift_rst else 0),
+                    b_reads=1,
+                    b_writes=1,
+                    event_label="ap_idle_shutdown",
+                    state_dict=st,
+                )
                 st["last_action_utc"] = now_iso
                 st["last_action_reason"] = f"Ciclo completato ({why}) -> ritorno in IDLE. {msg}"
             else:
@@ -1345,6 +1408,8 @@ def run_autopilot_tick(
             st["armed_by_prearm"] = False
             st["active_window_start_local"] = None
             st["active_window_end_local"] = None
+            st["base_window_end_local"] = None
+            st["calculated_curve_shift"] = 0
             st["min_end_temp_extended"] = False
             st["min_end_ext_count"] = 0
             st["soft_curve_trim_k"] = 0

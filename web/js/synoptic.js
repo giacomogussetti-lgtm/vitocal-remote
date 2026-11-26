@@ -939,31 +939,36 @@ function computeWo1cCutoffMargin(d, samplesList) {
 
   const cutoffBuf = targetLwt + 2.5; // Real verified 7209 top threshold (+2.1..+2.7 K)
   const cutoffEwt = targetLwt;       // Real verified 7209 bottom threshold (-0.2..+0.1 K)
-  const marginBuf = cutoffBuf - buf;
-  const marginEwt = ewt != null ? (cutoffEwt - ewt) : null;
+  const deltaBuf = buf - targetLwt;  // Signed delta vs Target (+0.45 K at steady state)
+  const deltaEwt = ewt != null ? (ewt - targetLwt) : null; // Signed delta vs Target (-1.37 K at steady state)
+  const marginBuf = cutoffBuf - buf; // Remaining headroom before +2.5 K (>0 safe, <=0 exceeded)
+  const marginEwt = ewt != null ? (cutoffEwt - ewt) : null; // Remaining headroom before 0.0 K
 
-  const satBuf = clamp((buf - (targetLwt - 3.0)) / 5.5, 0, 1);
-  const satEwt = ewt != null ? clamp((ewt - (targetLwt - 5.0)) / 5.0, 0, 1) : satBuf * 0.85;
-  let satFrac = (satBuf * 0.55) + (satEwt * 0.45);
+  // Recalibrated on 1,907 real samples (21/11, 24/11, 26/11):
+  // Steady state (BUF = Tgt+0.45K, EWT = Tgt-1.37K, Mod 40-50%) -> ~38% GREEN (never false yellow!)
+  // Dual saturation (BUF >= Tgt+1.7K AND EWT >= Tgt-0.3K) -> 85-100% RED!
+  const satBuf = clamp((buf - (targetLwt - 0.5)) / 3.0, 0, 1);
+  const satEwt = ewt != null ? clamp((ewt - (targetLwt - 2.5)) / 2.5, 0, 1) : satBuf * 0.85;
+  let satFrac = (satBuf * 0.50) + (satEwt * 0.50);
 
-  // PI wind-up urgency: if buffer is already above target while modulation is still high and rising
-  const piLagPush = (buf > targetLwt && modNum >= 65 && (dBufPerMin == null || dBufPerMin > 0.03));
-  if (piLagPush) satFrac = Math.min(1.0, satFrac + 0.08);
+  // PI wind-up urgency: only when buffer already exceeds target + 0.6 K AND modulation >= 68% AND rising
+  const piLagPush = (deltaBuf > 0.6 && modNum >= 68 && (dBufPerMin == null || dBufPerMin > 0.04));
+  if (piLagPush) satFrac = Math.min(1.0, satFrac + 0.10);
 
-  // Key verified physical invariant (21/11 11:51 & 24/11 13:25): if EWT is still well below Target,
+  // Key verified physical invariant (21/11 11:51 & 24/11 13:25): if EWT is still >= 0.35 K below Target,
   // bottom of puffer is absorbing heat and WO1C does NOT trip 7209 yet -> cap below red!
-  if (marginEwt != null && marginEwt > 0.65) {
-    satFrac = Math.min(satFrac, 0.76);
+  if (marginEwt != null && marginEwt > 0.35) {
+    satFrac = Math.min(satFrac, 0.78);
   }
   // Dual saturation imminent (24/11 14:11, 26/11 11:53 & 13:02): both top and bottom near limit!
-  if (marginBuf <= 0.8 && (marginEwt == null || marginEwt <= 0.35)) {
+  if (marginBuf <= 0.8 && (marginEwt == null || marginEwt <= 0.30)) {
     satFrac = Math.max(satFrac, 0.88);
   }
   const satPct = Math.round(clamp(satFrac, 0.04, 1.0) * 100);
 
   // Optional ETA to cutoff when climbing toward saturation
   let etaStr = "";
-  if (satPct >= 55 && dBufPerMin != null && dBufPerMin > 0.05 && marginBuf > 0) {
+  if (satPct >= 60 && dBufPerMin != null && dBufPerMin > 0.05 && marginBuf > 0) {
     const etaBuf = marginBuf / dBufPerMin;
     const etaEwt = (marginEwt != null && marginEwt > 0 && dEwtPerMin != null && dEwtPerMin > 0.03)
       ? (marginEwt / dEwtPerMin)
@@ -974,21 +979,22 @@ function computeWo1cCutoffMargin(d, samplesList) {
     }
   }
 
+  const fmtSigned = v => `${v >= 0 ? "+" : ""}${v.toFixed(1)} K`;
   let tone = "safe";
   let badge = "🟢 MARGINE AMPIO";
-  let summary = `Lontano dallo stacco 7209: testa ${marginBuf.toFixed(1)} K sotto soglia${marginEwt != null ? `, fondo ${marginEwt.toFixed(1)} K sotto target` : ""}.`;
+  let summary = `Regime sicuro: testa a ${marginBuf.toFixed(1)} K dallo stacco (BUF ${fmtSigned(deltaBuf)} su Tgt)${marginEwt != null ? `, fondo a ${marginEwt.toFixed(1)} K (EWT ${fmtSigned(deltaEwt)})` : ""}.`;
 
-  if (satPct >= 85 || (marginBuf <= 0.8 && (marginEwt == null || marginEwt <= 0.35))) {
+  if (satPct >= 85 || (marginBuf <= 0.8 && (marginEwt == null || marginEwt <= 0.30))) {
     tone = "danger";
     badge = "🔴 RISCHIO STACCO 7209";
-    summary = `Puffer quasi saturo testa-fondo (BUF ${marginBuf >= 0 ? "+" : ""}${marginBuf.toFixed(1)} K, EWT ${marginEwt != null ? (marginEwt >= 0 ? "+" : "") + marginEwt.toFixed(1) + " K" : "--"})${etaStr}.`;
-  } else if (satPct >= 62 || marginBuf <= 1.4 || piLagPush) {
+    summary = `Puffer quasi saturo testa-fondo: BUF ${fmtSigned(deltaBuf)} su Tgt (marg. ${marginBuf.toFixed(1)} K), EWT ${deltaEwt != null ? fmtSigned(deltaEwt) : "--"}${etaStr}.`;
+  } else if (satPct >= 64 || (marginBuf <= 1.2 && (marginEwt == null || marginEwt <= 0.8)) || piLagPush) {
     tone = "warn";
     badge = piLagPush ? "🟡 ATTENZIONE (PI ALTO)" : "🟡 IN AVVICINAMENTO";
-    if (marginEwt != null && marginEwt > 0.65) {
-      summary = `Testa calda (marg. ${marginBuf.toFixed(1)} K) ma fondo ancora ricettivo (EWT −${marginEwt.toFixed(1)} K): se il PI frena evita lo stacco${etaStr}.`;
+    if (marginEwt != null && marginEwt > 0.35) {
+      summary = `Testa alta (BUF ${fmtSigned(deltaBuf)} su Tgt, marg. ${marginBuf.toFixed(1)} K) ma fondo ancora sotto target (EWT ${fmtSigned(deltaEwt)}): se il PI frena evita lo stacco${etaStr}.`;
     } else {
-      summary = `Puffer vicino al target (BUF marg. ${marginBuf.toFixed(1)} K${marginEwt != null ? `, EWT ${marginEwt.toFixed(1)} K` : ""})${etaStr}.`;
+      summary = `Puffer vicino alla soglia 7209: mancano ${marginBuf.toFixed(1)} K in testa e ${marginEwt != null ? marginEwt.toFixed(1) : "--"} K sul fondo${etaStr}.`;
     }
   }
 
