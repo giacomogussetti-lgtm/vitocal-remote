@@ -797,16 +797,16 @@
     }
   ],
   "calibration": {
-    "oat_samples_matched": 6,
-    "oat_bias_c": 0.3,
-    "oat_raw_mae_c": 0.88,
-    "oat_mae_c": 0.62,
-    "oat_max_abs_err_c": 1.1,
+    "oat_samples_matched": 5,
+    "oat_bias_c": 0.26,
+    "oat_raw_mae_c": 0.9,
+    "oat_mae_c": 0.66,
+    "oat_max_abs_err_c": 1.14,
     "frost_active_hours_matched": 5,
     "frost_penalty_scale": 0.92,
-    "tin_proj_samples_matched": 6,
-    "tin_projection_mae_c": 0.4,
-    "calibrated_utc": "2026-11-26T12:01:35.713367+00:00"
+    "tin_proj_samples_matched": 5,
+    "tin_projection_mae_c": 0.46,
+    "calibrated_utc": "2026-11-26T12:02:30.851367+00:00"
   },
   "calibration_history": [
     {
@@ -1438,13 +1438,6 @@
   ],
   "recent_oat_checks": [
     {
-      "time_local": "2026-11-26T08:00",
-      "forecast_raw_c": 2.9,
-      "forecast_corr_c": 3.2,
-      "actual_oat_c": 3.7,
-      "err_corr_c": 0.5
-    },
-    {
       "time_local": "2026-11-26T09:00",
       "forecast_raw_c": 3.5,
       "forecast_corr_c": 3.8,
@@ -1834,7 +1827,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 90.0,
-      "tin_proj_c": 6.95,
+      "tin_proj_c": 6.96,
       "in_window": true
     },
     {
@@ -1968,7 +1961,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "26/11 13:01",
+    "evaluated_local": "26/11 13:02",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": true,
@@ -1976,7 +1969,7 @@
     "committed_window_start": "09:00",
     "committed_window_end": "14:00",
     "in_window_now": true,
-    "remaining_window_min": 59,
+    "remaining_window_min": 58,
     "next_hour_cop_net": 4.56,
     "next_hour_label": "Oggi 13:00",
     "today_window": {
@@ -2019,12 +2012,12 @@
     },
     "projection_to_tomorrow": {
       "start_tin_c": 7.8,
-      "min_tin_c": 6.95,
-      "end_tin_c": 6.95,
+      "min_tin_c": 6.96,
+      "end_tin_c": 6.96,
       "hours_simulated": 20.0,
       "target_local": "27/11 09:00",
-      "first_below_tmin_local": "26/11 22:01",
-      "first_below_safe_local": "27/11 05:01"
+      "first_below_tmin_local": "26/11 22:02",
+      "first_below_safe_local": "27/11 05:02"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -2032,7 +2025,7 @@
     "prearm_reason": null,
     "defer_recommended": false,
     "defer_reason": null,
-    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 59m)",
+    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 58m)",
     "decision_trace": [
       "Finestra Oggi: 09:00–14:00 🔒 (COP netto stimato 4.56, OAT +4.0°C, RH 96%, Brina MEDIO, allineata a statica).",
       "Finestra Domani: 09:00–14:00 (COP netto 4.94, OAT +3.3°C, RH 80%, Brina MEDIO).",
@@ -2048,13 +2041,13 @@
       "safe_floor_c": 7.2,
       "min_cycle_minutes": 120,
       "arbitrage_cop_delta": 0.25,
-      "oat_bias_c": 0.3,
-      "oat_raw_mae_c": 0.88,
-      "oat_mae_c": 0.62,
-      "oat_max_abs_err_c": 1.1,
-      "oat_samples_matched": 6,
+      "oat_bias_c": 0.26,
+      "oat_raw_mae_c": 0.9,
+      "oat_mae_c": 0.66,
+      "oat_max_abs_err_c": 1.14,
+      "oat_samples_matched": 5,
       "frost_penalty_scale": 0.92,
-      "tin_projection_mae_c": 0.4
+      "tin_projection_mae_c": 0.46
     }
   }
 }
