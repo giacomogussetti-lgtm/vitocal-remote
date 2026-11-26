@@ -137,6 +137,12 @@ const HELP_CATALOG = {
     impact: "Rinvia SOLO se la simulazione conservativa (UA × 1.15) garantisce che la notte resti sopra il pavimento di sicurezza e MAI per due giorni di fila (anti-starvation). La soglia Emergenza 6.8 °C resta sempre prioritaria.",
     tip: "Puoi disattivare il solo rinvio mantenendo comunque attiva la finestra dinamica e l'anti-micro-ciclo."
   },
+  ap_selftuning_audit: {
+    title: "📈 Registro Self-Tuning & Convergenza Bayesiana",
+    what: "Mostra in totale trasparenza come il modello fisico (k_rad, floor inverter, caduta defrost, dispersione UA) e il correttore meteo (Bias OAT) si aggiornano man mano che arrivano cicli reali.",
+    impact: "Ogni parametro NON oscilla sugli ultimi campioni: calcola la mediana robusta su tutto lo storico con Bayesian shrinkage w = n / (n + k). All'aumentare dei cicli osservati (n), il valore converge asintoticamente verso il comportamento reale dell'impianto.",
+    tip: "La tabella Open-Meteo vs Sonda OAT ti permette di verificare ora per ora quanto 'sgarra' la previsione rispetto al sensore fisico esterno della tua Vitocal."
+  },
   cmd_profiles_smart: {
     title: "🎯 Scenari & Profili Coordinati (PdC + Consenso Pompa)",
     what: "Combina in un solo tocco i parametri Vitocal (modo, curva, temperature, fascia oraria) e il consenso relè del BTicino Smarther.",

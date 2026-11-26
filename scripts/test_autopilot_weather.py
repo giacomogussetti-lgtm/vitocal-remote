@@ -420,9 +420,57 @@ def test_11_privacy_and_calibration(cfg_file: Path, st_file: Path, wx_file: Path
     )
     bias = plan["assumptions"]["oat_bias_c"]
     assert -1.5 <= bias <= -0.8, f"Expected Bayesian shrunk OAT bias near -1.0 C, got {bias}"
+    assert plan["assumptions"]["oat_raw_mae_c"] is not None
+    assert plan["assumptions"]["oat_mae_c"] < plan["assumptions"]["oat_raw_mae_c"], "Bias correction must reduce MAE"
+    saved_wx = json.loads(wx_file.read_text(encoding="utf-8"))
+    assert len(saved_wx.get("recent_oat_checks") or []) >= 6, "Expected recent_oat_checks populated"
+    assert len(saved_wx.get("calibration_log") or []) >= 1, "Expected calibration_log populated"
     raw_txt = wx_file.read_text(encoding="utf-8")
     for forbidden in ("latitude", "longitude", "elevation"):
         assert forbidden not in raw_txt, f"Privacy breach: found {forbidden} in weather_forecast.json"
+
+
+def test_12_thermal_model_convergence_and_changelog(cfg_file: Path, st_file: Path, wx_file: Path) -> None:
+    from scripts import thermal_model as tm
+    tz = _rome_tz()
+    t0 = datetime(2026, 11, 20, 0, 0, tzinfo=tz).astimezone(timezone.utc)
+    tmp_dir = cfg_file.parent
+    log_p = tmp_dir / "cloud_telemetry.jsonl"
+    mod_p = tmp_dir / "thermal_model.json"
+
+    # Build 1 standby segment (16h cooling from 8.4 -> 7.6 at OAT 2.0)
+    rows = []
+    for i in range(17):
+        ts = t0 + timedelta(hours=i)
+        rows.append(_sample(ts, t_in=round(8.4 - (0.05 * i), 2), oat=2.0))
+    log_p.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+
+    m1 = tm.update_model_from_log(write_file=True, log_path=log_p, model_file=mod_p)
+    assert "diagnostics" in m1
+    assert m1["diagnostics"]["ua_building_c_24h_per_k"]["n_obs"] == 1
+    assert m1["diagnostics"]["ua_building_c_24h_per_k"]["data_weight_pct"] == 25
+    assert len(m1.get("history") or []) == 1
+
+    # Re-run unchanged -> delta == 0.0 and no duplicate history entry appended
+    m2 = tm.update_model_from_log(write_file=True, log_path=log_p, model_file=mod_p)
+    assert abs(m2["last_deltas"]["ua_building_c_24h_per_k"]) < 1e-6
+    assert len(m2["history"]) == 1, f"Unchanged re-run should not append history, got {len(m2['history'])}"
+
+    # Add a 2nd colder/higher-loss standby segment (16h cooling 8.4 -> 7.0 at OAT 0.0) -> UA must update & log change
+    t1 = t0 + timedelta(hours=24)
+    # Separator active sample so segments don't merge
+    rows.append({**_sample(t1 - timedelta(minutes=30), t_in=8.4, oat=0.0), "compressor_active": 1})
+    for i in range(17):
+        ts = t1 + timedelta(hours=i)
+        rows.append(_sample(ts, t_in=round(8.4 - (0.0875 * i), 2), oat=0.0))
+    log_p.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+
+    m3 = tm.update_model_from_log(write_file=True, log_path=log_p, model_file=mod_p)
+    assert m3["standby_segments_observed"] == 2
+    assert m3["last_deltas"]["ua_building_c_24h_per_k"] > 0.001
+    assert abs(m3["last_deltas"]["k_rad_kw_per_k"]) < 1e-6, "k_rad should stay unchanged when no cycles added"
+    assert len(m3["history"]) == 2
+    assert any("UA:" in c for c in m3["history"][-1]["changes"])
 
 
 def main() -> int:
@@ -440,11 +488,12 @@ def main() -> int:
         ("8. Emergenza notturna scavalca tutto", test_8_night_emergency_overrides_all),
         ("9. Finestra dinamica 12:00-17:00 + lock in HEATING_SYNC", test_9_dynamic_window_selection_and_lock),
         ("10. Fallback offline / Secrets mancanti", test_10_offline_missing_secrets_fallback),
-        ("11. Privacy cache JSON & self-tuning bias OAT", test_11_privacy_and_calibration),
+        ("11. Privacy cache JSON, verifica OAT & self-tuning bias", test_11_privacy_and_calibration),
+        ("12. Convergenza Bayesiana & changelog thermal_model.json", test_12_thermal_model_convergence_and_changelog),
     ]
     for title, fn in cases:
         _run_case(title, fn)
-    print("\n[✓] TUTTI GLI 11 TEST SUPERATI CON SUCCESSO!")
+    print("\n[✓] TUTTI I 12 TEST SUPERATI CON SUCCESSO!")
     print("=" * 72)
     return 0
 

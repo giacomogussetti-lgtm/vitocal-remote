@@ -319,13 +319,25 @@ def main() -> int:
             f"| OAT 0°C->{rec0['recommended_target_lwt_c']}°C (~{rec0['pred_autonomy_hours']:.0f}h) "
             f"| OAT -5°C->{recm5['recommended_target_lwt_c']}°C (~{recm5['pred_autonomy_hours']:.0f}h)"
         )
+        saved_tm = load_json_safe(Config.DATA_DIR / "thermal_model.json")
+        diag = tm.get("diagnostics") or saved_tm.get("diagnostics") or {}
+        if diag:
+            w_parts = []
+            for k, lbl in (("k_rad_kw_per_k", "k_rad"), ("inverter_min_mod_pct", "Floor"), ("defrost_lwt_drop_p90_k", "ΔBPHE"), ("ua_building_c_24h_per_k", "UA")):
+                d_item = diag.get(k) or {}
+                w_parts.append(f"{lbl}:w={d_item.get('data_weight_pct', 0)}%(n={d_item.get('n_obs', 0)})")
+            print(f"  Pesi Convergenza: {' | '.join(w_parts)}")
+        tm_hist = saved_tm.get("history") or []
+        for h_ev in tm_hist[-3:]:
+            ts_s = str(h_ev.get("ts_utc") or "")[:16].replace("T", " ")
+            print(f"  Self-Tuning [{ts_s}]: {'; '.join(h_ev.get('changes') or [])}")
     except Exception:
         pass
 
     # Weather-Aware Dynamic Window & Predictive Plan summary
+    wf_file = load_json_safe(Config.DATA_DIR / "weather_forecast.json")
     wp = st.get("weather_plan") if isinstance(st.get("weather_plan"), dict) else None
     if not wp:
-        wf_file = load_json_safe(Config.DATA_DIR / "weather_forecast.json")
         wp = wf_file.get("plan") if isinstance(wf_file.get("plan"), dict) else None
     print("\n--- PIANIFICATORE METEO & FINESTRA DINAMICA ---")
     if wp:
@@ -334,11 +346,13 @@ def main() -> int:
         tmw = wp.get("tomorrow_window") or {}
         proj = wp.get("projection_to_tomorrow") or {}
         bias_s = f"{assump.get('oat_bias_c', 0.0):+.2f}°C"
+        raw_mae_s = f"{assump['oat_raw_mae_c']:.2f}°C" if assump.get("oat_raw_mae_c") is not None else "--"
         mae_s = f"{assump['oat_mae_c']:.2f}°C" if assump.get("oat_mae_c") is not None else "--"
+        max_err_s = f"{assump['oat_max_abs_err_c']:.2f}°C" if assump.get("oat_max_abs_err_c") is not None else "--"
         tin_mae_s = f"{assump['tin_projection_mae_c']:.2f}°C" if assump.get("tin_projection_mae_c") is not None else "--"
         print(
             f"  Sorgente Meteo  : available={wp.get('available')} ({wp.get('source', '--')}) | "
-            f"Bias OAT={bias_s} (MAE={mae_s}, n={assump.get('oat_samples_matched', 0)}) | MAE T_in={tin_mae_s}"
+            f"Bias OAT={bias_s} (MAE grezzo={raw_mae_s} -> corr={mae_s}, max={max_err_s}, n={assump.get('oat_samples_matched', 0)}) | MAE T_in={tin_mae_s}"
         )
         print(
             f"  Finestra Attiva : {wp.get('effective_window_start', '--')}–{wp.get('effective_window_end', '--')} "
@@ -353,6 +367,15 @@ def main() -> int:
         print(f"  Decisione Live  : {wp.get('decision_summary', '--')}")
         for line in (wp.get("decision_trace") or [])[:4]:
             print(f"    • {line}")
+        oat_checks = wf_file.get("recent_oat_checks") or []
+        if oat_checks:
+            print("  Verifica Oraria (Open-Meteo vs Sonda OAT):")
+            for chk in oat_checks[-5:]:
+                print(
+                    f"    • {str(chk.get('time_local', ''))[5:16].replace('T', ' ')}: "
+                    f"Meteo={chk.get('forecast_raw_c')}°C -> Corr={chk.get('forecast_corr_c')}°C | "
+                    f"Sonda={chk.get('actual_oat_c')}°C (scarto {chk.get('err_corr_c'):+.1f}K)"
+                )
     else:
         print(f"  Stato Meteo     : Nessun piano meteo ancora generato (finestra statica {cfg.get('cop_window_start', '11:00')}–{cfg.get('cop_window_end', '16:00')}).")
     print("=" * 78)

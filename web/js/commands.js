@@ -1231,10 +1231,8 @@ async function refreshAutopilotStatus() {
   }
   if (!cfg) cfg = await fetchDataJson("autopilot_config.json");
   if (!st) st = await fetchDataJson("autopilot_state.json");
-  if (!st || !st.thermal_model) {
-    const tm = await fetchDataJson("thermal_model.json");
-    if (tm) cmdState.lastThermalModel = tm;
-  }
+  const tm = await fetchDataJson("thermal_model.json");
+  if (tm) cmdState.lastThermalModel = tm;
   const wf = await fetchDataJson("weather_forecast.json");
   if (wf) cmdState.lastWeatherForecast = wf;
   if (cfg || st) {
@@ -1399,6 +1397,7 @@ function renderAutopilotUI(cfg, st) {
   }
 
   renderWeatherBrainUI(cfg, st, cmdState.lastWeatherForecast);
+  renderSelfTuningAuditUI(st, cmdState.lastThermalModel, cmdState.lastWeatherForecast);
 
   // Render live converging physical model summary
   const tmEl = document.getElementById("apThermalModelSummary");
@@ -1534,6 +1533,114 @@ function renderWeatherBrainUI(cfg, st, wf) {
     `• Bias OAT appreso: <strong>${biasStr}</strong> · MAE OAT: <strong>${maeStr}</strong> · MAE proiezione T_casa: <strong>${tinMaeStr}</strong><br>` +
     `• Dispersione usata: UA=${a.ua_raw_c_24h_k ?? "--"} × ${a.ua_safety_factor ?? 1.15} = <strong>${a.ua_effective_c_24h_k ?? "--"} (°C/24h)/K</strong> · ΔEvap: −${a.t_evap_offset_k ?? 7.5} K · Scala brina: ${a.frost_penalty_scale ?? 1.0}×<br>` +
     `• Pavimento notte sicuro: <strong>${a.safe_floor_c ?? "--"} °C</strong> · Ciclo min: <strong>${a.min_cycle_minutes ?? "--"} min</strong> · Arbitraggio ΔCOP: ≥ ${a.arbitrage_cop_delta ?? "--"} · Agg. ${escapeHtmlSafe(fetchedTxt)}`;
+}
+
+function renderSelfTuningAuditUI(st, tm, wf) {
+  const badgeEl = document.getElementById("apAuditSummaryBadge");
+  const convGrid = document.getElementById("apConvergenceGrid");
+  const histList = document.getElementById("apSelfTuningHistoryList");
+  const oatBox = document.getElementById("apOatVerifyBox");
+  if (!convGrid || !histList || !oatBox) return;
+
+  const model = (tm && tm.diagnostics) ? tm : ((st && st.thermal_model) ? st.thermal_model : tm);
+  if (badgeEl) {
+    const conf = model && model.confidence_pct != null ? `${model.confidence_pct}%` : "--";
+    const cyc = model && model.cycles_observed != null ? model.cycles_observed : "--";
+    badgeEl.textContent = `Conf. ${conf} · ${cyc} cicli`;
+  }
+
+  const diag = (model && model.diagnostics) || null;
+  const deltas = (model && model.last_deltas) || {};
+  const specs = [
+    { key: "k_rad_kw_per_k", label: "k_rad Pavimento", unit: "kW/K", digits: 3 },
+    { key: "inverter_min_mod_pct", label: "Floor Inverter", unit: "%", digits: 1 },
+    { key: "defrost_lwt_drop_p90_k", label: "ΔBPHE Defrost (p90)", unit: "K", digits: 1 },
+    { key: "ua_building_c_24h_per_k", label: "Dispersione UA", unit: "(°C/24h)/K", digits: 3 },
+    { key: "alpha_heat_c_h_per_k", label: "Resa Diretta α", unit: "(°C/h)/K", digits: 4 },
+  ];
+
+  if (diag) {
+    convGrid.innerHTML = specs.map(sp => {
+      const d = diag[sp.key] || {};
+      const valStr = d.value != null ? Number(d.value).toFixed(sp.digits) : "--";
+      const priorStr = d.prior != null ? Number(d.prior).toFixed(sp.digits) : "--";
+      const obsStr = d.raw_observed != null ? Number(d.raw_observed).toFixed(sp.digits) : "--";
+      const wPct = Math.max(0, Math.min(100, Number(d.data_weight_pct || 0)));
+      const dl = Number(deltas[sp.key] || 0);
+      const changed = Math.abs(dl) >= 0.0005;
+      const dlText = changed ? `${dl >= 0 ? "+" : ""}${dl.toFixed(sp.digits)}` : "invariato";
+      const dlCls = changed ? "is-changed" : "";
+      const barCol = wPct >= 70 ? "#10b981" : (wPct >= 45 ? "#38bdf8" : "#f59e0b");
+      return `
+        <div class="ap-conv-card">
+          <div class="ap-conv-head">
+            <span>${sp.label}</span>
+            <span class="ap-delta-chip ${dlCls}">${dlText}</span>
+          </div>
+          <div class="ap-conv-val">${valStr} <small>${sp.unit}</small></div>
+          <div class="ap-conv-bar-bg"><div class="ap-conv-bar-fill" style="width:${Math.max(4, wPct)}%; background:${barCol};"></div></div>
+          <div class="ap-conv-meta">
+            <span>Prior ${priorStr} · Obs ${obsStr}</span>
+            <span>Peso dati ${wPct}% (n=${d.n_obs ?? 0})</span>
+          </div>
+        </div>`;
+    }).join("");
+  } else {
+    convGrid.innerHTML = '<span class="cmd-muted-note">Diagnostica convergenza disponibile dopo il prossimo update modello.</span>';
+  }
+
+  const hist = (model && Array.isArray(model.history)) ? model.history : [];
+  if (hist.length) {
+    histList.innerHTML = hist.slice(-6).reverse().map(ev => {
+      const ts = ev.ts_utc ? formatReceiptTime(ev.ts_utc) : "--";
+      const dtStr = ev.ts_utc ? String(ev.ts_utc).slice(5, 10).split("-").reverse().join("/") : "--/--";
+      const chgTxt = Array.isArray(ev.changes) ? ev.changes.join(" · ") : "--";
+      return `<li><strong>${dtStr} ${ts}</strong> (cicli=${ev.cycles_observed ?? "-"}, standby=${ev.standby_segments_observed ?? "-"}) — ${escapeHtmlSafe(chgTxt)}</li>`;
+    }).join("");
+  } else {
+    histList.innerHTML = "<li>Nessuna revisione storica ancora registrata.</li>";
+  }
+
+  const wp = (st && st.weather_plan) || (wf && wf.plan) || null;
+  const a = (wp && wp.assumptions) || (wf && wf.calibration) || {};
+  const checks = (wf && Array.isArray(wf.recent_oat_checks)) ? wf.recent_oat_checks : [];
+  const biasStr = a.oat_bias_c != null ? `${Number(a.oat_bias_c) >= 0 ? "+" : ""}${Number(a.oat_bias_c).toFixed(2)} °C` : "0.00 °C";
+  const rawMae = a.oat_raw_mae_c != null ? `${Number(a.oat_raw_mae_c).toFixed(2)} °C` : "--";
+  const corrMae = a.oat_mae_c != null ? `${Number(a.oat_mae_c).toFixed(2)} °C` : "--";
+  const maxErr = a.oat_max_abs_err_c != null ? `${Number(a.oat_max_abs_err_c).toFixed(2)} °C` : "--";
+
+  let tableHtml = '<span class="cmd-muted-note">In attesa dei primi confronti orari Open-Meteo vs Sonda OAT (si popola automaticamente dal primo fetch meteo).</span>';
+  if (checks.length) {
+    const rowsHtml = checks.slice(-8).reverse().map(c => {
+      const tShort = String(c.time_local || "").slice(5, 16).replace("T", " ");
+      const err = Number(c.err_corr_c || 0);
+      const errCls = Math.abs(err) <= 1.2 ? "oat-err-ok" : (Math.abs(err) <= 2.5 ? "oat-err-warn" : "oat-err-high");
+      return `
+        <tr>
+          <td>${escapeHtmlSafe(tShort)}</td>
+          <td>${Number(c.forecast_raw_c).toFixed(1)}°</td>
+          <td>${Number(c.forecast_corr_c).toFixed(1)}°</td>
+          <td><strong>${Number(c.actual_oat_c).toFixed(1)}°</strong></td>
+          <td><span class="oat-err-pill ${errCls}">${err >= 0 ? "+" : ""}${err.toFixed(1)}K</span></td>
+        </tr>`;
+    }).join("");
+    tableHtml = `
+      <div class="ap-oat-table-wrap">
+        <table class="ap-oat-table">
+          <thead><tr><th>Ora</th><th>Meteo</th><th>Corr.</th><th>Sonda</th><th>Scarto</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>`;
+  }
+
+  oatBox.innerHTML = `
+    <div class="ap-oat-kpi-strip">
+      <span>Bias: <strong>${biasStr}</strong></span>
+      <span>MAE: <strong>${rawMae} → ${corrMae}</strong></span>
+      <span>Max: <strong>${maxErr}</strong> (${a.oat_samples_matched || 0}h)</span>
+    </div>
+    ${tableHtml}
+  `;
 }
 
 function computeApiQuotaSummary() {

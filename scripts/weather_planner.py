@@ -256,6 +256,8 @@ def fetch_or_load_weather(
             "hourly": hourly_clean,
             "calibration": existing.get("calibration") or {},
             "calibration_history": hist_sorted,
+            "calibration_log": existing.get("calibration_log") or [],
+            "recent_oat_checks": existing.get("recent_oat_checks") or [],
             "prediction_history": existing.get("prediction_history") or [],
         }
     except Exception as exc:
@@ -299,6 +301,7 @@ def calibrate_weather_from_telemetry(
     parsed_samples.sort(key=lambda x: x[0])
 
     errors_oat: list[float] = []
+    matched_pairs: list[dict[str, Any]] = []
     frost_active_hours = 0
     frost_expected_rate_sum = 0.0
     frost_observed_episodes = 0
@@ -323,7 +326,16 @@ def calibrate_weather_from_telemetry(
                 best_s = s
 
         if best_s is not None:
-            errors_oat.append(float(best_s["external_temp_c"]) - float(raw_t))
+            act_oat = float(best_s["external_temp_c"])
+            raw_f = float(raw_t)
+            err_raw = act_oat - raw_f
+            errors_oat.append(err_raw)
+            matched_pairs.append({
+                "time_local": str(h_rec.get("time_local")),
+                "forecast_raw_c": round(raw_f, 1),
+                "actual_oat_c": round(act_oat, 1),
+                "err_raw_c": round(err_raw, 2),
+            })
 
         # Check active heating defrost calibration inside this hour
         if hour_samples:
@@ -359,10 +371,26 @@ def calibrate_weather_from_telemetry(
         med_err = trimmed[mid] if len(trimmed) % 2 == 1 else 0.5 * (trimmed[mid - 1] + trimmed[mid])
         # Bayesian shrinkage toward 0.0 (prior weight = 12 hours)
         oat_bias_c = round(max(-4.0, min(4.0, med_err * (n_oat / (n_oat + 12.0)))), 2)
+        oat_raw_mae_c = round(sum(abs(e) for e in errors_oat) / n_oat, 2)
         oat_mae_c = round(sum(abs(e - oat_bias_c) for e in errors_oat) / n_oat, 2)
+        oat_max_abs_err_c = round(max(abs(e - oat_bias_c) for e in errors_oat), 2)
     else:
         oat_bias_c = 0.0
+        oat_raw_mae_c = None
         oat_mae_c = None
+        oat_max_abs_err_c = None
+
+    recent_oat_checks: list[dict[str, Any]] = []
+    for p in matched_pairs[-18:]:
+        f_corr = round(float(p["forecast_raw_c"]) + oat_bias_c, 1)
+        err_corr = round(float(p["actual_oat_c"]) - f_corr, 1)
+        recent_oat_checks.append({
+            "time_local": p["time_local"],
+            "forecast_raw_c": p["forecast_raw_c"],
+            "forecast_corr_c": f_corr,
+            "actual_oat_c": p["actual_oat_c"],
+            "err_corr_c": err_corr,
+        })
 
     if frost_active_hours >= 4 and frost_expected_rate_sum > 0.5:
         raw_scale = frost_observed_episodes / frost_expected_rate_sum
@@ -394,14 +422,39 @@ def calibrate_weather_from_telemetry(
 
     tin_mae_c = round(sum(tin_errors) / len(tin_errors), 2) if len(tin_errors) >= 2 else None
 
+    cal_log = [c for c in (cache_data.get("calibration_log") or []) if isinstance(c, dict)]
+    last_cl = cal_log[-1] if cal_log else None
+    should_log_cal = n_oat >= 2 and (
+        last_cl is None
+        or (n_oat - int(last_cl.get("oat_samples_matched") or 0)) >= 6
+        or abs(oat_bias_c - float(last_cl.get("oat_bias_c") or 0.0)) >= 0.05
+        or frost_penalty_scale != float(last_cl.get("frost_penalty_scale") or 1.0)
+    )
+    if should_log_cal:
+        cal_log.append({
+            "ts_utc": datetime.now(timezone.utc).isoformat(),
+            "oat_samples_matched": n_oat,
+            "oat_bias_c": oat_bias_c,
+            "oat_raw_mae_c": oat_raw_mae_c,
+            "oat_mae_c": oat_mae_c,
+            "oat_max_abs_err_c": oat_max_abs_err_c,
+            "frost_penalty_scale": frost_penalty_scale,
+            "tin_projection_mae_c": tin_mae_c,
+        })
+        cal_log = cal_log[-40:]
+
     return {
         "oat_samples_matched": n_oat,
         "oat_bias_c": oat_bias_c,
+        "oat_raw_mae_c": oat_raw_mae_c,
         "oat_mae_c": oat_mae_c,
+        "oat_max_abs_err_c": oat_max_abs_err_c,
         "frost_active_hours_matched": frost_active_hours,
         "frost_penalty_scale": frost_penalty_scale,
         "tin_proj_samples_matched": len(tin_errors),
         "tin_projection_mae_c": tin_mae_c,
+        "recent_oat_checks": recent_oat_checks,
+        "calibration_log": cal_log,
         "calibrated_utc": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -923,7 +976,9 @@ def evaluate_weather_plan(
         "min_cycle_minutes": min_cycle_min,
         "arbitrage_cop_delta": arb_delta,
         "oat_bias_c": oat_bias,
+        "oat_raw_mae_c": cal.get("oat_raw_mae_c"),
         "oat_mae_c": cal.get("oat_mae_c"),
+        "oat_max_abs_err_c": cal.get("oat_max_abs_err_c"),
         "oat_samples_matched": cal.get("oat_samples_matched", 0),
         "frost_penalty_scale": frost_scale,
         "tin_projection_mae_c": cal.get("tin_projection_mae_c"),
@@ -961,13 +1016,16 @@ def evaluate_weather_plan(
     }
 
     if not dry_run and cache_data.get("available"):
+        cal_clean = {k: v for k, v in cal.items() if k not in ("recent_oat_checks", "calibration_log")}
         to_save = {
             "location_label": cache_data.get("location_label", "Abitazione di Montagna (Zona Climatica E)"),
             "model": cache_data.get("model", "Open-Meteo ICON-D2 / Best Match"),
             "fetched_utc": cache_data.get("fetched_utc"),
             "hourly": cache_data.get("hourly") or [],
-            "calibration": cal,
+            "calibration": cal_clean,
             "calibration_history": cache_data.get("calibration_history") or [],
+            "calibration_log": cal.get("calibration_log") or cache_data.get("calibration_log") or [],
+            "recent_oat_checks": (cal.get("recent_oat_checks") or cache_data.get("recent_oat_checks") or [])[-12:],
             "prediction_history": pred_hist,
             "hourly_preview": hourly_preview,
             "plan": plan_result,

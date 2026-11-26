@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
   <!-- CSS Stylesheet -->
-  <link rel="stylesheet" href="css/styles.css?v=17">
+  <link rel="stylesheet" href="css/styles.css?v=18">
 
   <!-- Chart.js & Continuous Time Date Adapter (Offline First & PWA Ready) -->
   <script src="js/chart.min.js"></script>
@@ -250,6 +250,24 @@
             <div class="ap-weather-strip-title">Previsione Oraria (OAT corretta · RH% · COP netto · T casa stimata):</div>
             <div id="apWeatherHourlyStrip" class="ap-weather-hourly-strip"></div>
             <div id="apWeatherAssumptionsBox" class="ap-assumptions-box"></div>
+          </div>
+        </details>
+
+        <details class="autopilot-tuning-drawer ap-audit-drawer" id="apSelfTuningAuditDrawer">
+          <summary class="ap-weather-summary">
+            <span class="label-with-help">
+              <span>📈 Registro Self-Tuning, Convergenza &amp; Verifica Meteo</span>
+              <button type="button" class="help-info-btn" data-help-key="ap_selftuning_audit" aria-label="Spiegazione Convergenza Self-Tuning">i</button>
+            </span>
+            <span id="apAuditSummaryBadge" class="cmd-live-tag">--</span>
+          </summary>
+          <div class="ap-weather-body">
+            <div class="ap-weather-strip-title">Convergenza Bayesiana Parametri Fisici (Prior → Osservato → Convergente):</div>
+            <div id="apConvergenceGrid" class="ap-conv-grid"></div>
+            <div class="ap-weather-strip-title">Ultime Revisioni Self-Tuning (cosa è cambiato):</div>
+            <ul id="apSelfTuningHistoryList" class="ap-history-list"></ul>
+            <div class="ap-weather-strip-title">Verifica Oraria Open-Meteo vs Sonda Reale Viessmann (OAT):</div>
+            <div id="apOatVerifyBox" class="ap-oat-verify-box"></div>
           </div>
         </details>
 
@@ -1085,11 +1103,11 @@
   <div id="toast"></div>
 
   <!-- Scripts -->
-  <script src="js/synoptic.js?v=17"></script>
-  <script src="js/charts.js?v=17"></script>
-  <script src="js/analytics.js?v=17"></script>
-  <script src="js/commands.js?v=17"></script>
-  <script src="js/help.js?v=17"></script>
-  <script src="js/app.js?v=17"></script>
+  <script src="js/synoptic.js?v=18"></script>
+  <script src="js/charts.js?v=18"></script>
+  <script src="js/analytics.js?v=18"></script>
+  <script src="js/commands.js?v=18"></script>
+  <script src="js/help.js?v=18"></script>
+  <script src="js/app.js?v=18"></script>
 </body>
 </html>
