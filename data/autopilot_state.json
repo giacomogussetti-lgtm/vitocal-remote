@@ -5,7 +5,7 @@
   "cycle_started_utc": "2026-11-26T08:01:19.186928+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": "2026-11-26T14:01:44.853639+00:00",
-  "last_eval_utc": "2026-11-26T14:18:37.576638+00:00",
+  "last_eval_utc": "2026-11-26T14:19:37.029659+00:00",
   "last_action_utc": "2026-11-26T14:01:44.853639+00:00",
   "last_action_reason": "Stop PdC (Durata max raggiunta (360m) — stop preferito a estensione: notte sicura (min 7.2°C ≥ 7.2°C) e domani COP migliore (4.91 vs 4.64)), avvio scarico puffer 25 min. Modalità PdC impostata e verificata: standby | Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual)",
   "indoor_slope_c_per_h": 0.14,
@@ -20,7 +20,7 @@
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": 0,
   "soft_curve_last_trim_utc": null,
-  "last_grundfos_run_utc": "2026-11-26T14:18:37.576638+00:00",
+  "last_grundfos_run_utc": "2026-11-26T14:19:37.029659+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
@@ -69,7 +69,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "26/11 15:18",
+    "evaluated_local": "26/11 15:19",
     "effective_window_start": "09:00",
     "effective_window_end": "15:01",
     "window_locked": true,
@@ -124,7 +124,7 @@
       "end_tin_c": 7.26,
       "hours_simulated": 17.7,
       "target_local": "27/11 09:00",
-      "first_below_tmin_local": "27/11 05:18",
+      "first_below_tmin_local": "27/11 05:19",
       "first_below_safe_local": null
     },
     "short_cycle_action": "normal",
@@ -161,12 +161,12 @@
   },
   "api_usage": {
     "date_utc": "2026-11-26",
-    "viessmann_reads": 942,
+    "viessmann_reads": 944,
     "viessmann_writes": 6,
-    "bticino_reads": 935,
+    "bticino_reads": 937,
     "bticino_writes": 3,
     "cronjob_patches": 1,
-    "github_runs": 466,
+    "github_runs": 467,
     "recent_events": [
       {
         "ts": "2026-11-25T14:31:29.051166+00:00",
@@ -4082,6 +4082,13 @@
       },
       {
         "ts": "2026-11-26T14:18:37.573001+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-26T14:19:37.025901+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
