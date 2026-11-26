@@ -806,7 +806,7 @@
     "frost_penalty_scale": 1.02,
     "tin_proj_samples_matched": 4,
     "tin_projection_mae_c": 0.77,
-    "calibrated_utc": "2026-11-26T13:43:32.236094+00:00"
+    "calibrated_utc": "2026-11-26T13:44:31.773684+00:00"
   },
   "calibration_history": [
     {
@@ -2009,7 +2009,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "26/11 14:43",
+    "evaluated_local": "26/11 14:44",
     "effective_window_start": "09:00",
     "effective_window_end": "15:01",
     "window_locked": true,
@@ -2017,7 +2017,7 @@
     "committed_window_start": "09:00",
     "committed_window_end": "15:01",
     "in_window_now": true,
-    "remaining_window_min": 18,
+    "remaining_window_min": 17,
     "next_hour_cop_net": 4.59,
     "next_hour_label": "Oggi 15:00",
     "today_window": {
@@ -2064,8 +2064,8 @@
       "end_tin_c": 7.16,
       "hours_simulated": 18.3,
       "target_local": "27/11 09:00",
-      "first_below_tmin_local": "27/11 03:43",
-      "first_below_safe_local": "27/11 08:43"
+      "first_below_tmin_local": "27/11 03:44",
+      "first_below_safe_local": "27/11 08:44"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -2073,7 +2073,7 @@
     "prearm_reason": null,
     "defer_recommended": false,
     "defer_reason": null,
-    "decision_summary": "☀️ In finestra COP attiva (09:00–15:01, restano 18m)",
+    "decision_summary": "☀️ In finestra COP attiva (09:00–15:01, restano 17m)",
     "decision_trace": [
       "Finestra Oggi: 09:00–15:01 🔒 (COP netto stimato 4.55, OAT +4.0°C, RH 93%, Brina MEDIO, allineata a statica).",
       "Finestra Domani: 09:00–14:00 (COP netto 4.88, OAT +2.8°C, RH 79%, Brina MEDIO).",
