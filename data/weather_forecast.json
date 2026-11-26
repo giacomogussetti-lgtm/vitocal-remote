@@ -806,7 +806,7 @@
     "frost_penalty_scale": 1.0,
     "tin_proj_samples_matched": 0,
     "tin_projection_mae_c": null,
-    "calibrated_utc": "2026-11-26T01:05:06.024946+00:00"
+    "calibrated_utc": "2026-11-26T01:05:39.755752+00:00"
   },
   "calibration_history": [
     {
@@ -1780,7 +1780,7 @@
   ],
   "plan": {
     "available": true,
-    "source": "open_meteo_live",
+    "source": "cache",
     "fallback_reason": null,
     "evaluated_local": "26/11 02:05",
     "effective_window_start": "13:00",
