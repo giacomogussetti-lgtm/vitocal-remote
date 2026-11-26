@@ -39,6 +39,9 @@ jobs:
           NETATMO_REFRESH_TOKEN: ${{ secrets.NETATMO_REFRESH_TOKEN }}
           CRONJOB_API_KEY: ${{ secrets.CRONJOB_API_KEY }}
           CRONJOB_ID: ${{ secrets.CRONJOB_ID }}
+          WEATHER_LAT: ${{ secrets.WEATHER_LAT }}
+          WEATHER_LON: ${{ secrets.WEATHER_LON }}
+          WEATHER_ELEVATION_M: ${{ secrets.WEATHER_ELEVATION_M }}
         run: |
           python scripts/cloud_logger.py
 
@@ -49,4 +52,4 @@ jobs:
           python scripts/git_safe_push.py \
             --mode telemetry \
             --message "chore(telemetry): record cloud sample [skip ci]" \
-            --files data/cloud_telemetry.jsonl data/autopilot_state.json data/thermal_model.json data/archive
+            --files data/cloud_telemetry.jsonl data/autopilot_state.json data/thermal_model.json data/weather_forecast.json data/archive

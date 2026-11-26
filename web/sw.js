@@ -1,15 +1,15 @@
 // Vitocal Remote - Service Worker for PWA Offline Caching
-const CACHE_NAME = 'vitocal-remote-v16';
+const CACHE_NAME = 'vitocal-remote-v17';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './css/styles.css?v=16',
-  './js/app.js?v=16',
-  './js/synoptic.js?v=16',
-  './js/charts.js?v=16',
-  './js/analytics.js?v=16',
-  './js/commands.js?v=16',
-  './js/help.js?v=16',
+  './css/styles.css?v=17',
+  './js/app.js?v=17',
+  './js/synoptic.js?v=17',
+  './js/charts.js?v=17',
+  './js/analytics.js?v=17',
+  './js/commands.js?v=17',
+  './js/help.js?v=17',
   './js/chart.min.js',
   './js/chartjs-adapter-date-fns.bundle.min.js',
   './manifest.json',

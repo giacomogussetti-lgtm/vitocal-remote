@@ -321,6 +321,40 @@ def main() -> int:
         )
     except Exception:
         pass
+
+    # Weather-Aware Dynamic Window & Predictive Plan summary
+    wp = st.get("weather_plan") if isinstance(st.get("weather_plan"), dict) else None
+    if not wp:
+        wf_file = load_json_safe(Config.DATA_DIR / "weather_forecast.json")
+        wp = wf_file.get("plan") if isinstance(wf_file.get("plan"), dict) else None
+    print("\n--- PIANIFICATORE METEO & FINESTRA DINAMICA ---")
+    if wp:
+        assump = wp.get("assumptions") or {}
+        tw = wp.get("today_window") or {}
+        tmw = wp.get("tomorrow_window") or {}
+        proj = wp.get("projection_to_tomorrow") or {}
+        bias_s = f"{assump.get('oat_bias_c', 0.0):+.2f}°C"
+        mae_s = f"{assump['oat_mae_c']:.2f}°C" if assump.get("oat_mae_c") is not None else "--"
+        tin_mae_s = f"{assump['tin_projection_mae_c']:.2f}°C" if assump.get("tin_projection_mae_c") is not None else "--"
+        print(
+            f"  Sorgente Meteo  : available={wp.get('available')} ({wp.get('source', '--')}) | "
+            f"Bias OAT={bias_s} (MAE={mae_s}, n={assump.get('oat_samples_matched', 0)}) | MAE T_in={tin_mae_s}"
+        )
+        print(
+            f"  Finestra Attiva : {wp.get('effective_window_start', '--')}–{wp.get('effective_window_end', '--')} "
+            f"| Oggi={tw.get('start_hhmm', '--')}–{tw.get('end_hhmm', '--')} (COP={tw.get('avg_cop_net', '--')}, {tw.get('frost_risk', '--')}) "
+            f"| Domani={tmw.get('start_hhmm', '--')}–{tmw.get('end_hhmm', '--')} (COP={tmw.get('avg_cop_net', '--')}, {tmw.get('frost_risk', '--')})"
+        )
+        if proj:
+            print(
+                f"  Proiezione Casa : {proj.get('start_tin_c', '--')}°C -> min {proj.get('min_tin_c', '--')}°C / fine {proj.get('end_tin_c', '--')}°C "
+                f"(orizzonte {proj.get('hours_simulated', '--')}h, pavimento {assump.get('safe_floor_c', '--')}°C)"
+            )
+        print(f"  Decisione Live  : {wp.get('decision_summary', '--')}")
+        for line in (wp.get("decision_trace") or [])[:4]:
+            print(f"    • {line}")
+    else:
+        print(f"  Stato Meteo     : Nessun piano meteo ancora generato (finestra statica {cfg.get('cop_window_start', '11:00')}–{cfg.get('cop_window_end', '16:00')}).")
     print("=" * 78)
     return 0
 

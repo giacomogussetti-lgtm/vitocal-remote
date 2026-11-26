@@ -50,6 +50,9 @@ jobs:
           NETATMO_REFRESH_TOKEN: ${{ secrets.NETATMO_REFRESH_TOKEN }}
           CRONJOB_API_KEY: ${{ secrets.CRONJOB_API_KEY }}
           CRONJOB_ID: ${{ secrets.CRONJOB_ID }}
+          WEATHER_LAT: ${{ secrets.WEATHER_LAT }}
+          WEATHER_LON: ${{ secrets.WEATHER_LON }}
+          WEATHER_ELEVATION_M: ${{ secrets.WEATHER_ELEVATION_M }}
           CMD_ACTION: ${{ inputs.command }}
           CMD_PAYLOAD_JSON: ${{ inputs.payload_json }}
         run: |
@@ -66,7 +69,7 @@ jobs:
           python scripts/git_safe_push.py \
             --mode command \
             --message "chore(command): execute ${{ inputs.command }} [skip ci]" \
-            --files data/last_command.json data/autopilot_config.json data/autopilot_state.json data/cloud_telemetry.jsonl data/archive
+            --files data/last_command.json data/autopilot_config.json data/autopilot_state.json data/thermal_model.json data/weather_forecast.json data/cloud_telemetry.jsonl data/archive
 
       - name: Enforce Command Exit Status
         if: steps.run_cmd.outputs.cmd_exit != '0'

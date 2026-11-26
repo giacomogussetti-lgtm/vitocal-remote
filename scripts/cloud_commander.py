@@ -251,30 +251,45 @@ def _validate_autopilot_params(params: dict[str, Any], force_enable: bool = Fals
         "soft_curve_max_shift_delta_k": (1, 4, int),
         "soft_curve_cooldown_minutes": (15, 180, int),
         "anti_seize_days": (0, 30, int),
+        "weather_window_hours": (2, 9, int),
+        "weather_refresh_hours": (1, 12, int),
+        "weather_min_cop_gain": (0.0, 1.0, float),
+        "min_cycle_minutes": (45, 240, int),
+        "max_window_extension_minutes": (0, 240, int),
+        "prearm_max_above_tmin_c": (0.1, 2.0, float),
+        "prearm_emergency_margin_c": (0.1, 1.5, float),
+        "weather_arbitrage_cop_delta": (0.05, 1.5, float),
     }
     for key, (lo, hi, caster) in bounds.items():
         if params.get(key) is not None:
             val = caster(params[key])
             if not (lo <= val <= hi):
                 raise ValueError(f"{key} fuori range ({lo} – {hi}).")
-            clean[key] = round(val, 1) if caster is float else val
+            clean[key] = round(val, 2) if key in ("weather_min_cop_gain", "weather_arbitrage_cop_delta") else (round(val, 1) if caster is float else val)
 
-    if "dynamic_cron_enabled" in params:
-        clean["dynamic_cron_enabled"] = bool(params["dynamic_cron_enabled"])
-    if "soft_start_enabled" in params:
-        clean["soft_start_enabled"] = bool(params["soft_start_enabled"])
-    if "defrost_guard_enabled" in params:
-        clean["defrost_guard_enabled"] = bool(params["defrost_guard_enabled"])
-    if "soft_curve_tuning_enabled" in params:
-        clean["soft_curve_tuning_enabled"] = bool(params["soft_curve_tuning_enabled"])
-    if "adaptive_model_enabled" in params:
-        clean["adaptive_model_enabled"] = bool(params["adaptive_model_enabled"])
-    if "adaptive_model_apply_targets" in params:
-        clean["adaptive_model_apply_targets"] = bool(params["adaptive_model_apply_targets"])
+    for bool_key in (
+        "dynamic_cron_enabled",
+        "soft_start_enabled",
+        "defrost_guard_enabled",
+        "soft_curve_tuning_enabled",
+        "adaptive_model_enabled",
+        "adaptive_model_apply_targets",
+        "weather_planner_enabled",
+        "weather_dynamic_window_enabled",
+        "anti_short_cycle_enabled",
+        "predictive_prearm_enabled",
+        "weather_defer_enabled",
+    ):
+        if bool_key in params:
+            clean[bool_key] = bool(params[bool_key])
 
-    for tkey in ("cop_window_start", "cop_window_end"):
+    for tkey in ("cop_window_start", "cop_window_end", "weather_search_start", "weather_search_end"):
         if params.get(tkey) is not None:
             clean[tkey] = _validate_hhmm(str(params[tkey]), tkey)
+
+    if "weather_search_start" in clean and "weather_search_end" in clean:
+        if clean["weather_search_end"] <= clean["weather_search_start"]:
+            raise ValueError("weather_search_end deve essere successivo a weather_search_start.")
 
     return clean
 

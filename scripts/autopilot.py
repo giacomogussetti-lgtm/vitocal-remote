@@ -67,6 +67,21 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "anti_seize_days": 4,
     "adaptive_model_enabled": True,
     "adaptive_model_apply_targets": False,
+    "weather_planner_enabled": True,
+    "weather_dynamic_window_enabled": True,
+    "weather_search_start": "09:00",
+    "weather_search_end": "18:00",
+    "weather_window_hours": 5,
+    "weather_refresh_hours": 3,
+    "weather_min_cop_gain": 0.08,
+    "anti_short_cycle_enabled": True,
+    "min_cycle_minutes": 120,
+    "max_window_extension_minutes": 120,
+    "predictive_prearm_enabled": True,
+    "prearm_max_above_tmin_c": 0.6,
+    "prearm_emergency_margin_c": 0.4,
+    "weather_defer_enabled": True,
+    "weather_arbitrage_cop_delta": 0.25,
 }
 
 DEFAULT_STATE: dict[str, Any] = {
@@ -95,6 +110,11 @@ DEFAULT_STATE: dict[str, Any] = {
     "last_anti_seize_utc": None,
     "error_counter_d6": 0,
     "recent_wo1c_events": [],
+    "active_window_start_local": None,
+    "active_window_end_local": None,
+    "weather_deferred_date": None,
+    "armed_by_prearm": False,
+    "weather_plan": None,
     "api_usage": {
         "date_utc": None,
         "viessmann_reads": 0,
@@ -372,16 +392,32 @@ def _hhmm_to_minutes(hhmm: str) -> int:
     return int(parts[0]) * 60 + int(parts[1])
 
 
-def _is_in_cop_window(local_dt: datetime, cfg: dict[str, Any]) -> bool:
+def _round_hhmm_10m(hhmm: str, round_up: bool = False) -> str:
+    m = _hhmm_to_minutes(hhmm)
+    m = ((m + 9) // 10) * 10 if round_up else (m // 10) * 10
+    m = max(0, min(23 * 60 + 50, m))
+    return f"{m // 60:02d}:{m % 60:02d}"
+
+
+def _is_in_cop_window(
+    local_dt: datetime,
+    cfg: dict[str, Any],
+    start_override: Optional[str] = None,
+    end_override: Optional[str] = None,
+) -> bool:
     cur_min = local_dt.hour * 60 + local_dt.minute
-    start_min = _hhmm_to_minutes(str(cfg.get("cop_window_start", "11:30")))
-    end_min = _hhmm_to_minutes(str(cfg.get("cop_window_end", "15:30")))
+    start_min = _hhmm_to_minutes(str(start_override or cfg.get("cop_window_start", "11:00")))
+    end_min = _hhmm_to_minutes(str(end_override or cfg.get("cop_window_end", "16:00")))
     return start_min <= cur_min <= end_min
 
 
-def _is_past_cop_window_end(local_dt: datetime, cfg: dict[str, Any]) -> bool:
+def _is_past_cop_window_end(
+    local_dt: datetime,
+    cfg: dict[str, Any],
+    end_override: Optional[str] = None,
+) -> bool:
     cur_min = local_dt.hour * 60 + local_dt.minute
-    end_min = _hhmm_to_minutes(str(cfg.get("cop_window_end", "15:30")))
+    end_min = _hhmm_to_minutes(str(end_override or cfg.get("cop_window_end", "16:00")))
     return cur_min >= end_min
 
 
@@ -538,6 +574,8 @@ def _apply_start_heating(
     pdc_setpoint: int,
     local_dt: datetime,
     is_emergency: bool,
+    active_start_hhmm: Optional[str] = None,
+    active_end_hhmm: Optional[str] = None,
 ) -> tuple[bool, str]:
     """Starts synchronized BTicino Grundfos + Viessmann PdC heating cycle with hardware fail-safes."""
     b_conn = BTicinoConnector()
@@ -555,9 +593,9 @@ def _apply_start_heating(
     ok_r, msg_r = v_conn.set_reduced_temperature(float(pdc_setpoint))
     ok_n, msg_n = v_conn.set_normal_temperature(float(pdc_setpoint))
 
-    # If emergency cycle outside COP window, temporarily open today's hardware schedule
+    # Align WO1C hardware schedule when emergency or dynamic/extended window differs from static window
+    today_code = _weekday_code(local_dt)
     if is_emergency:
-        today_code = _weekday_code(local_dt)
         v_conn.set_heating_schedule_simple(
             days=[today_code],
             start="00:00",
@@ -565,6 +603,20 @@ def _apply_start_heating(
             mode="reduced",
             clear=False,
         )
+    elif active_start_hhmm and active_end_hhmm and (
+        active_start_hhmm != str(cfg.get("cop_window_start", "11:00"))
+        or active_end_hhmm != str(cfg.get("cop_window_end", "16:00"))
+    ):
+        s10 = _round_hhmm_10m(active_start_hhmm, round_up=False)
+        e10 = _round_hhmm_10m(active_end_hhmm, round_up=True)
+        if e10 > s10:
+            v_conn.set_heating_schedule_simple(
+                days=[today_code],
+                start=s10,
+                end=e10,
+                mode="reduced",
+                clear=False,
+            )
 
     ok_m, msg_m = v_conn.set_mode("dhwAndHeating")
     return (ok_r and ok_n and ok_m), f"{msg_b} | {msg_r} | {msg_m}"
@@ -646,11 +698,14 @@ def run_autopilot_tick(
     latest_sample: dict[str, Any] | Any,
     dry_run: bool = False,
     extra_diagnostics: Optional[dict[str, Any]] = None,
+    now_utc_override: Optional[datetime] = None,
+    weather_cache_file: Optional[Path] = None,
 ) -> dict[str, Any]:
     """
     Executes one evaluation tick of the Full-Auto Mountain Custody v2 state machine.
-    Includes Soft-Start anti-overshoot ramp, Defrost-Aware derating (safe against WO1C
-    buffer upper hysteresis), smart Grundfos anti-seize, and adaptive telemetry polling.
+    Includes Weather-Aware dynamic COP window, Anti-Short-Cycle guard, Predictive Pre-Arming,
+    Soft-Start anti-overshoot ramp, Defrost-Aware derating, smart Grundfos anti-seize,
+    and adaptive telemetry polling.
     """
     if hasattr(latest_sample, "model_dump"):
         sample = latest_sample.model_dump()
@@ -660,11 +715,11 @@ def run_autopilot_tick(
     cfg = load_config()
     st = load_state()
     rome_tz = _get_rome_tz()
-    now_utc = datetime.now(timezone.utc)
+    now_utc = now_utc_override.astimezone(timezone.utc) if now_utc_override else datetime.now(timezone.utc)
     now_local = now_utc.astimezone(rome_tz)
     now_iso = now_utc.isoformat()
 
-    recent = _load_recent_samples(limit=200)
+    recent = _load_recent_samples(limit=250)
     if sample and (not recent or recent[-1].get("timestamp_utc") != sample.get("timestamp_utc")):
         recent.append(sample)
 
@@ -740,6 +795,37 @@ def run_autopilot_tick(
         st["calculated_pdc_setpoint_c"] = pdc_setpoint
         st["target_pdc_setpoint_c"] = regime_sp
 
+    # Evaluate Weather-Aware Dynamic Window, Anti-Short-Cycle & Predictive Plan (fail-safe wrapped)
+    weather_plan: dict[str, Any] = {
+        "available": False,
+        "effective_window_start": str(cfg.get("cop_window_start") or "11:00"),
+        "effective_window_end": str(cfg.get("cop_window_end") or "16:00"),
+        "in_window_now": _is_in_cop_window(now_local, cfg),
+        "short_cycle_action": "normal",
+        "prearm_recommended": False,
+        "defer_recommended": False,
+        "decision_summary": f"Finestra statica {cfg.get('cop_window_start', '11:00')}–{cfg.get('cop_window_end', '16:00')}",
+        "decision_trace": [],
+    }
+    try:
+        from scripts.weather_planner import evaluate_weather_plan
+        eval_state = st.get("state") or "IDLE"
+        weather_plan = evaluate_weather_plan(
+            now_local=now_local,
+            t_in_c=float(t_in) if t_in is not None else None,
+            current_oat_c=float(oat),
+            cur_state=eval_state,
+            cfg=cfg,
+            thermal_model=tm_model,
+            recent_samples=recent,
+            st=st,
+            dry_run=dry_run,
+            cache_file=weather_cache_file,
+        )
+        st["weather_plan"] = weather_plan
+    except Exception as wp_err:
+        logger.warning("Valutazione weather_planner fallita (fallback statico): %s", wp_err)
+
     if not cfg.get("enabled"):
         st["state"] = "DISABLED"
         st["below_threshold_since_utc"] = None
@@ -756,6 +842,8 @@ def run_autopilot_tick(
 
     t_in_f = float(t_in)
     cur_state = st["state"]
+    eff_win_start = str(weather_plan.get("effective_window_start") or cfg.get("cop_window_start") or "11:00")
+    eff_win_end = str(weather_plan.get("effective_window_end") or cfg.get("cop_window_end") or "16:00")
 
     # ---------------- STATE MACHINE ----------------
     if cur_state == "IDLE":
@@ -798,19 +886,35 @@ def run_autopilot_tick(
                 if held_min >= float(cfg["debounce_minutes"]):
                     st["state"] = "ARMED"
                     st["state_since_utc"] = now_iso
-                    st["last_action_reason"] = f"Richiesta calore confermata da {held_min:.0f} min (T={t_in_f:.1f}°C). Attesa finestra COP / emergenza."
+                    st["armed_by_prearm"] = False
+                    st["last_action_reason"] = f"Richiesta calore confermata da {held_min:.0f} min (T={t_in_f:.1f}°C). Attesa finestra COP ({eff_win_start}–{eff_win_end}) / emergenza."
+        elif cfg.get("predictive_prearm_enabled", True) and weather_plan.get("prearm_recommended"):
+            st["state"] = "ARMED"
+            st["state_since_utc"] = now_iso
+            st["below_threshold_since_utc"] = now_iso
+            st["armed_by_prearm"] = True
+            st["last_action_utc"] = now_iso
+            st["last_action_reason"] = weather_plan.get("prearm_reason") or weather_plan.get("decision_summary")
         else:
             st["below_threshold_since_utc"] = None
-            st["last_action_reason"] = f"Standby OK: T={t_in_f:.1f}°C > {cfg['t_min_c']}°C (pendenza {slope_c_h:+.2f}°C/h)."
+            st["armed_by_prearm"] = False
+            st["last_action_reason"] = f"Standby OK: T={t_in_f:.1f}°C > {cfg['t_min_c']}°C (pendenza {slope_c_h:+.2f}°C/h). {weather_plan.get('decision_summary', '')}".strip()
 
     elif cur_state == "ARMED":
-        if t_in_f >= float(cfg["t_min_c"]) + 0.3:
+        prearm_hold = bool(
+            cfg.get("predictive_prearm_enabled", True)
+            and (weather_plan.get("prearm_recommended") or st.get("armed_by_prearm"))
+            and weather_plan.get("in_window_now")
+            and t_in_f <= float(cfg["t_min_c"]) + float(cfg.get("prearm_max_above_tmin_c") or 0.6) + 0.15
+        )
+        if t_in_f >= float(cfg["t_min_c"]) + 0.3 and not prearm_hold:
             st["state"] = "IDLE"
             st["state_since_utc"] = now_iso
             st["below_threshold_since_utc"] = None
+            st["armed_by_prearm"] = False
             st["last_action_reason"] = f"Rientro termico spontaneo (T={t_in_f:.1f}°C): ritorno in IDLE."
         else:
-            in_cop = _is_in_cop_window(now_local, cfg)
+            in_cop = _is_in_cop_window(now_local, cfg, start_override=eff_win_start, end_override=eff_win_end)
             is_emergency = t_in_f <= float(cfg["t_emergency_c"])
             projected_6h = t_in_f + (slope_c_h * 6.0)
             is_steep_drop = (
@@ -818,8 +922,25 @@ def run_autopilot_tick(
                 and slope_c_h <= float(cfg["rapid_drop_slope_c_per_h"])
                 and projected_6h < float(cfg["t_emergency_c"])
             )
-            if in_cop or is_emergency or is_steep_drop:
-                trigger_why = "Emergenza Gelo" if is_emergency else ("Crollo Rapido Notturno" if is_steep_drop else "Finestra Alto COP")
+
+            short_cycle_action = str(weather_plan.get("short_cycle_action") or "normal")
+            should_defer_sc = (not is_emergency and not is_steep_drop and in_cop and short_cycle_action == "defer_short_cycle")
+            should_defer_wx = (not is_emergency and not is_steep_drop and in_cop and not should_defer_sc and bool(weather_plan.get("defer_recommended")))
+
+            if should_defer_sc:
+                st["last_action_reason"] = weather_plan.get("decision_summary") or "Rinvio anti-micro-ciclo a domani."
+            elif should_defer_wx:
+                st["weather_deferred_date"] = now_local.strftime("%Y-%m-%d")
+                st["last_action_utc"] = now_iso
+                st["last_action_reason"] = weather_plan.get("defer_reason") or weather_plan.get("decision_summary")
+            elif in_cop or is_emergency or is_steep_drop:
+                trigger_why = "Emergenza Gelo" if is_emergency else ("Crollo Rapido Notturno" if is_steep_drop else ("Pre-Armamento Predittivo" if st.get("armed_by_prearm") else "Finestra Alto COP"))
+                run_win_start = eff_win_start
+                run_win_end = eff_win_end
+                if (not is_emergency and not is_steep_drop) and short_cycle_action == "extend_short_cycle" and weather_plan.get("extended_end_hhmm"):
+                    run_win_end = str(weather_plan["extended_end_hhmm"])
+                    trigger_why = f"{trigger_why} + Estensione Anti-Short-Cycle ({run_win_end})"
+
                 # Soft-Start Anti-Overshoot: avoid 14K cold-start error on WO1C PI controller
                 start_sp = regime_sp
                 start_lwt = target_lwt
@@ -840,11 +961,22 @@ def run_autopilot_tick(
                     start_lwt = compute_wo1c_lwt(float(oat), float(start_sp), float(curve_slope), float(curve_shift))
 
                 if not dry_run:
-                    ok, msg = _apply_start_heating(cfg, start_sp, now_local, is_emergency=(is_emergency or is_steep_drop))
+                    ok, msg = _apply_start_heating(
+                        cfg,
+                        start_sp,
+                        now_local,
+                        is_emergency=(is_emergency or is_steep_drop),
+                        active_start_hhmm=run_win_start,
+                        active_end_hhmm=run_win_end,
+                    )
                     emerg_flag = bool(is_emergency or is_steep_drop)
+                    sched_changed = emerg_flag or (
+                        run_win_start != str(cfg.get("cop_window_start", "11:00"))
+                        or run_win_end != str(cfg.get("cop_window_end", "16:00"))
+                    )
                     record_api_usage(
-                        v_reads=6 if emerg_flag else 4,
-                        v_writes=4 if emerg_flag else 3,
+                        v_reads=6 if sched_changed else 4,
+                        v_writes=4 if sched_changed else 3,
                         b_reads=1,
                         b_writes=1,
                         event_label="ap_start_heating",
@@ -855,6 +987,10 @@ def run_autopilot_tick(
                         st["state_since_utc"] = now_iso
                         st["cycle_started_utc"] = now_iso
                         st["cycle_is_emergency"] = emerg_flag
+                        st["armed_by_prearm"] = False
+                        st["active_window_start_local"] = run_win_start
+                        st["active_window_end_local"] = run_win_end
+                        st["weather_deferred_date"] = None
                         st["target_pdc_setpoint_c"] = regime_sp
                         st["calculated_pdc_setpoint_c"] = start_sp
                         st["calculated_target_lwt_c"] = start_lwt
@@ -873,6 +1009,10 @@ def run_autopilot_tick(
                     st["state_since_utc"] = now_iso
                     st["cycle_started_utc"] = now_iso
                     st["cycle_is_emergency"] = bool(is_emergency or is_steep_drop)
+                    st["armed_by_prearm"] = False
+                    st["active_window_start_local"] = run_win_start
+                    st["active_window_end_local"] = run_win_end
+                    st["weather_deferred_date"] = None
                     st["target_pdc_setpoint_c"] = regime_sp
                     st["calculated_pdc_setpoint_c"] = start_sp
                     st["calculated_target_lwt_c"] = start_lwt
@@ -1022,10 +1162,11 @@ def run_autopilot_tick(
             if abs(int(st.get("soft_curve_trim_k") or 0)) < int(cfg.get("soft_curve_max_shift_delta_k") or 2):
                 stop_target = False
         stop_max_dur = elapsed_min >= float(cfg["max_cycle_minutes"])
-        stop_window = (not is_emerg_cycle) and _is_past_cop_window_end(now_local, cfg)
+        active_win_end = str(st.get("active_window_end_local") or eff_win_end)
+        stop_window = (not is_emerg_cycle) and _is_past_cop_window_end(now_local, cfg, end_override=active_win_end)
 
         if stop_target or stop_max_dur or stop_window:
-            why = "Target raggiunto" if stop_target else ("Durata max raggiunta" if stop_max_dur else "Fine finestra COP")
+            why = "Target raggiunto" if stop_target else ("Durata max raggiunta" if stop_max_dur else f"Fine finestra COP ({active_win_end})")
             if not dry_run:
                 ok, msg = _apply_stop_pdc_keep_drain(cfg)
                 record_api_usage(v_reads=2, v_writes=1, b_reads=1, b_writes=1, event_label="ap_stop_pdc_drain", state_dict=st)
@@ -1056,6 +1197,9 @@ def run_autopilot_tick(
             st["cycle_started_utc"] = None
             st["drain_started_utc"] = None
             st["cycle_is_emergency"] = False
+            st["armed_by_prearm"] = False
+            st["active_window_start_local"] = None
+            st["active_window_end_local"] = None
             st["soft_curve_trim_k"] = 0
             st["soft_curve_last_trim_utc"] = None
             st["cycle_defrost_episodes"] = 0

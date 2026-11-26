@@ -204,9 +204,15 @@ def _apply_merged_snapshot(mode: str, file_args: list[str], snap: dict[str, Any]
         jsonl_path.write_text(merged_text, encoding="utf-8")
         paths_to_stage.append(jsonl_rel)
 
-    # 3. Mode-specific handling for config / command receipt / autopilot state
+    # 3. Mode-specific handling for config / command receipt / autopilot state / models / weather
     if mode == "command":
-        for rel in ("data/last_command.json", "data/autopilot_config.json", "data/autopilot_state.json"):
+        for rel in (
+            "data/last_command.json",
+            "data/autopilot_config.json",
+            "data/autopilot_state.json",
+            "data/thermal_model.json",
+            "data/weather_forecast.json",
+        ):
             if rel in local_files:
                 p = Path(rel)
                 p.parent.mkdir(parents=True, exist_ok=True)
@@ -214,6 +220,13 @@ def _apply_merged_snapshot(mode: str, file_args: list[str], snap: dict[str, Any]
                 paths_to_stage.append(rel)
     else:
         # Telemetry mode NEVER overwrites autopilot_config.json or last_command.json
+        for rel in ("data/thermal_model.json", "data/weather_forecast.json"):
+            if rel in local_files:
+                p = Path(rel)
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_bytes(local_files[rel])
+                paths_to_stage.append(rel)
+
         st_rel = "data/autopilot_state.json"
         if st_rel in local_files:
             st_path = Path(st_rel)

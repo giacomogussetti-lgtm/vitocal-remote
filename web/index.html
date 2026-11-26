@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
   <!-- CSS Stylesheet -->
-  <link rel="stylesheet" href="css/styles.css?v=16">
+  <link rel="stylesheet" href="css/styles.css?v=17">
 
   <!-- Chart.js & Continuous Time Date Adapter (Offline First & PWA Ready) -->
   <script src="js/chart.min.js"></script>
@@ -221,6 +221,7 @@
         <div class="autopilot-metrics-row">
           <span id="apMetricSlope">Pendenza: -- °C/h</span>
           <span id="apMetricLwt">Target LWT Auto: -- °C</span>
+          <span id="apMetricWindow">Finestra: 11:00–16:00</span>
           <span id="apMetricCron">Polling: -- min</span>
         </div>
 
@@ -231,6 +232,26 @@
           <button type="button" class="btn-action btn-secondary" id="btnDisableAutopilot" style="margin-top: 0;">✋ Disattiva (Manuale)</button>
           <button type="button" class="btn-action btn-secondary" id="btnQuickPreheatArrival" style="margin-top: 0;">🏡 Pre-Riscald. Arrivo</button>
         </div>
+
+        <details class="autopilot-tuning-drawer ap-weather-drawer" id="apPredictiveBrainDrawer">
+          <summary class="ap-weather-summary">
+            <span class="label-with-help">
+              <span>🌦️ Previsioni Meteo, Finestra Dinamica &amp; Ragionamento</span>
+              <button type="button" class="help-info-btn" data-help-key="ap_weather_planner" aria-label="Spiegazione Pianificatore Meteo">i</button>
+            </span>
+            <span id="apWeatherSummaryBadge" class="cmd-live-tag">--</span>
+          </summary>
+          <div class="ap-weather-body">
+            <div id="apWeatherDecisionBox" class="ap-weather-decision">
+              <div class="ap-weather-verdict" id="apWeatherVerdict">In attesa di sincronizzazione piano meteo...</div>
+              <ul id="apWeatherTraceList" class="ap-trace-list"></ul>
+            </div>
+            <div id="apWeatherCompareGrid" class="ap-weather-compare"></div>
+            <div class="ap-weather-strip-title">Previsione Oraria (OAT corretta · RH% · COP netto · T casa stimata):</div>
+            <div id="apWeatherHourlyStrip" class="ap-weather-hourly-strip"></div>
+            <div id="apWeatherAssumptionsBox" class="ap-assumptions-box"></div>
+          </div>
+        </details>
 
         <details class="autopilot-tuning-drawer">
           <summary>⚙️ Parametri Strategia, Frequenza Dinamica & Self-Tuning</summary>
@@ -367,6 +388,80 @@
             </label>
             <div class="cmd-quota-hint" id="apThermalModelSummary" style="margin-top: 8px; line-height: 1.45;">
               🧠 Modello Fisico: in caricamento dati storici...
+            </div>
+          </div>
+
+          <div class="cmd-subbox" style="margin-top: 10px;">
+            <div class="cmd-card-header" style="margin-bottom: 4px;">
+              <span class="cmd-sub-title label-with-help">🌦️ Meteo Dinamico, Anti-Micro-Ciclo &amp; Pre-Armamento <button type="button" class="help-info-btn" data-help-key="ap_weather_planner" aria-label="Spiegazione Meteo Dinamico">i</button></span>
+            </div>
+            <label class="ap-checkbox-row" style="margin-top: 6px;">
+              <input type="checkbox" id="apWeatherPlannerEnabled" checked>
+              <span>Pianificatore Meteo Open-Meteo (ICON-D2 + Self-Tuning OAT)</span>
+              <button type="button" class="help-info-btn" data-help-key="ap_weather_planner" aria-label="Spiegazione Pianificatore Meteo">i</button>
+            </label>
+            <label class="ap-checkbox-row" style="margin-top: 6px;">
+              <input type="checkbox" id="apWeatherDynamicWindow" checked>
+              <span>Sposta dinamicamente finestra COP nelle ore migliori</span>
+              <button type="button" class="help-info-btn" data-help-key="ap_weather_search_band" aria-label="Spiegazione Finestra Dinamica">i</button>
+            </label>
+            <label class="ap-checkbox-row" style="margin-top: 6px;">
+              <input type="checkbox" id="apAntiShortCycleEnabled" checked>
+              <span>Anti-Micro-Ciclo (evita accensioni brevi a fine finestra)</span>
+              <button type="button" class="help-info-btn" data-help-key="ap_anti_short_cycle" aria-label="Spiegazione Anti-Micro-Ciclo">i</button>
+            </label>
+            <label class="ap-checkbox-row" style="margin-top: 6px;">
+              <input type="checkbox" id="apPredictivePrearmEnabled" checked>
+              <span>Pre-Armamento Predittivo (anticipa se notte a rischio gelo)</span>
+              <button type="button" class="help-info-btn" data-help-key="ap_predictive_prearm" aria-label="Spiegazione Pre-Armamento">i</button>
+            </label>
+            <label class="ap-checkbox-row" style="margin-top: 6px;">
+              <input type="checkbox" id="apWeatherDeferEnabled" checked>
+              <span>Arbitraggio Meteo (rinvia a domani se COP molto migliore e notte sicura)</span>
+              <button type="button" class="help-info-btn" data-help-key="ap_weather_defer" aria-label="Spiegazione Arbitraggio">i</button>
+            </label>
+
+            <div class="cmd-sync-row" style="margin-top: 10px;">
+              <div class="cmd-inline-field">
+                <label for="apWeatherSearchStart" class="label-with-help">Ricerca Meteo Da <button type="button" class="help-info-btn" data-help-key="ap_weather_search_band" aria-label="Ricerca Da">i</button></label>
+                <input type="time" id="apWeatherSearchStart" class="form-input" value="09:00">
+              </div>
+              <div class="cmd-inline-field">
+                <label for="apWeatherSearchEnd" class="label-with-help">Ricerca Meteo A <button type="button" class="help-info-btn" data-help-key="ap_weather_search_band" aria-label="Ricerca A">i</button></label>
+                <input type="time" id="apWeatherSearchEnd" class="form-input" value="18:00">
+              </div>
+              <div class="cmd-inline-field">
+                <label for="apWeatherWindowHours">Durata Finestra (h)</label>
+                <input type="number" id="apWeatherWindowHours" class="form-input" min="2" max="9" step="1" value="5">
+              </div>
+              <div class="cmd-inline-field">
+                <label for="apMinCycleMin" class="label-with-help">Ciclo Minimo (min) <button type="button" class="help-info-btn" data-help-key="ap_anti_short_cycle" aria-label="Ciclo Minimo">i</button></label>
+                <input type="number" id="apMinCycleMin" class="form-input" min="45" max="240" step="15" value="120">
+              </div>
+              <div class="cmd-inline-field">
+                <label for="apMaxWinExtMin">Max Estensione (min)</label>
+                <input type="number" id="apMaxWinExtMin" class="form-input" min="0" max="240" step="15" value="120">
+              </div>
+              <div class="cmd-inline-field">
+                <label for="apPrearmMaxAbove" class="label-with-help">Pre-Armo +°C su T_min <button type="button" class="help-info-btn" data-help-key="ap_predictive_prearm" aria-label="Pre-Armo Delta">i</button></label>
+                <input type="number" id="apPrearmMaxAbove" class="form-input" min="0.1" max="2.0" step="0.1" value="0.6">
+              </div>
+              <div class="cmd-inline-field">
+                <label for="apPrearmEmergMargin">Margine Sic. Notte (°C)</label>
+                <input type="number" id="apPrearmEmergMargin" class="form-input" min="0.1" max="1.5" step="0.1" value="0.4">
+              </div>
+              <div class="cmd-inline-field">
+                <label for="apWeatherArbDelta" class="label-with-help">Soglia Arbitraggio COP <button type="button" class="help-info-btn" data-help-key="ap_weather_defer" aria-label="Soglia Arbitraggio">i</button></label>
+                <input type="number" id="apWeatherArbDelta" class="form-input" min="0.05" max="1.5" step="0.05" value="0.25">
+              </div>
+              <div class="cmd-inline-field">
+                <label for="apWeatherMinGain">Soglia Spostamento COP</label>
+                <input type="number" id="apWeatherMinGain" class="form-input" min="0.0" max="1.0" step="0.02" value="0.08">
+              </div>
+              <div class="cmd-inline-field">
+                <label for="apWeatherRefreshH">Refresh Meteo (h)</label>
+                <input type="number" id="apWeatherRefreshH" class="form-input" min="1" max="12" step="1" value="3">
+              </div>
             </div>
           </div>
 
@@ -990,11 +1085,11 @@
   <div id="toast"></div>
 
   <!-- Scripts -->
-  <script src="js/synoptic.js?v=16"></script>
-  <script src="js/charts.js?v=16"></script>
-  <script src="js/analytics.js?v=16"></script>
-  <script src="js/commands.js?v=16"></script>
-  <script src="js/help.js?v=16"></script>
-  <script src="js/app.js?v=16"></script>
+  <script src="js/synoptic.js?v=17"></script>
+  <script src="js/charts.js?v=17"></script>
+  <script src="js/analytics.js?v=17"></script>
+  <script src="js/commands.js?v=17"></script>
+  <script src="js/help.js?v=17"></script>
+  <script src="js/app.js?v=17"></script>
 </body>
 </html>

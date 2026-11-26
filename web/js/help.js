@@ -107,6 +107,36 @@ const HELP_CATALOG = {
     impact: "Mantiene il circolatore secondario sempre aperto e costringe l'inverter Vitocal a modulare verso il basso, allungando il ciclo ed evitando stacchi secchi sul puffer.",
     tip: "Ideale in presenza o in giornate miti quando la casa tende a scaldarsi prima della fine finestra COP."
   },
+  ap_weather_planner: {
+    title: "🌦️ Pianificatore Meteo & Self-Tuning OAT",
+    what: "Interroga Open-Meteo (modello alpino ICON-D2 / Best Match, senza salvare coordinate nel repository) e combina Temperatura esterna prevista, Umidità Relativa (RH%), precipitazioni e soleggiamento per stimare il COP netto orario e il rischio brina.",
+    impact: "Calcola la finestra migliore della giornata e proietta T_casa fino a domani con un margine di sicurezza conservativo (UA × 1.15). Si auto-calibra confrontando la OAT prevista con la sonda reale Viessmann.",
+    tip: "Espandi il cassetto 'Previsioni Meteo & Ragionamento' per vedere ogni numero, ogni assunzione e perché l'Autopilota ha deciso di partire, aspettare o estendere."
+  },
+  ap_weather_search_band: {
+    title: "🕒 Fascia Ricerca Finestra Dinamica",
+    what: "Intervallo orario entro cui l'algoritmo cerca il blocco continuo migliore di N ore (es. 5h tra le 09:00 e le 18:00), spostando la finestra statica 11:00–16:00 solo se il guadagno supera la soglia di stabilità (default +0.08 COP).",
+    impact: "In giornate fredde al mattino e miti nel pomeriggio può centrare ad esempio 12:00–17:00; prima di una perturbazione nevosa pomeridiana può anticipare a 09:00–14:00. La fascia hardware WO1C viene allineata in automatico.",
+    tip: "Se i Secrets meteo non sono configurati o Open-Meteo è offline, torna in sicurezza alla finestra statica senza errori."
+  },
+  ap_anti_short_cycle: {
+    title: "🛡️ Protezione Anti-Micro-Ciclo (Fine Finestra)",
+    what: "Impedisce alla PdC di avviarsi quando restano meno di N minuti (default 120 min) prima della chiusura della finestra COP.",
+    impact: "Simula T_casa fino alla finestra di domani: se la notte resta sicura (≥ Emergenza + Margine), rinvia evitando uno short-cycle inutile da 20 minuti; se invece la notte rischierebbe il gelo, parte subito estendendo la chiusura per garantire almeno il ciclo minimo.",
+    tip: "120 minuti garantiscono sempre il superamento della rampa fredda e un accumulo reale nel massetto radiante."
+  },
+  ap_predictive_prearm: {
+    title: "⚡ Pre-Armamento Predittivo Notturno",
+    what: "Se siamo dentro la finestra calda di oggi e T_casa è ancora leggermente sopra T_min (es. 7.8 °C vs 7.5 °C), verifica se stanotte scenderebbe sotto il pavimento di sicurezza prima della finestra di domani.",
+    impact: "Evita il caso limite del trigger alle 16:30 seguito da un'emergenza notturna alle 04:00 a −5 °C: anticipa la carica alle ore miti di oggi, spendendo meno elettricità.",
+    tip: "Può anche anticipare quando oggi c'è sole/COP alto e domani peggiora molto, se T_casa è già vicina a T_min."
+  },
+  ap_weather_defer: {
+    title: "🌤️ Arbitraggio Meteo (Rinvio a Domani)",
+    what: "Se l'impianto è ARMED dentro una giornata molto sfavorevole da brina/gelo ma domani è previsto un netto miglioramento (ΔCOP ≥ soglia, default +0.25), valuta se rimandare il ciclo a domani.",
+    impact: "Rinvia SOLO se la simulazione conservativa (UA × 1.15) garantisce che la notte resti sopra il pavimento di sicurezza e MAI per due giorni di fila (anti-starvation). La soglia Emergenza 6.8 °C resta sempre prioritaria.",
+    tip: "Puoi disattivare il solo rinvio mantenendo comunque attiva la finestra dinamica e l'anti-micro-ciclo."
+  },
   cmd_profiles_smart: {
     title: "🎯 Scenari & Profili Coordinati (PdC + Consenso Pompa)",
     what: "Combina in un solo tocco i parametri Vitocal (modo, curva, temperature, fascia oraria) e il consenso relè del BTicino Smarther.",

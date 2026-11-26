@@ -35,6 +35,11 @@ class Config:
     GITHUB_REPO = os.getenv("GITHUB_REPO", "giacomogussetti-lgtm/vitocal-remote")
     GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 
+    # Weather Forecast (Open-Meteo - Private Coordinates from Secrets/.env only)
+    WEATHER_LAT = os.getenv("WEATHER_LAT", "").strip()
+    WEATHER_LON = os.getenv("WEATHER_LON", "").strip()
+    WEATHER_ELEVATION_M = os.getenv("WEATHER_ELEVATION_M", "").strip()
+
     @classmethod
     def validate_viessmann(cls) -> tuple[bool, str]:
         if not cls.VIESSMANN_CLIENT_ID:

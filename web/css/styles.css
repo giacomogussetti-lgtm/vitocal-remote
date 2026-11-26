@@ -2063,3 +2063,181 @@ nav.bottom-nav {
   gap: 6px;
   flex-wrap: wrap;
 }
+
+/* Weather Planner & Glass-Box Predictive Brain Drawer */
+.ap-weather-drawer {
+  border-top: 1px solid rgba(56, 189, 248, 0.25);
+  margin-top: 10px;
+  padding-top: 8px;
+}
+
+.ap-weather-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.ap-weather-body {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ap-weather-decision {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 9px;
+  padding: 9px 11px;
+}
+
+.ap-weather-verdict {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #bae6fd;
+  margin-bottom: 6px;
+}
+
+.ap-trace-list {
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: #cbd5e1;
+}
+
+.ap-weather-compare {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 440px) {
+  .ap-weather-compare {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ap-wx-card {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ap-wx-card.is-shifted {
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+.ap-wx-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.ap-wx-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(56, 189, 248, 0.14);
+  color: #7dd3fc;
+}
+
+.ap-wx-badge.risk-alto {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+}
+
+.ap-wx-badge.risk-medio {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fde68a;
+}
+
+.ap-wx-badge.risk-basso {
+  background: rgba(16, 185, 129, 0.18);
+  color: #6ee7b7;
+}
+
+.ap-wx-card-main {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #38bdf8;
+}
+
+.ap-wx-card-sub {
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.ap-weather-strip-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.ap-weather-hourly-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.ap-hour-pill {
+  flex: 0 0 auto;
+  min-width: 68px;
+  padding: 6px 7px;
+  border-radius: 8px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.64rem;
+  color: #cbd5e1;
+  font-variant-numeric: tabular-nums;
+}
+
+.ap-hour-pill.in-window {
+  border-color: rgba(16, 185, 129, 0.65);
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.ap-hour-time {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.ap-hour-cop {
+  font-weight: 700;
+  color: #38bdf8;
+}
+
+.ap-hour-tin {
+  font-size: 0.6rem;
+  color: #a7f3d0;
+}
+
+.ap-assumptions-box {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.66rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}

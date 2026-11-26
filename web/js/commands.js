@@ -1122,6 +1122,21 @@ function readAutopilotFormValues() {
     soft_curve_tuning_enabled: Boolean(document.getElementById("apSoftCurveTuning")?.checked),
     adaptive_model_enabled: Boolean(document.getElementById("apAdaptiveModelEnabled")?.checked),
     adaptive_model_apply_targets: Boolean(document.getElementById("apAdaptiveModelApply")?.checked),
+    weather_planner_enabled: Boolean(document.getElementById("apWeatherPlannerEnabled")?.checked),
+    weather_dynamic_window_enabled: Boolean(document.getElementById("apWeatherDynamicWindow")?.checked),
+    anti_short_cycle_enabled: Boolean(document.getElementById("apAntiShortCycleEnabled")?.checked),
+    predictive_prearm_enabled: Boolean(document.getElementById("apPredictivePrearmEnabled")?.checked),
+    weather_defer_enabled: Boolean(document.getElementById("apWeatherDeferEnabled")?.checked),
+    weather_search_start: document.getElementById("apWeatherSearchStart")?.value || "09:00",
+    weather_search_end: document.getElementById("apWeatherSearchEnd")?.value || "18:00",
+    weather_window_hours: clampInt(document.getElementById("apWeatherWindowHours")?.value, 2, 9, 5),
+    min_cycle_minutes: clampInt(document.getElementById("apMinCycleMin")?.value, 45, 240, 120),
+    max_window_extension_minutes: clampInt(document.getElementById("apMaxWinExtMin")?.value, 0, 240, 120),
+    prearm_max_above_tmin_c: parseFloat(document.getElementById("apPrearmMaxAbove")?.value || "0.6"),
+    prearm_emergency_margin_c: parseFloat(document.getElementById("apPrearmEmergMargin")?.value || "0.4"),
+    weather_arbitrage_cop_delta: parseFloat(document.getElementById("apWeatherArbDelta")?.value || "0.25"),
+    weather_min_cop_gain: parseFloat(document.getElementById("apWeatherMinGain")?.value || "0.08"),
+    weather_refresh_hours: clampInt(document.getElementById("apWeatherRefreshH")?.value, 1, 12, 3),
   };
 }
 
@@ -1220,6 +1235,8 @@ async function refreshAutopilotStatus() {
     const tm = await fetchDataJson("thermal_model.json");
     if (tm) cmdState.lastThermalModel = tm;
   }
+  const wf = await fetchDataJson("weather_forecast.json");
+  if (wf) cmdState.lastWeatherForecast = wf;
   if (cfg || st) {
     renderAutopilotUI(cfg || {}, st || {});
   } else {
@@ -1280,6 +1297,7 @@ function renderAutopilotUI(cfg, st) {
 
   const slopeEl = document.getElementById("apMetricSlope");
   const lwtEl = document.getElementById("apMetricLwt");
+  const winEl = document.getElementById("apMetricWindow");
   const cronEl = document.getElementById("apMetricCron");
   if (slopeEl) {
     const slp = st.indoor_slope_c_per_h != null ? Number(st.indoor_slope_c_per_h).toFixed(2) : "--";
@@ -1289,6 +1307,12 @@ function renderAutopilotUI(cfg, st) {
     lwtEl.textContent = st.calculated_target_lwt_c != null
       ? `Target LWT Auto: ${Number(st.calculated_target_lwt_c).toFixed(1)} °C`
       : "Target LWT Auto: -- °C";
+  }
+  if (winEl) {
+    const wp = st.weather_plan || (cmdState.lastWeatherForecast && cmdState.lastWeatherForecast.plan) || null;
+    const wStart = st.active_window_start_local || (wp && wp.effective_window_start) || cfg.cop_window_start || "11:00";
+    const wEnd = st.active_window_end_local || (wp && wp.effective_window_end) || cfg.cop_window_end || "16:00";
+    winEl.textContent = `Finestra: ${wStart}–${wEnd}`;
   }
   if (cronEl) {
     cronEl.textContent = st.current_cron_interval_min != null
@@ -1334,6 +1358,16 @@ function renderAutopilotUI(cfg, st) {
       apCronIdle: cfg.cron_idle_minutes,
       apCronArmed: cfg.cron_armed_minutes,
       apCronActive: cfg.cron_active_minutes,
+      apWeatherSearchStart: cfg.weather_search_start,
+      apWeatherSearchEnd: cfg.weather_search_end,
+      apWeatherWindowHours: cfg.weather_window_hours,
+      apMinCycleMin: cfg.min_cycle_minutes,
+      apMaxWinExtMin: cfg.max_window_extension_minutes,
+      apPrearmMaxAbove: cfg.prearm_max_above_tmin_c,
+      apPrearmEmergMargin: cfg.prearm_emergency_margin_c,
+      apWeatherArbDelta: cfg.weather_arbitrage_cop_delta,
+      apWeatherMinGain: cfg.weather_min_cop_gain,
+      apWeatherRefreshH: cfg.weather_refresh_hours,
     };
     for (const [elId, val] of Object.entries(mapVals)) {
       const el = document.getElementById(elId);
@@ -1351,8 +1385,20 @@ function renderAutopilotUI(cfg, st) {
     if (chkAm && cfg.adaptive_model_enabled != null) chkAm.checked = Boolean(cfg.adaptive_model_enabled);
     const chkAmApply = document.getElementById("apAdaptiveModelApply");
     if (chkAmApply && cfg.adaptive_model_apply_targets != null) chkAmApply.checked = Boolean(cfg.adaptive_model_apply_targets);
+    const chkWp = document.getElementById("apWeatherPlannerEnabled");
+    if (chkWp && cfg.weather_planner_enabled != null) chkWp.checked = Boolean(cfg.weather_planner_enabled);
+    const chkWdw = document.getElementById("apWeatherDynamicWindow");
+    if (chkWdw && cfg.weather_dynamic_window_enabled != null) chkWdw.checked = Boolean(cfg.weather_dynamic_window_enabled);
+    const chkAsc = document.getElementById("apAntiShortCycleEnabled");
+    if (chkAsc && cfg.anti_short_cycle_enabled != null) chkAsc.checked = Boolean(cfg.anti_short_cycle_enabled);
+    const chkPpa = document.getElementById("apPredictivePrearmEnabled");
+    if (chkPpa && cfg.predictive_prearm_enabled != null) chkPpa.checked = Boolean(cfg.predictive_prearm_enabled);
+    const chkWdf = document.getElementById("apWeatherDeferEnabled");
+    if (chkWdf && cfg.weather_defer_enabled != null) chkWdf.checked = Boolean(cfg.weather_defer_enabled);
     updateCronQuotaPreview();
   }
+
+  renderWeatherBrainUI(cfg, st, cmdState.lastWeatherForecast);
 
   // Render live converging physical model summary
   const tmEl = document.getElementById("apThermalModelSummary");
@@ -1382,6 +1428,112 @@ function renderAutopilotUI(cfg, st) {
     if (typeof renderDetailedSondeList === "function") renderDetailedSondeList(state.latestSample);
   }
   renderApiQuotaMonitor();
+}
+
+function escapeHtmlSafe(str) {
+  return String(str == null ? "" : str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function renderWeatherBrainUI(cfg, st, wf) {
+  const badgeEl = document.getElementById("apWeatherSummaryBadge");
+  const verdictEl = document.getElementById("apWeatherVerdict");
+  const traceEl = document.getElementById("apWeatherTraceList");
+  const compareEl = document.getElementById("apWeatherCompareGrid");
+  const stripEl = document.getElementById("apWeatherHourlyStrip");
+  const assumpEl = document.getElementById("apWeatherAssumptionsBox");
+  if (!verdictEl || !traceEl || !compareEl || !stripEl || !assumpEl) return;
+
+  const wp = (st && st.weather_plan) || (wf && wf.plan) || null;
+  const effStart = (st && st.active_window_start_local) || (wp && wp.effective_window_start) || (cfg && cfg.cop_window_start) || "11:00";
+  const effEnd = (st && st.active_window_end_local) || (wp && wp.effective_window_end) || (cfg && cfg.cop_window_end) || "16:00";
+
+  if (badgeEl) {
+    if (wp && wp.available && wp.today_window) {
+      badgeEl.textContent = `${effStart}–${effEnd} · COP ${Number(wp.today_window.avg_cop_net).toFixed(2)}`;
+      badgeEl.style.color = wp.today_window.is_dynamic_shifted ? "#6ee7b7" : "#38bdf8";
+    } else {
+      badgeEl.textContent = `${effStart}–${effEnd} (Statica)`;
+      badgeEl.style.color = "#fbbf24";
+    }
+  }
+
+  if (!wp) {
+    verdictEl.textContent = `Finestra statica ${effStart}–${effEnd}. In attesa della prossima valutazione cloud.`;
+    traceEl.innerHTML = "<li>Inserisci i GitHub Secrets WEATHER_LAT e WEATHER_LON (e WEATHER_ELEVATION_M) per attivare le previsioni Open-Meteo alpine.</li>";
+    compareEl.innerHTML = "";
+    stripEl.innerHTML = '<span class="cmd-muted-note">Nessun dato orario meteo disponibile.</span>';
+    assumpEl.textContent = "Assunzioni attive: fallback finestra statica, fattore sicurezza UA × 1.15.";
+    return;
+  }
+
+  verdictEl.textContent = wp.decision_summary || `Finestra attiva ${effStart}–${effEnd}`;
+  const traceItems = Array.isArray(wp.decision_trace) ? wp.decision_trace : [];
+  traceEl.innerHTML = traceItems.length
+    ? traceItems.map(line => `<li>${escapeHtmlSafe(line)}</li>`).join("")
+    : `<li>${escapeHtmlSafe(wp.fallback_reason || "Nessun dettaglio aggiuntivo.")}</li>`;
+
+  const cards = [];
+  const buildWinCard = (label, win) => {
+    if (!win) {
+      return `
+        <div class="ap-wx-card">
+          <div class="ap-wx-card-head"><span>${label}</span><span class="ap-wx-badge">N/D</span></div>
+          <div class="ap-wx-card-main">--</div>
+          <div class="ap-wx-card-sub">Dati meteo orari non ancora disponibili</div>
+        </div>`;
+    }
+    const riskCls = `risk-${String(win.frost_risk || "basso").toLowerCase()}`;
+    const shiftNote = win.is_dynamic_shifted
+      ? `Spostata (+${Number(win.cop_gain_vs_static || 0).toFixed(2)} COP vs statica)`
+      : `Allineata a statica (${win.static_start_hhmm}–${win.static_end_hhmm})`;
+    return `
+      <div class="ap-wx-card ${win.is_dynamic_shifted ? "is-shifted" : ""}">
+        <div class="ap-wx-card-head">
+          <span>${label}</span>
+          <span class="ap-wx-badge ${riskCls}">Brina ${escapeHtmlSafe(win.frost_risk || "--")}</span>
+        </div>
+        <div class="ap-wx-card-main">${escapeHtmlSafe(win.start_hhmm)}–${escapeHtmlSafe(win.end_hhmm)} · COP ${Number(win.avg_cop_net).toFixed(2)}</div>
+        <div class="ap-wx-card-sub">
+          OAT ${Number(win.avg_temp_c) >= 0 ? "+" : ""}${Number(win.avg_temp_c).toFixed(1)} °C · RH ${win.avg_rh_pct}% · ${shiftNote}
+        </div>
+      </div>`;
+  };
+  cards.push(buildWinCard("📅 Oggi", wp.today_window));
+  cards.push(buildWinCard("📆 Domani", wp.tomorrow_window));
+  compareEl.innerHTML = cards.join("");
+
+  const hourly = (wf && Array.isArray(wf.hourly_preview)) ? wf.hourly_preview : [];
+  if (hourly.length) {
+    stripEl.innerHTML = hourly.map(h => {
+      const tinTxt = h.tin_proj_c != null ? `🏠 ${Number(h.tin_proj_c).toFixed(1)}°` : "";
+      const rainTxt = h.precip_mm > 0.1 ? `💧${Number(h.precip_mm).toFixed(1)}` : "";
+      return `
+        <div class="ap-hour-pill ${h.in_window ? "in-window" : ""}" title="${escapeHtmlSafe(h.day_tag)} ${escapeHtmlSafe(h.hh)} · Brina ${escapeHtmlSafe(h.frost_risk)}">
+          <span class="ap-hour-time">${escapeHtmlSafe(h.day_tag)} ${escapeHtmlSafe(h.hh)}</span>
+          <span>${escapeHtmlSafe(h.icon || "🌤️")} ${Number(h.temp_c) >= 0 ? "+" : ""}${Number(h.temp_c).toFixed(1)}°</span>
+          <span>RH ${h.rh_pct}% ${rainTxt}</span>
+          <span class="ap-hour-cop">COP ${Number(h.cop_net).toFixed(2)}</span>
+          ${tinTxt ? `<span class="ap-hour-tin">${tinTxt}</span>` : ""}
+        </div>`;
+    }).join("");
+  } else {
+    stripEl.innerHTML = `<span class="cmd-muted-note">${escapeHtmlSafe(wp.fallback_reason || "Anteprima oraria non disponibile (modalità fallback).")}</span>`;
+  }
+
+  const a = wp.assumptions || {};
+  const biasStr = a.oat_bias_c != null ? `${Number(a.oat_bias_c) >= 0 ? "+" : ""}${Number(a.oat_bias_c).toFixed(2)} °C` : "0.00 °C";
+  const maeStr = a.oat_mae_c != null ? `${Number(a.oat_mae_c).toFixed(2)} °C (${a.oat_samples_matched || 0}h)` : "in raccolta";
+  const tinMaeStr = a.tin_projection_mae_c != null ? `${Number(a.tin_projection_mae_c).toFixed(2)} °C` : "in raccolta";
+  const fetchedTxt = wf && wf.fetched_utc ? formatReceiptTime(wf.fetched_utc) : (wp.evaluated_local || "--");
+  assumpEl.innerHTML =
+    `<strong>Assunzioni &amp; Self-Tuning (${escapeHtmlSafe((wf && wf.model) || "Open-Meteo")})</strong><br>` +
+    `• Bias OAT appreso: <strong>${biasStr}</strong> · MAE OAT: <strong>${maeStr}</strong> · MAE proiezione T_casa: <strong>${tinMaeStr}</strong><br>` +
+    `• Dispersione usata: UA=${a.ua_raw_c_24h_k ?? "--"} × ${a.ua_safety_factor ?? 1.15} = <strong>${a.ua_effective_c_24h_k ?? "--"} (°C/24h)/K</strong> · ΔEvap: −${a.t_evap_offset_k ?? 7.5} K · Scala brina: ${a.frost_penalty_scale ?? 1.0}×<br>` +
+    `• Pavimento notte sicuro: <strong>${a.safe_floor_c ?? "--"} °C</strong> · Ciclo min: <strong>${a.min_cycle_minutes ?? "--"} min</strong> · Arbitraggio ΔCOP: ≥ ${a.arbitrage_cop_delta ?? "--"} · Agg. ${escapeHtmlSafe(fetchedTxt)}`;
 }
 
 function computeApiQuotaSummary() {

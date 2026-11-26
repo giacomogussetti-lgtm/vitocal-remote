@@ -35,5 +35,20 @@
   "soft_curve_cooldown_minutes": 45,
   "anti_seize_days": 4,
   "adaptive_model_enabled": true,
-  "adaptive_model_apply_targets": false
+  "adaptive_model_apply_targets": false,
+  "weather_planner_enabled": true,
+  "weather_dynamic_window_enabled": true,
+  "weather_search_start": "09:00",
+  "weather_search_end": "18:00",
+  "weather_window_hours": 5,
+  "weather_refresh_hours": 3,
+  "weather_min_cop_gain": 0.08,
+  "anti_short_cycle_enabled": true,
+  "min_cycle_minutes": 120,
+  "max_window_extension_minutes": 120,
+  "predictive_prearm_enabled": true,
+  "prearm_max_above_tmin_c": 0.6,
+  "prearm_emergency_margin_c": 0.4,
+  "weather_defer_enabled": true,
+  "weather_arbitrage_cop_delta": 0.25
 }
