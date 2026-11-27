@@ -1,28 +1,28 @@
 {
-  "state": "PUFFER_DRAIN",
-  "state_since_utc": "2026-11-27T15:01:46.327329+00:00",
-  "below_threshold_since_utc": "2026-11-27T10:01:18.065407+00:00",
-  "cycle_started_utc": "2026-11-27T10:35:40.628623+00:00",
+  "state": "IDLE",
+  "state_since_utc": "2026-11-27T15:27:32.495729+00:00",
+  "below_threshold_since_utc": null,
+  "cycle_started_utc": null,
   "cycle_is_emergency": false,
-  "drain_started_utc": "2026-11-27T15:01:46.327329+00:00",
-  "last_eval_utc": "2026-11-27T15:26:30.874768+00:00",
-  "last_action_utc": "2026-11-27T15:01:46.327329+00:00",
-  "last_action_reason": "Stop PdC (Fine finestra COP (16:00)), avvio scarico puffer 25 min. Modalità PdC impostata e verificata: standby | Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual)",
+  "drain_started_utc": null,
+  "last_eval_utc": "2026-11-27T15:27:32.495729+00:00",
+  "last_action_utc": "2026-11-27T15:27:32.495729+00:00",
+  "last_action_reason": "Ciclo completato (Timeout scarico (26 min)) -> ritorno in IDLE. Modalità BTicino aggiornata su 'hg' | Modalità PdC impostata e verificata: standby",
   "indoor_slope_c_per_h": 0.197,
   "calculated_target_lwt_c": 23.7,
   "calculated_pdc_setpoint_c": 13,
   "target_pdc_setpoint_c": 15,
-  "calculated_curve_shift": 1,
-  "base_window_end_local": "16:00",
-  "soft_start_last_step_utc": "2026-11-27T11:01:51.551675+00:00",
-  "current_cron_interval_min": 1,
+  "calculated_curve_shift": 0,
+  "base_window_end_local": null,
+  "soft_start_last_step_utc": null,
+  "current_cron_interval_min": 15,
   "defrost_detected_today": 3,
-  "cycle_defrost_episodes": 3,
+  "cycle_defrost_episodes": 0,
   "prev_phase_was_defrost": false,
   "heating_rod_delta_s": 0,
-  "soft_curve_trim_k": -1,
-  "soft_curve_last_trim_utc": "2026-11-27T11:02:36.054104+00:00",
-  "last_grundfos_run_utc": "2026-11-27T15:26:30.874768+00:00",
+  "soft_curve_trim_k": 0,
+  "soft_curve_last_trim_utc": null,
+  "last_grundfos_run_utc": "2026-11-27T15:27:32.495729+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
@@ -57,8 +57,8 @@
       "info_s": 900
     }
   ],
-  "active_window_start_local": "11:00",
-  "active_window_end_local": "16:00",
+  "active_window_start_local": null,
+  "active_window_end_local": null,
   "weather_deferred_date": null,
   "armed_by_prearm": false,
   "committed_window_date": "2026-11-27",
@@ -71,7 +71,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "27/11 16:26",
+    "evaluated_local": "27/11 16:27",
     "effective_window_start": "11:00",
     "effective_window_end": "16:00",
     "window_locked": true,
@@ -124,7 +124,7 @@
       "start_tin_c": 8.5,
       "min_tin_c": 7.56,
       "end_tin_c": 7.56,
-      "hours_simulated": 16.6,
+      "hours_simulated": 16.5,
       "target_local": "28/11 09:00",
       "first_below_tmin_local": null,
       "first_below_safe_local": null
@@ -140,7 +140,7 @@
       "Finestra Oggi: 11:00–16:00 🔒 (COP netto stimato 4.77, OAT +3.4°C, RH 95%, Brina ALTO, allineata a statica).",
       "Finestra bloccata 🔒 (11:00–16:00): entro 90m dall'avvio non slitta più.",
       "Finestra Domani: 09:00–14:00 (COP netto 4.91, OAT +2.2°C, RH 80%, Brina MEDIO).",
-      "Proiezione prudenziale sicurezza fino a domani 09:00 (16.6h, UA×1.15=0.207): 8.5°C → 7.6°C (min 7.6°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.180)."
+      "Proiezione prudenziale sicurezza fino a domani 09:00 (16.5h, UA×1.15=0.207): 8.5°C → 7.6°C (min 7.6°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.180)."
     ],
     "assumptions": {
       "ua_raw_c_24h_k": 0.18,
@@ -163,12 +163,12 @@
   },
   "api_usage": {
     "date_utc": "2026-11-27",
-    "viessmann_reads": 670,
-    "viessmann_writes": 9,
-    "bticino_reads": 658,
-    "bticino_writes": 2,
-    "cronjob_patches": 2,
-    "github_runs": 328,
+    "viessmann_reads": 680,
+    "viessmann_writes": 14,
+    "bticino_reads": 661,
+    "bticino_writes": 3,
+    "cronjob_patches": 3,
+    "github_runs": 329,
     "recent_events": [
       {
         "ts": "2026-11-26T15:31:08.124993+00:00",
@@ -2741,18 +2741,38 @@
         "vr": 2,
         "br": 2,
         "gh": 1
+      },
+      {
+        "ts": "2026-11-27T15:27:32.493043+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-27T15:27:44.920043+00:00",
+        "lbl": "ap_idle_shutdown",
+        "vr": 8,
+        "vw": 5,
+        "br": 1,
+        "bw": 1
+      },
+      {
+        "ts": "2026-11-27T15:27:45.672837+00:00",
+        "lbl": "ap_cron_adapt",
+        "cp": 1
       }
     ]
   },
   "thermal_model": {
-    "cycles_observed": 7,
-    "confidence_pct": 69,
-    "k_rad_kw_per_k": 0.444,
+    "cycles_observed": 8,
+    "confidence_pct": 76,
+    "k_rad_kw_per_k": 0.447,
     "inverter_min_mod_pct": 38.8,
-    "defrost_lwt_drop_p90_k": 9.1,
-    "ua_building_c_24h_per_k": 0.18,
-    "recommended_target_lwt_c": 26.5,
-    "pred_autonomy_hours": 40.3,
-    "updated_utc": "2026-11-26T14:27:37.027634+00:00"
+    "defrost_lwt_drop_p90_k": 9.3,
+    "ua_building_c_24h_per_k": 0.188,
+    "recommended_target_lwt_c": 24.5,
+    "pred_autonomy_hours": 38.6,
+    "updated_utc": "2026-11-27T15:27:44.952360+00:00"
   }
 }
