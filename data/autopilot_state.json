@@ -5,10 +5,10 @@
   "cycle_started_utc": "2026-11-27T10:35:40.628623+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": "2026-11-27T15:01:46.327329+00:00",
-  "last_eval_utc": "2026-11-27T15:15:52.372638+00:00",
+  "last_eval_utc": "2026-11-27T15:16:32.351470+00:00",
   "last_action_utc": "2026-11-27T15:01:46.327329+00:00",
   "last_action_reason": "Stop PdC (Fine finestra COP (16:00)), avvio scarico puffer 25 min. Modalità PdC impostata e verificata: standby | Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual)",
-  "indoor_slope_c_per_h": 0.189,
+  "indoor_slope_c_per_h": 0.191,
   "calculated_target_lwt_c": 23.7,
   "calculated_pdc_setpoint_c": 13,
   "target_pdc_setpoint_c": 15,
@@ -22,7 +22,7 @@
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": -1,
   "soft_curve_last_trim_utc": "2026-11-27T11:02:36.054104+00:00",
-  "last_grundfos_run_utc": "2026-11-27T15:15:52.372638+00:00",
+  "last_grundfos_run_utc": "2026-11-27T15:16:32.351470+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
@@ -71,7 +71,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "27/11 16:15",
+    "evaluated_local": "27/11 16:16",
     "effective_window_start": "11:00",
     "effective_window_end": "16:00",
     "window_locked": true,
@@ -163,20 +163,13 @@
   },
   "api_usage": {
     "date_utc": "2026-11-27",
-    "viessmann_reads": 648,
+    "viessmann_reads": 650,
     "viessmann_writes": 9,
-    "bticino_reads": 636,
+    "bticino_reads": 638,
     "bticino_writes": 2,
     "cronjob_patches": 2,
-    "github_runs": 317,
+    "github_runs": 318,
     "recent_events": [
-      {
-        "ts": "2026-11-26T15:15:53.003415+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-26T15:31:08.124993+00:00",
         "lbl": "telemetry_poll",
@@ -2667,6 +2660,13 @@
       },
       {
         "ts": "2026-11-27T15:15:52.369316+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-27T15:16:32.348890+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
