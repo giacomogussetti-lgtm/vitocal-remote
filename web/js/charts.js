@@ -347,6 +347,25 @@ const CHANNEL_DEFS = [
       ? Math.round((Number(s.indoor_temp_bticino_c) - Number(s.external_temp_c)) * 10) / 10
       : null,
   },
+  {
+    key: "_wo1c_sat_pct",
+    label: "Saturaz. Anti-Stacco 7209",
+    unit: "%",
+    color: "#f43f5e",
+    yAxis: "yOther",
+    group: "other",
+    borderDash: [4, 2],
+    borderWidth: 2.1,
+    active: false,
+    defaultInLegend: false,
+    keywords: "anti stacco 7209 saturazione margine puffer on off isteresi",
+    computed: (s, idx, arr) => {
+      if (typeof computeWo1cCutoffMargin !== "function" || !s) return null;
+      const slice = Array.isArray(arr) ? arr.slice(Math.max(0, idx - 14), idx + 1) : [s];
+      const info = computeWo1cCutoffMargin(s, slice);
+      return (info && info.mode === "heating" && info.pct != null) ? Number(info.pct) : null;
+    },
+  },
   { key: "normal_setpoint_c", label: "Setpoint Normale PdC", unit: "°C", color: "#f43f5e", yAxis: "yTemp", group: "temp", stepped: true, borderDash: [6, 3], borderWidth: 1.7, active: false, defaultInLegend: false, keywords: "setpoint normale pdc curva" },
   { key: "reduced_setpoint_c", label: "Setpoint Ridotta PdC", unit: "°C", color: "#ec4899", yAxis: "yTemp", group: "temp", stepped: true, borderDash: [3, 3], borderWidth: 1.7, active: false, defaultInLegend: false, keywords: "setpoint ridotta pdc curva" },
   { key: "dhw_setpoint_c", label: "Setpoint Bollitore ACS", unit: "°C", color: "#a855f7", yAxis: "yTemp", group: "temp", stepped: true, borderDash: [2, 3], borderWidth: 1.7, active: false, defaultInLegend: false, keywords: "setpoint bollitore acs sanitario" },

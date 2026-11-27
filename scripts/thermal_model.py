@@ -36,6 +36,7 @@ MODEL_FILE = Config.DATA_DIR / "thermal_model.json"
 # Conservative physical priors (used only with weak weight when observed cycles are few)
 PRIOR_MODEL: dict[str, Any] = {
     "k_rad_kw_per_k": 0.344,
+    "k_rad_end_kw_per_k": 0.320,
     "inverter_min_mod_pct": 38.0,
     "p_min_continuous_kw_ref": 3.8,
     "defrost_lwt_drop_p90_k": 9.8,
@@ -152,8 +153,9 @@ def fit_thermal_model(samples: list[dict[str, Any]]) -> dict[str, Any]:
         if dur_m >= 30.0 and gf_ratio >= 0.5:
             valid_cycles.append(cyc)
 
-    # 2. Identify k_rad (radiant floor heat transfer), inverter floor %, p_min_kw, heating gain
+    # 2. Identify k_rad (overall & late-cycle asymptotic after slab warm-up), inverter floor %, p_min_kw, heating gain
     krad_samples: list[float] = []
+    krad_end_samples: list[float] = []
     steady_mods: list[float] = []
     p_min_obs_list: list[float] = []
     gain_obs_list: list[float] = []
@@ -182,7 +184,11 @@ def fit_thermal_model(samples: list[dict[str, Any]]) -> dict[str, Any]:
                     # Only use quasi-steady points where buffer isn't rapidly ramping
                     prev_buf = cyc[i - 1][1].get("buffer_temp_c") if i > 0 else buf
                     if prev_buf is not None and abs(float(buf) - float(prev_buf)) <= 0.4:
-                        krad_samples.append(p_th / (float(buf) - float(tin)))
+                        kr_val = p_th / (float(buf) - float(tin))
+                        krad_samples.append(kr_val)
+                        # Asymptotic late-cycle k_rad (>= 90 min, once radiant screed C_slab is thermally charged)
+                        if elapsed_m >= 90.0:
+                            krad_end_samples.append(kr_val)
                 if float(mod) <= 42.0 and p_th > 1.5:
                     oat = float(s.get("external_temp_c") if s.get("external_temp_c") is not None else 5.0)
                     # Normalize thermal power to reference OAT = +4 C (~2.5% per K)
@@ -261,6 +267,7 @@ def fit_thermal_model(samples: list[dict[str, Any]]) -> dict[str, Any]:
     n_standby = len(ua_obs_list)
 
     krad_obs = _percentile(krad_samples, 0.50) if len(krad_samples) >= 5 else None
+    krad_end_obs = _percentile(krad_end_samples, 0.45) if len(krad_end_samples) >= 5 else (krad_obs * 0.90 if krad_obs is not None else None)
     mod_floor_obs = _percentile(steady_mods, 0.05) if len(steady_mods) >= 15 else None
     pmin_obs = _percentile(p_min_obs_list, 0.35) if len(p_min_obs_list) >= 5 else None
     lwt_drop_obs = _percentile(lwt_drops, 0.90) if lwt_drops else None
@@ -270,6 +277,9 @@ def fit_thermal_model(samples: list[dict[str, Any]]) -> dict[str, Any]:
 
     k_rad = round(_shrink(krad_obs, PRIOR_MODEL["k_rad_kw_per_k"], n_cycles, prior_weight=3.0), 3)
     k_rad = max(0.18, min(0.85, k_rad))
+
+    k_rad_end = round(_shrink(krad_end_obs, PRIOR_MODEL["k_rad_end_kw_per_k"], n_cycles, prior_weight=3.0), 3)
+    k_rad_end = max(0.18, min(k_rad, k_rad_end))
 
     inv_floor = round(_shrink(mod_floor_obs, PRIOR_MODEL["inverter_min_mod_pct"], n_cycles, prior_weight=2.0), 1)
     inv_floor = max(25.0, min(50.0, inv_floor))
@@ -325,6 +335,7 @@ def fit_thermal_model(samples: list[dict[str, Any]]) -> dict[str, Any]:
 
     diagnostics = {
         "k_rad_kw_per_k": _diag_entry(krad_obs, PRIOR_MODEL["k_rad_kw_per_k"], k_rad, n_cycles, 3.0, krad_samples, 3),
+        "k_rad_end_kw_per_k": _diag_entry(krad_end_obs, PRIOR_MODEL["k_rad_end_kw_per_k"], k_rad_end, n_cycles, 3.0, krad_end_samples, 3),
         "inverter_min_mod_pct": _diag_entry(mod_floor_obs, PRIOR_MODEL["inverter_min_mod_pct"], inv_floor, n_cycles, 2.0, steady_mods, 1),
         "p_min_continuous_kw_ref": _diag_entry(pmin_obs, PRIOR_MODEL["p_min_continuous_kw_ref"], p_min_ref, n_cycles, 3.0, p_min_obs_list, 2),
         "defrost_lwt_drop_p90_k": _diag_entry(lwt_drop_obs, PRIOR_MODEL["defrost_lwt_drop_p90_k"], defrost_lwt_drop, n_defrosts, 4.0, lwt_drops, 1),
@@ -342,6 +353,7 @@ def fit_thermal_model(samples: list[dict[str, Any]]) -> dict[str, Any]:
         "oat_range_observed_c": [round(min(oat_seen), 1), round(max(oat_seen), 1)] if oat_seen else None,
         "confidence_pct": confidence_pct,
         "k_rad_kw_per_k": k_rad,
+        "k_rad_end_kw_per_k": k_rad_end,
         "inverter_min_mod_pct": inv_floor,
         "p_min_continuous_kw_ref": p_min_ref,
         "defrost_lwt_drop_p90_k": defrost_lwt_drop,
@@ -385,6 +397,8 @@ def recommend_operating_targets(
     strictly bounded by the user's configured guardrails.
     """
     k_rad = float(model.get("k_rad_kw_per_k") or PRIOR_MODEL["k_rad_kw_per_k"])
+    # Use asymptotic late-cycle k_rad_end when identified (slab already warm at hours 2-5!)
+    k_rad_anti = float(model["k_rad_end_kw_per_k"]) if model.get("k_rad_end_kw_per_k") is not None else k_rad
     p_min_ref = float(model.get("p_min_continuous_kw_ref") or PRIOR_MODEL["p_min_continuous_kw_ref"])
     lwt_drop = float(model.get("defrost_lwt_drop_p90_k") or PRIOR_MODEL["defrost_lwt_drop_p90_k"])
     ua = float(model.get("ua_building_c_24h_per_k") or PRIOR_MODEL["ua_building_c_24h_per_k"])
@@ -400,7 +414,7 @@ def recommend_operating_targets(
     min_end_t = float(cfg.get("min_cycle_end_temp_c") or 8.2)
     ref_tin_end = min(t_max, float(t_in) + 0.8)
     p_min_at_oat = p_min_ref * max(0.72, min(1.30, 1.0 + 0.025 * (float(oat) - 4.0)))
-    dt_anti_onoff = (p_min_at_oat * 1.15) / max(0.18, k_rad)
+    dt_anti_onoff = (p_min_at_oat * 1.15) / max(0.18, k_rad_anti)
     t_buf_anti_onoff = ref_tin_end + max(float(cfg.get("defrost_min_delta_k") or 13.5), dt_anti_onoff)
 
     # 2. BPHE Defrost thermal reserve floor (active when OAT <= defrost_guard_oat_max_c + 1.5 C)

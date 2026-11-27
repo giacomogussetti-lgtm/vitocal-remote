@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
   <!-- CSS Stylesheet -->
-  <link rel="stylesheet" href="css/styles.css?v=22">
+  <link rel="stylesheet" href="css/styles.css?v=23">
 
   <!-- Chart.js & Continuous Time Date Adapter (Offline First & PWA Ready) -->
   <script src="js/chart.min.js"></script>
@@ -69,23 +69,34 @@
         </details>
       </div>
 
-      <!-- Live WO1C 7209 Anti-Cutoff Margin Gauge (Expanded when PdC is active/paused; compact 1-line pill in Standby) -->
+      <!-- Live SCADA WO1C 7209 Anti-Cutoff Tachometer Cockpit -->
       <div id="wo1cCutoffMarginCard" class="wo1c-margin-card is-standby">
-        <div class="wo1c-margin-head">
-          <span class="label-with-help">
-            <span id="wo1cMarginTitle">🛡️ Margine Anti-Stacco WO1C (7209)</span>
-            <button type="button" class="help-info-btn" data-help-key="wo1c_cutoff_margin" aria-label="Spiegazione indicatore Anti-Stacco">i</button>
-          </span>
-          <span id="wo1cMarginBadge" class="wo1c-margin-badge tone-idle">IN STANDBY</span>
+        <div class="wo1c-cockpit-top" id="wo1cCockpitToggle" role="button" tabindex="0" title="Tocca per espandere/comprimere dettagli Anti-Stacco">
+          <div class="wo1c-dial-box" id="wo1cGaugeDialBox" aria-hidden="true"></div>
+          <div class="wo1c-cockpit-main">
+            <div class="wo1c-margin-head">
+              <span class="label-with-help">
+                <span id="wo1cMarginTitle">🛡️ Anti-Stacco WO1C (7209)</span>
+                <button type="button" class="help-info-btn" data-help-key="wo1c_cutoff_margin" aria-label="Spiegazione indicatore Anti-Stacco">i</button>
+              </span>
+              <span id="wo1cMarginBadge" class="wo1c-margin-badge tone-idle">STANDBY</span>
+            </div>
+            <div class="wo1c-zone-track">
+              <div class="wo1c-zone-seg seg-safe"></div>
+              <div class="wo1c-zone-seg seg-warn"></div>
+              <div class="wo1c-zone-seg seg-danger"></div>
+              <div id="wo1cZoneMarker" class="wo1c-zone-marker" style="left: 6%;"></div>
+            </div>
+            <div class="wo1c-zone-ScaleLabels">
+              <span>0%</span>
+              <span>Regime ~39%</span>
+              <span>64%</span>
+              <span>Stacco 85%+</span>
+            </div>
+            <div id="wo1cMarginSummary" class="wo1c-margin-summary">In attesa dati live...</div>
+          </div>
         </div>
         <div id="wo1cMarginBody" class="wo1c-margin-body" style="display: none;">
-          <div class="wo1c-margin-bar-wrap">
-            <div class="wo1c-margin-bar-bg">
-              <div id="wo1cMarginBarFill" class="wo1c-margin-bar-fill" style="width: 0%;"></div>
-            </div>
-            <span id="wo1cMarginPct" class="wo1c-margin-pct">--%</span>
-          </div>
-          <div id="wo1cMarginSummary" class="wo1c-margin-summary">In attesa dati live...</div>
           <div class="wo1c-margin-chips">
             <div class="wo1c-chip">
               <span class="wo1c-chip-lbl" id="wo1cChipBufLbl">Testa Puffer (BUF)</span>
@@ -1164,11 +1175,11 @@
   <div id="toast"></div>
 
   <!-- Scripts -->
-  <script src="js/synoptic.js?v=22"></script>
-  <script src="js/charts.js?v=22"></script>
-  <script src="js/analytics.js?v=22"></script>
-  <script src="js/commands.js?v=22"></script>
-  <script src="js/help.js?v=22"></script>
-  <script src="js/app.js?v=22"></script>
+  <script src="js/synoptic.js?v=23"></script>
+  <script src="js/charts.js?v=23"></script>
+  <script src="js/analytics.js?v=23"></script>
+  <script src="js/commands.js?v=23"></script>
+  <script src="js/help.js?v=23"></script>
+  <script src="js/app.js?v=23"></script>
 </body>
 </html>

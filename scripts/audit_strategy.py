@@ -20,8 +20,77 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
 from config import Config
+from api.viessmann import compute_wo1c_lwt
 
 CET = timezone(timedelta(hours=1))
+
+
+def eval_wo1c_7209_sample(
+    dt: datetime,
+    s: dict[str, Any],
+    prev_samples: list[tuple[datetime, dict[str, Any]]],
+) -> dict[str, Any]:
+    """
+    Python mirror of PWA v22/v23 computeWo1cCutoffMargin for automated post-cycle auditing.
+    Returns {mode, tone, pct, margin_buf, margin_ewt, delta_buf, delta_ewt}.
+    """
+    prog = str(s.get("active_program") or "standby").lower()
+    phase = str(s.get("compressor_phase") or "off").lower()
+    mod = float(s.get("compressor_modulation_percent") or 0.0)
+    comp = (s.get("compressor_active") == 1) or (mod > 0.0)
+    if not comp and prog == "standby":
+        return {"mode": "standby", "tone": "idle", "pct": 0, "margin_buf": None, "margin_ewt": None}
+    if "defrost" in phase:
+        return {"mode": "defrost", "tone": "defrost", "pct": 0, "margin_buf": None, "margin_ewt": None}
+    if not comp and prog != "standby":
+        return {"mode": "pause", "tone": "pause", "pct": 0, "margin_buf": None, "margin_ewt": None}
+
+    buf = float(s["buffer_temp_c"]) if s.get("buffer_temp_c") is not None else None
+    ewt = float(s["pdc_return_temp_c"]) if s.get("pdc_return_temp_c") is not None else None
+    tgt = float(s["target_supply_temp_c"]) if s.get("target_supply_temp_c") is not None else None
+    if tgt is None and s.get("external_temp_c") is not None:
+        sp = s.get("reduced_setpoint_c") if prog == "reduced" else s.get("normal_setpoint_c")
+        if sp is not None:
+            tgt = compute_wo1c_lwt(
+                float(s["external_temp_c"]),
+                float(sp),
+                float(s.get("heating_curve_slope") or 0.6),
+                float(s.get("heating_curve_shift") or 0.0),
+            )
+    if buf is None or tgt is None:
+        return {"mode": "heating", "tone": "safe", "pct": 25, "margin_buf": None, "margin_ewt": None}
+
+    d_buf = None
+    for p_dt, p_s in reversed(prev_samples):
+        dt_m = (dt - p_dt).total_seconds() / 60.0
+        if 2.5 <= dt_m <= 12.0:
+            if p_s.get("buffer_temp_c") is not None:
+                d_buf = (buf - float(p_s["buffer_temp_c"])) / dt_m
+            break
+        if dt_m > 12.0:
+            break
+
+    delta_buf = buf - tgt
+    mb = (tgt + 2.5) - buf
+    me = (tgt - ewt) if ewt is not None else None
+    sb = max(0.0, min(1.0, (buf - (tgt - 0.5)) / 3.0))
+    se = max(0.0, min(1.0, (ewt - (tgt - 2.5)) / 2.5)) if ewt is not None else (sb * 0.85)
+    sf = 0.50 * sb + 0.50 * se
+    pi_push = (delta_buf > 0.6 and mod >= 68.0 and (d_buf is None or d_buf > 0.04))
+    if pi_push:
+        sf = min(1.0, sf + 0.10)
+    if me is not None and me > 0.35:
+        sf = min(sf, 0.78)
+    if mb <= 0.8 and (me is None or me <= 0.30):
+        sf = max(sf, 0.88)
+    pct = int(round(max(0.04, min(1.0, sf)) * 100))
+    if pct >= 85 or (mb <= 0.8 and (me is None or me <= 0.30)):
+        tone = "danger"
+    elif pct >= 64 or (mb <= 1.2 and (me is None or me <= 0.8)) or pi_push:
+        tone = "warn"
+    else:
+        tone = "safe"
+    return {"mode": "heating", "tone": tone, "pct": pct, "margin_buf": mb, "margin_ewt": me}
 
 
 def _parse_ts(ts: Optional[str]) -> Optional[datetime]:
@@ -229,11 +298,18 @@ def main() -> int:
     if cur_cycle:
         cycles.append(cur_cycle)
 
+    # Precompute 7209 saturation gauge across window for cycle & global audit
+    gauge_by_ts: dict[datetime, dict[str, Any]] = {}
+    for w_i, (dt_w, s_w) in enumerate(window):
+        gauge_by_ts[dt_w] = eval_wo1c_7209_sample(dt_w, s_w, window[max(0, w_i - 16):w_i])
+
     print(f"\n--- DETTAGLIO CICLI COMPRESSORE ({len(cycles)} rilevati) ---")
     short_with_gf = 0
     short_no_gf = 0
     low_dt_prim_cycles = 0
     high_dt_sup_buf_cycles = 0
+    near_miss_7209_cycles = 0
+    cycle_7209_summaries = []
     for idx, cyc in enumerate(cycles, 1):
         c_start = cyc[0][0].astimezone(CET)
         c_end = cyc[-1][0].astimezone(CET)
@@ -273,12 +349,58 @@ def main() -> int:
             low_dt_prim_cycles += 1
         if avg_dt_sb is not None and dur_min >= 15 and gf_pct >= 50 and avg_dt_sb > 2.5:
             high_dt_sup_buf_cycles += 1
+        # 7209 saturation summary on this cycle
+        g_cyc = [gauge_by_ts[dt_c] for dt_c, _ in cyc if gauge_by_ts.get(dt_c, {}).get("mode") == "heating"]
+        max_sat = max((g["pct"] for g in g_cyc), default=0)
+        min_mb = min((g["margin_buf"] for g in g_cyc if g["margin_buf"] is not None), default=None)
+        min_me = min((g["margin_ewt"] for g in g_cyc if g["margin_ewt"] is not None), default=None)
+        red_cnt = sum(1 for g in g_cyc if g["tone"] == "danger")
+        ended_in_active_sched = str(cyc[-1][1].get("active_program") or "standby").lower() != "standby" and (
+            idx < len(cycles) and (cycles[idx][0][0] - cyc[-1][0]).total_seconds() < 3600
+        )
+        if max_sat >= 82 and not ended_in_active_sched:
+            near_miss_7209_cycles += 1
+        sat_icon = "🔴" if max_sat >= 85 else ("🟡" if max_sat >= 64 else "🟢")
+        cycle_7209_summaries.append({
+            "idx": idx,
+            "start": c_start.strftime("%d/%m %H:%M"),
+            "max_sat": max_sat,
+            "red_samples": red_cnt,
+            "min_mb": min_mb,
+            "min_me": min_me,
+            "cutoff_7209": ended_in_active_sched and max_sat >= 85,
+        })
         p1_str = f"P1={avg_p1:3.0f}%" if avg_p1 is not None else "P1=--"
         dtp_str = f"ΔTp={avg_dt_p:4.1f}K" if avg_dt_p is not None else "ΔTp=--"
         print(
             f"  #{idx:2d} {c_start.strftime('%d/%m %H:%M')}->{c_end.strftime('%H:%M')} (~{dur_min:3.0f}m)"
-            f" | Mod={min_mod:2.0f}/{avg_mod:2.0f}/{max_mod:2.0f}% | LWTmax={max_sup:4.1f} BufMax={max_buf:4.1f}°C | {dtp_str} {p1_str} | {tin_str} | GF={gf_pct:3.0f}%"
+            f" | Mod={min_mod:2.0f}/{avg_mod:2.0f}/{max_mod:2.0f}% | LWTmax={max_sup:4.1f} BufMax={max_buf:4.1f}°C | {dtp_str} {p1_str} | {tin_str} | Sat7209={sat_icon}{max_sat:3d}%"
         )
+
+    # Dedicated Anti-Stacco WO1C (7209) Audit Section
+    heat_gauges = [g for g in gauge_by_ts.values() if g.get("mode") == "heating"]
+    if heat_gauges:
+        n_hg = len(heat_gauges)
+        p_safe = 100.0 * sum(1 for g in heat_gauges if g["tone"] == "safe") / n_hg
+        p_warn = 100.0 * sum(1 for g in heat_gauges if g["tone"] == "warn") / n_hg
+        p_dang = 100.0 * sum(1 for g in heat_gauges if g["tone"] == "danger") / n_hg
+        pause_cnt = sum(1 for g in gauge_by_ts.values() if g.get("mode") == "pause")
+        cutoffs_7209 = [c for c in cycle_7209_summaries if c["cutoff_7209"]]
+        print("\n--- AUDIT INDICATORE ANTI-STACCO WO1C (7209 / 7203) ---")
+        print(
+            f"  Tempo in marcia : 🟢 Sicuro={p_safe:.1f}% | 🟡 Attenzione={p_warn:.1f}% | 🔴 Rischio 7209={p_dang:.1f}% "
+            f"(campioni pausa 7203={pause_cnt})"
+        )
+        print(
+            f"  Stacchi 7209    : {len(cutoffs_7209)} rilevati "
+            + (f"({', '.join('#' + str(c['idx']) + ' ' + c['start'] for c in cutoffs_7209)})" if cutoffs_7209 else "(nessuno!)")
+            + f" | Quasi-stacchi sfiorati (≥82% senza OFF): {near_miss_7209_cycles}"
+        )
+        for c in cycle_7209_summaries[-4:]:
+            mb_s = f"{c['min_mb']:+.1f}K" if c["min_mb"] is not None else "--"
+            me_s = f"{c['min_me']:+.1f}K" if c["min_me"] is not None else "--"
+            tag = "-> STACCO 7209!" if c["cutoff_7209"] else ("-> sfiorato" if c["max_sat"] >= 82 else "-> stabile")
+            print(f"    • Ciclo #{c['idx']} ({c['start']}): SatMax={c['max_sat']}% (🔴={c['red_samples']} samp) | MargMin BUF={mb_s}, EWT={me_s} {tag}")
 
     # Automated tuning hints
     print("\n--- RACCOMANDAZIONI DIAGNOSTICHE ---")
@@ -296,6 +418,8 @@ def main() -> int:
         print(f"  [i] {low_dt_prim_cycles} cicli con ΔT Primario medio < 2.8K: verificare se dovuto a modulazione minima vicina a saturazione Target LWT.")
     if high_dt_sup_buf_cycles > 0:
         print(f"  [i] {high_dt_sup_buf_cycles} cicli con ΔT Mandata-Puffer medio > 2.5K a Grundfos ON: possibile squilibrio/stratificazione puffer.")
+    if near_miss_7209_cycles > 0:
+        print(f"  [i] {near_miss_7209_cycles} cicli hanno sfiorato la soglia 7209 (SatMax ≥ 82%) pur senza staccare: margine puffer stretto sui picchi PI.")
     if not short_no_gf and not short_with_gf and cycles:
         print("  [✓] Nessun ciclo breve rilevato sui cicli registrati.")
     if not cfg.get("enabled"):
@@ -311,7 +435,7 @@ def main() -> int:
         print("\n--- MODELLO MATEMATICO AUTO-CONVERGENTE ---")
         print(
             f"  Cicli={tm['cycles_observed']} | Confidenza={tm['confidence_pct']}% "
-            f"| k_rad={tm['k_rad_kw_per_k']:.3f} kW/K | FloorInv={tm['inverter_min_mod_pct']:.1f}% (~{tm['p_min_continuous_kw_ref']:.2f} kW_t) "
+            f"| k_rad={tm['k_rad_kw_per_k']:.3f} (fine={tm.get('k_rad_end_kw_per_k', tm['k_rad_kw_per_k']):.3f}) kW/K | FloorInv={tm['inverter_min_mod_pct']:.1f}% (~{tm['p_min_continuous_kw_ref']:.2f} kW_t) "
             f"| ΔBPHE_defrost=-{tm['defrost_lwt_drop_p90_k']:.1f}K | UA={tm['ua_building_c_24h_per_k']:.3f} (°C/24h)/K"
         )
         print(

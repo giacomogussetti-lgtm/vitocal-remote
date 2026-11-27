@@ -47,7 +47,7 @@ function renderSynoptic(data) {
   const titleEl = document.getElementById("synopticToolbarTitle");
   const badgeEl = document.getElementById("synopticOrientationBadge");
   if (mode === "portrait") {
-    svg.setAttribute("viewBox", "0 0 420 850");
+    svg.setAttribute("viewBox", "0 0 420 914");
     svg.classList.add("mode-portrait");
     svg.classList.remove("mode-landscape");
     if (titleEl) titleEl.textContent = "SINOTTICO VERTICALE IMPIANTO";
@@ -208,6 +208,7 @@ function extractSynopticMetrics(d) {
     rodColor: rodActive ? "#fb7185" : (rodTodayMin > 0 ? "#fbbf24" : "#94a3b8"),
     rodBorder: rodActive ? "#ef4444" : (rodTodayMin > 0 ? "#f59e0b" : "#334155"),
     pufferTopColor,
+    wo1cGauge: computeWo1cCutoffMargin(d, samplesList),
   };
 }
 
@@ -300,11 +301,11 @@ function buildSharedSvgDefs(m) {
 }
 
 // =========================================================================
-// PORTRAIT LAYOUT (420 x 850) — Zero Horizontal Scroll on Smartphones
+// PORTRAIT LAYOUT (420 x 914) — Zero Horizontal Scroll on Smartphones
 // =========================================================================
 function renderSynopticPortrait(m) {
   return `
-    <rect x="0" y="0" width="420" height="850" fill="#0c1322" rx="10" />
+    <rect x="0" y="0" width="420" height="914" fill="#0c1322" rx="10" />
 
     <!-- 1. ARIA ESTERNA (Outdoor Atmosphere Strip) -->
     <rect x="12" y="8" width="396" height="64" rx="10" fill="url(#skyGrad)" stroke="#38bdf8" stroke-width="1.4" stroke-dasharray="5,4" />
@@ -384,45 +385,46 @@ function renderSynopticPortrait(m) {
       <text x="48" y="29" fill="#38bdf8" font-size="12" font-weight="800" text-anchor="middle">${m.ret}</text>
     </g>
 
-    <!-- 4. PUFFER INERZIALE 200 L -->
-    <rect x="66" y="404" width="288" height="104" rx="26" fill="url(#pufferGrad)" stroke="#f59e0b" stroke-width="2.4" />
-    <text x="210" y="424" fill="#f59e0b" font-size="11.5" font-weight="800" text-anchor="middle">PUFFER INERZIALE 200 L (Sensore Regolaz. WO1C)</text>
-    <rect x="82" y="434" width="124" height="62" rx="8" fill="#0f172a" stroke="#f59e0b" stroke-width="1.3" />
-    <text x="144" y="450" fill="#94a3b8" font-size="7.6" font-weight="700" text-anchor="middle">🌡️ PUFFER REALE</text>
-    <text x="144" y="476" fill="#fbbf24" font-size="16" font-weight="800" text-anchor="middle">${m.buffer}</text>
-    <text x="144" y="490" fill="#64748b" font-size="6.8" text-anchor="middle">Accumulo superiore</text>
-    <rect x="214" y="434" width="124" height="62" rx="8" fill="#0f172a" stroke="#e879f9" stroke-width="1.3" />
-    <text x="276" y="450" fill="#e879f9" font-size="7.6" font-weight="700" text-anchor="middle">🎯 TARGET ACQUA</text>
-    <text x="276" y="476" fill="#f0abfc" font-size="15.5" font-weight="800" text-anchor="middle">${m.targetWaterVal}</text>
-    <text x="276" y="490" fill="#94a3b8" font-size="6.8" text-anchor="middle">${m.targetWaterSub}</text>
+    <!-- 4. PUFFER INERZIALE 200 L (+ SCADA Anti-Stacco 7209 Gauge) -->
+    <rect x="36" y="404" width="348" height="168" rx="26" fill="url(#pufferGrad)" stroke="#f59e0b" stroke-width="2.4" />
+    <text x="210" y="423" fill="#f59e0b" font-size="11.2" font-weight="800" text-anchor="middle">PUFFER INERZIALE 200 L (Sensore Regolaz. WO1C)</text>
+    <rect x="52" y="431" width="150" height="58" rx="8" fill="#0f172a" stroke="#f59e0b" stroke-width="1.3" />
+    <text x="127" y="446" fill="#94a3b8" font-size="7.5" font-weight="700" text-anchor="middle">🌡️ PUFFER REALE</text>
+    <text x="127" y="471" fill="#fbbf24" font-size="15.5" font-weight="800" text-anchor="middle">${m.buffer}</text>
+    <text x="127" y="484" fill="#64748b" font-size="6.6" text-anchor="middle">Accumulo superiore</text>
+    <rect x="218" y="431" width="150" height="58" rx="8" fill="#0f172a" stroke="#e879f9" stroke-width="1.3" />
+    <text x="293" y="446" fill="#e879f9" font-size="7.5" font-weight="700" text-anchor="middle">🎯 TARGET ACQUA</text>
+    <text x="293" y="471" fill="#f0abfc" font-size="15" font-weight="800" text-anchor="middle">${m.targetWaterVal}</text>
+    <text x="293" y="484" fill="#94a3b8" font-size="6.6" text-anchor="middle">${m.targetWaterSub}</text>
+    ${svgPufferAntiStaccoPortrait(52, 496, 316, 66, m.wo1cGauge)}
 
     <!-- 5. CIRCUITO SECONDARIO VERTICALE (Puffer <-> Casetta + Grundfos) -->
-    <!-- Supply runs Puffer(125,508) -> Grundfos(125,550) -> bend at y=584 -> x=50 -> floor slab y=792 -->
-    <path d="M 125 508 L 125 584 L 50 584 L 50 792" class="flow-sec-hot" />
-    ${svgArrow(125, 520, 0, 1, m.pumpActive ? "#ef4444" : "#7f1d1d")}
-    ${svgArrow(50, 695, 0, 1, m.pumpActive ? "#ef4444" : "#7f1d1d")}
+    <!-- Supply runs Puffer(125,572) -> Grundfos(125,614) -> bend at y=648 -> x=50 -> floor slab y=856 -->
+    <path d="M 125 572 L 125 648 L 50 648 L 50 856" class="flow-sec-hot" />
+    ${svgArrow(125, 584, 0, 1, m.pumpActive ? "#ef4444" : "#7f1d1d")}
+    ${svgArrow(50, 759, 0, 1, m.pumpActive ? "#ef4444" : "#7f1d1d")}
 
-    <!-- Return runs floor slab(370,792) -> y=584 -> x=295 -> Puffer(295,508) -->
-    <path d="M 370 792 L 370 584 L 295 584 L 295 508" class="flow-sec-cold" />
-    ${svgArrow(370, 695, 0, -1, m.pumpActive ? "#3b82f6" : "#1e40af")}
-    ${svgArrow(295, 520, 0, -1, m.pumpActive ? "#3b82f6" : "#1e40af")}
+    <!-- Return runs floor slab(370,856) -> y=648 -> x=295 -> Puffer(295,572) -->
+    <path d="M 370 856 L 370 648 L 295 648 L 295 572" class="flow-sec-cold" />
+    ${svgArrow(370, 759, 0, -1, m.pumpActive ? "#3b82f6" : "#1e40af")}
+    ${svgArrow(295, 584, 0, -1, m.pumpActive ? "#3b82f6" : "#1e40af")}
 
     <!-- Grundfos Circulator on Secondary Supply -->
-    ${svgCirculator(125, 550, 20, m.pumpActive, "spin-gf", m.pumpColor)}
+    ${svgCirculator(125, 614, 20, m.pumpActive, "spin-gf", m.pumpColor)}
 
-    <g transform="translate(12, 530)">
+    <g transform="translate(12, 594)">
       <rect x="0" y="0" width="90" height="40" rx="6" fill="#161f30" stroke="${m.pumpActive ? '#10b981' : '#475569'}" stroke-width="1.3" />
       <text x="45" y="14" fill="#94a3b8" font-size="8" font-weight="700" text-anchor="middle">GRUNDFOS</text>
       <text x="45" y="31" fill="${m.pumpActive ? '#10b981' : '#94a3b8'}" font-size="11" font-weight="800" text-anchor="middle">${m.pumpStatusShort}</text>
     </g>
 
-    <g transform="translate(166, 532)">
+    <g transform="translate(166, 596)">
       <rect x="0" y="0" width="88" height="36" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1" />
       <text x="44" y="13" fill="#94a3b8" font-size="7.5" font-weight="700" text-anchor="middle">CONS. RELÈ</text>
       <text x="44" y="28" fill="${m.pumpActive ? '#10b981' : '#94a3b8'}" font-size="10.5" font-weight="800" text-anchor="middle">${m.pumpActive ? "⚡ ATTIVO" : "⏸ APERTO"}</text>
     </g>
 
-    <g transform="translate(314, 530)">
+    <g transform="translate(314, 594)">
       <rect x="0" y="0" width="94" height="40" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1" />
       <text x="47" y="14" fill="#94a3b8" font-size="7.5" font-weight="700" text-anchor="middle">RIT. PAVIM.</text>
       <text x="47" y="29" fill="#64748b" font-size="8.5" font-weight="600" text-anchor="middle">Sonda assente</text>
@@ -430,46 +432,46 @@ function renderSynopticPortrait(m) {
 
     <!-- 6. CASETTA STILIZZATA (Aria Esterna vs Aria Interna + Pavimento Radiante) -->
     <!-- Pitched House Roof & Room Body -->
-    <polygon points="210,626 20,674 400,674" fill="#1b283f" stroke="#10b981" stroke-width="2.2" stroke-linejoin="round" />
-    <text x="210" y="662" fill="#10b981" font-size="10.5" font-weight="800" text-anchor="middle" letter-spacing="0.4">🏠 ABITAZIONE (Massetto Radiante)</text>
+    <polygon points="210,690 20,738 400,738" fill="#1b283f" stroke="#10b981" stroke-width="2.2" stroke-linejoin="round" />
+    <text x="210" y="726" fill="#10b981" font-size="10.5" font-weight="800" text-anchor="middle" letter-spacing="0.4">🏠 ABITAZIONE (Massetto Radiante)</text>
 
     <!-- Outdoor badge cleanly in open air between roof slope and return pipe -->
-    <g transform="translate(244, 594)">
+    <g transform="translate(244, 658)">
       <rect x="0" y="0" width="114" height="30" rx="8" fill="#0c1e36" stroke="#38bdf8" stroke-width="1.2" stroke-dasharray="4,3" />
       <text x="57" y="12" fill="#94a3b8" font-size="7.2" font-weight="700" text-anchor="middle">☁️ ARIA FUORI CASA</text>
       <text x="57" y="25" fill="#38bdf8" font-size="10.5" font-weight="800" text-anchor="middle">${m.oat}</text>
     </g>
 
-    <rect x="34" y="674" width="352" height="166" rx="8" fill="#131c2e" stroke="#10b981" stroke-width="2" />
+    <rect x="34" y="738" width="352" height="166" rx="8" fill="#131c2e" stroke="#10b981" stroke-width="2" />
 
     <!-- Wall-Mounted BTicino Smarther Thermostat & Indoor Air Card -->
-    <rect x="52" y="684" width="316" height="88" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1.2" />
-    ${svgThermostatWallIcon(64, 698)}
-    <text x="102" y="700" fill="#38bdf8" font-size="8.8" font-weight="800">ARIA CASA (Corridoio · ${m.apStateBadge})</text>
-    <text x="102" y="722" fill="#10b981" font-size="19" font-weight="800">${m.indoor}</text>
-    <text x="180" y="721" fill="#94a3b8" font-size="8.6" font-weight="600">UR ${m.humidity}</text>
+    <rect x="52" y="748" width="316" height="88" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1.2" />
+    ${svgThermostatWallIcon(64, 762)}
+    <text x="102" y="764" fill="#38bdf8" font-size="8.8" font-weight="800">ARIA CASA (Corridoio · ${m.apStateBadge})</text>
+    <text x="102" y="786" fill="#10b981" font-size="19" font-weight="800">${m.indoor}</text>
+    <text x="180" y="785" fill="#94a3b8" font-size="8.6" font-weight="600">UR ${m.humidity}</text>
 
-    <text x="64" y="745" fill="#94a3b8" font-size="8.2" font-weight="700">🎯 TARGET CASA:</text>
-    <text x="148" y="745" fill="#fde047" font-size="11.2" font-weight="800">${m.targetRoomReal}</text>
+    <text x="64" y="809" fill="#94a3b8" font-size="8.2" font-weight="700">🎯 TARGET CASA:</text>
+    <text x="148" y="809" fill="#fde047" font-size="11.2" font-weight="800">${m.targetRoomReal}</text>
 
-    <text x="250" y="745" fill="#94a3b8" font-size="8.2" font-weight="700">MARGINE:</text>
-    <text x="302" y="745" fill="#e2e8f0" font-size="10.5" font-weight="700">${m.deltaTargetStr}</text>
+    <text x="250" y="809" fill="#94a3b8" font-size="8.2" font-weight="700">MARGINE:</text>
+    <text x="302" y="809" fill="#e2e8f0" font-size="10.5" font-weight="700">${m.deltaTargetStr}</text>
 
-    <text x="210" y="764" fill="${m.pumpActive ? '#6ee7b7' : '#64748b'}" font-size="8.5" font-weight="700" text-anchor="middle">
+    <text x="210" y="828" fill="${m.pumpActive ? '#6ee7b7' : '#64748b'}" font-size="8.5" font-weight="700" text-anchor="middle">
       ${m.pumpActive ? "🔥 Rilancio attivo dal Puffer al massetto radiante" : "⏸ Rilancio spento — Puffer disaccoppiato dalla casa"}
     </text>
 
     <!-- Floor Slab & Radiant Serpentines Connected to Pipes at x=50 and x=370 -->
-    <rect x="44" y="778" width="332" height="54" rx="6" fill="#0b1120" stroke="#334155" stroke-width="1" />
-    <text x="210" y="790" fill="#64748b" font-size="7.5" font-weight="700" text-anchor="middle">SERPENTINA PAVIMENTO RADIANTE</text>
-    <path d="M 50 792
-             L 50 798
-             L 354 798
-             Q 364 804 354 810
-             L 66 810
-             Q 56 816 66 822
-             L 370 822
-             L 370 792"
+    <rect x="44" y="842" width="332" height="54" rx="6" fill="#0b1120" stroke="#334155" stroke-width="1" />
+    <text x="210" y="854" fill="#64748b" font-size="7.5" font-weight="700" text-anchor="middle">SERPENTINA PAVIMENTO RADIANTE</text>
+    <path d="M 50 856
+             L 50 862
+             L 354 862
+             Q 364 868 354 874
+             L 66 874
+             Q 56 880 66 886
+             L 370 886
+             L 370 856"
           fill="none" stroke="${m.pumpActive ? '#ef4444' : '#334155'}" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
   `;
 }
@@ -569,22 +571,24 @@ function renderSynopticLandscape(m) {
     <rect x="34" y="502" width="352" height="30" rx="6" fill="#0f172a" stroke="#334155" />
     <text x="210" y="521" fill="#94a3b8" font-size="9.5" font-weight="700" text-anchor="middle">MODO: ${m.mode}  |  WO1C CU401B</text>
 
-    <!-- 3. ZONE B: PUFFER INERZIALE 200 L -->
+    <!-- 3. ZONE B: PUFFER INERZIALE 200 L (+ SCADA Anti-Stacco 7209 Gauge) -->
     <rect x="570" y="102" width="150" height="414" rx="28" fill="url(#pufferGrad)" stroke="#f59e0b" stroke-width="2.5" />
-    <text x="645" y="138" fill="#f59e0b" font-size="13" font-weight="800" text-anchor="middle">PUFFER 200 L</text>
-    <text x="645" y="155" fill="#94a3b8" font-size="9" text-anchor="middle">(Disaccoppiatore)</text>
+    <text x="645" y="134" fill="#f59e0b" font-size="12.5" font-weight="800" text-anchor="middle">PUFFER 200 L</text>
+    <text x="645" y="149" fill="#94a3b8" font-size="8.5" text-anchor="middle">(Sensore WO1C)</text>
 
-    <rect x="582" y="218" width="126" height="62" rx="8" fill="#0f172a" stroke="#f59e0b" stroke-width="1.3" />
-    <text x="645" y="238" fill="#94a3b8" font-size="8" font-weight="700" text-anchor="middle">SONDA ACCUMULO</text>
-    <text x="645" y="266" fill="#fbbf24" font-size="17" font-weight="800" text-anchor="middle">${m.buffer}</text>
+    <rect x="582" y="162" width="126" height="54" rx="8" fill="#0f172a" stroke="#f59e0b" stroke-width="1.3" />
+    <text x="645" y="179" fill="#94a3b8" font-size="7.8" font-weight="700" text-anchor="middle">SONDA ACCUMULO</text>
+    <text x="645" y="205" fill="#fbbf24" font-size="16" font-weight="800" text-anchor="middle">${m.buffer}</text>
 
-    <rect x="582" y="294" width="126" height="66" rx="8" fill="#0f172a" stroke="#e879f9" stroke-width="1.3" />
-    <text x="645" y="313" fill="#e879f9" font-size="7.8" font-weight="700" text-anchor="middle">🎯 TARGET ACQUA</text>
-    <text x="645" y="339" fill="#f0abfc" font-size="15.5" font-weight="800" text-anchor="middle">${m.targetWaterVal}</text>
-    <text x="645" y="353" fill="#94a3b8" font-size="6.8" text-anchor="middle">${m.targetWaterSub}</text>
+    <rect x="582" y="222" width="126" height="60" rx="8" fill="#0f172a" stroke="#e879f9" stroke-width="1.3" />
+    <text x="645" y="239" fill="#e879f9" font-size="7.6" font-weight="700" text-anchor="middle">🎯 TARGET ACQUA</text>
+    <text x="645" y="263" fill="#f0abfc" font-size="15" font-weight="800" text-anchor="middle">${m.targetWaterVal}</text>
+    <text x="645" y="276" fill="#94a3b8" font-size="6.6" text-anchor="middle">${m.targetWaterSub}</text>
 
-    <text x="645" y="484" fill="#64748b" font-size="8.5" text-anchor="middle">Disaccoppiatore Idraulico</text>
-    <text x="645" y="498" fill="#64748b" font-size="8.5" text-anchor="middle">Primario / Secondario</text>
+    ${svgPufferAntiStaccoLandscape(580, 290, 130, 154, m.wo1cGauge)}
+
+    <text x="645" y="484" fill="#64748b" font-size="8.2" font-weight="700" text-anchor="middle">Disaccoppiatore Idraulico</text>
+    <text x="645" y="497" fill="#64748b" font-size="8.2" text-anchor="middle">Primario / Secondario</text>
 
     <!-- 4. CIRCOLATORE GRUNDFOS -->
     ${svgCirculator(800, 168, 24, m.pumpActive, "spin-gf", m.pumpColor)}
@@ -762,8 +766,94 @@ function svgBackupHeaterBlock(x, y, w, h, m) {
 //   - 7203 restart occurs when BUF <= Target - 5.0 K
 //   - Defrost BPHE guard: LWT >= 12.0 C, BUF >= 17.0 C
 // =========================================================================
+function computeLastCyclePeak7209(samplesList) {
+  if (!Array.isArray(samplesList) || samplesList.length === 0) return null;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  let foundActive = false;
+  let lastActiveMs = null;
+  let best = null;
+
+  for (let i = samplesList.length - 1; i >= 0; i--) {
+    const s = samplesList[i];
+    if (!s || !s.timestamp_utc) continue;
+    const tMs = new Date(s.timestamp_utc).getTime();
+    if (isNaN(tMs)) continue;
+
+    const mod = s.compressor_modulation_percent != null ? Number(s.compressor_modulation_percent) : 0;
+    const active = (s.compressor_active === 1) || (mod > 0);
+    const phase = String(s.compressor_phase || "").toLowerCase();
+
+    if (!active) {
+      if (foundActive && lastActiveMs != null && (lastActiveMs - tMs) > 45 * 60000) {
+        break; // Reached standby before this cycle started
+      }
+      continue;
+    }
+
+    foundActive = true;
+    lastActiveMs = tMs;
+    if (phase.includes("defrost")) continue;
+
+    const buf = s.buffer_temp_c != null ? Number(s.buffer_temp_c) : null;
+    const ewt = s.pdc_return_temp_c != null ? Number(s.pdc_return_temp_c) : null;
+    let tgt = s.target_supply_temp_c != null ? Number(s.target_supply_temp_c) : null;
+    if (tgt == null && typeof computeVitocalTargetLwt === "function") {
+      tgt = computeVitocalTargetLwt(s, false);
+    }
+    if (buf == null || tgt == null) continue;
+
+    const marginBuf = (tgt + 2.5) - buf;
+    const marginEwt = ewt != null ? (tgt - ewt) : null;
+    const satBuf = clamp((buf - (tgt - 0.5)) / 3.0, 0, 1);
+    const satEwt = ewt != null ? clamp((ewt - (tgt - 2.5)) / 2.5, 0, 1) : satBuf * 0.85;
+    let satFrac = 0.50 * satBuf + 0.50 * satEwt;
+    if ((buf - tgt) > 0.6 && mod >= 68) satFrac = Math.min(1.0, satFrac + 0.08);
+    if (marginEwt != null && marginEwt > 0.35) satFrac = Math.min(satFrac, 0.78);
+    if (marginBuf <= 0.8 && (marginEwt == null || marginEwt <= 0.30)) satFrac = Math.max(satFrac, 0.88);
+    const pct = Math.round(clamp(satFrac, 0.04, 1.0) * 100);
+
+    if (!best || pct > best.maxPct) {
+      const dt = new Date(tMs);
+      const dd = String(dt.getDate()).padStart(2, "0");
+      const mm = String(dt.getMonth() + 1).padStart(2, "0");
+      const hh = String(dt.getHours()).padStart(2, "0");
+      const mi = String(dt.getMinutes()).padStart(2, "0");
+      best = {
+        maxPct: pct,
+        maxTone: pct >= 85 ? "danger" : (pct >= 64 ? "warn" : "safe"),
+        satBufPct: Math.round(satBuf * 100),
+        satEwtPct: Math.round(satEwt * 100),
+        marginBuf,
+        marginEwt,
+        buf,
+        ewt,
+        tgt,
+        mod,
+        timeStr: `${dd}/${mm} ${hh}:${mi}`,
+        shortTime: `${hh}:${mi}`,
+      };
+    }
+  }
+  return best;
+}
+
 function computeWo1cCutoffMargin(d, samplesList) {
-  if (!d) return { mode: "standby" };
+  const lastPeak = computeLastCyclePeak7209(samplesList);
+  if (!d) {
+    return {
+      mode: "standby",
+      title: "🛡️ Anti-Stacco WO1C (7209)",
+      badge: "STANDBY",
+      tone: "idle",
+      pct: 0,
+      pctLabel: "STBY",
+      satBufPct: 0,
+      satEwtPct: 0,
+      lastPeak,
+      summary: "In attesa dati telemetrici...",
+      chips: [],
+    };
+  }
 
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const progLower = String(d.active_program || "standby").toLowerCase();
@@ -785,13 +875,50 @@ function computeWo1cCutoffMargin(d, samplesList) {
     targetLwt = Number(apSt.calculated_target_lwt_c);
   }
 
-  // Standby: PdC off and outside active heating schedule
+  // Standby: PdC off and outside active heating schedule -> show standby state + last cycle peak memory!
   if (!compActive && progLower === "standby") {
+    const pkIcon = lastPeak ? (lastPeak.maxPct >= 85 ? "🔴" : (lastPeak.maxPct >= 64 ? "🟡" : "🟢")) : "⏸";
     return {
       mode: "standby",
-      title: "🛡️ Margine Anti-Stacco WO1C (7209)",
-      badge: "IN STANDBY (attivo in marcia)",
+      title: "🛡️ Anti-Stacco WO1C (7209)",
+      badge: lastPeak ? `STANDBY · ULT. PICCO ${pkIcon} ${lastPeak.maxPct}%` : "STANDBY (attivo in marcia)",
       tone: "idle",
+      pct: 0,
+      pctLabel: "OFF",
+      ghostPct: lastPeak ? lastPeak.maxPct : null,
+      ghostTone: lastPeak ? lastPeak.maxTone : "idle",
+      satBufPct: lastPeak ? lastPeak.satBufPct : 0,
+      satEwtPct: lastPeak ? lastPeak.satEwtPct : 0,
+      marginBuf: null,
+      marginEwt: null,
+      modNum: 0,
+      lastPeak,
+      summary: lastPeak
+        ? `PdC a riposo. Ultimo ciclo (${lastPeak.timeStr}): picco saturazione ${lastPeak.maxPct}% (marg. min Testa ${lastPeak.marginBuf >= 0 ? "+" : ""}${lastPeak.marginBuf.toFixed(1)} K${lastPeak.marginEwt != null ? `, Fondo ${lastPeak.marginEwt >= 0 ? "+" : ""}${lastPeak.marginEwt.toFixed(1)} K` : ""}). Tocca per dettagli.`
+        : "PdC in standby: il tachimetro si accende in tempo reale appena parte il compressore.",
+      chips: lastPeak
+        ? [
+            {
+              lbl: `Picco Testa (${lastPeak.shortTime})`,
+              val: `${lastPeak.buf.toFixed(1)}° / ${(lastPeak.tgt + 2.5).toFixed(1)}°`,
+              sub: `Marg. min ${lastPeak.marginBuf >= 0 ? "+" : ""}${lastPeak.marginBuf.toFixed(1)} K (Tgt ${lastPeak.tgt.toFixed(1)}°)`,
+            },
+            {
+              lbl: `Picco Fondo (${lastPeak.shortTime})`,
+              val: lastPeak.ewt != null ? `${lastPeak.ewt.toFixed(1)}° / ${lastPeak.tgt.toFixed(1)}°` : "--",
+              sub: lastPeak.marginEwt != null ? `Marg. min ${lastPeak.marginEwt >= 0 ? "+" : ""}${lastPeak.marginEwt.toFixed(1)} K` : "--",
+            },
+            {
+              lbl: "Puffer Ora (Riposo)",
+              val: buf != null ? `BUF ${buf.toFixed(1)} °C` : "--",
+              sub: `Ult. picco: Mod ${lastPeak.mod.toFixed(0)}% · Sat ${lastPeak.maxPct}%`,
+            },
+          ]
+        : [
+            { lbl: "Puffer Attuale", val: buf != null ? `${buf.toFixed(1)} °C` : "--", sub: "Macchina a riposo" },
+            { lbl: "Ritorno Attuale", val: ewt != null ? `${ewt.toFixed(1)} °C` : "--", sub: "Circolatori fermi" },
+            { lbl: "Soglia WO1C 7209", val: "BUF +2.5K & EWT ≥ Tgt", sub: "Attivo a compressore ON" },
+          ],
     };
   }
 
@@ -853,6 +980,12 @@ function computeWo1cCutoffMargin(d, samplesList) {
       tone,
       pct: stressPct,
       pctLabel: lwt != null ? `${lwt.toFixed(1)}°` : "--",
+      satBufPct: bufMarg != null ? Math.round(clamp((6.0 - bufMarg) / 6.0, 0.05, 1.0) * 100) : 40,
+      satEwtPct: lwtMarg != null ? Math.round(clamp((10.0 - lwtMarg) / 10.0, 0.05, 1.0) * 100) : 40,
+      marginBuf: bufMarg,
+      marginEwt: lwtMarg,
+      modNum,
+      lastPeak,
       summary,
       chips: [
         {
@@ -893,7 +1026,13 @@ function computeWo1cCutoffMargin(d, samplesList) {
       badge: isPrep ? "AVVIAMENTO..." : "PAUSA 7203",
       tone: "pause",
       pct: isPrep ? 96 : coolPct,
-      pctLabel: distRestart != null ? `${distRestart <= 0 ? "0.0" : distRestart.toFixed(1)} K` : "--",
+      pctLabel: distRestart != null ? `${distRestart <= 0 ? "0.0" : distRestart.toFixed(1)}K` : "--",
+      satBufPct: isPrep ? 96 : coolPct,
+      satEwtPct: coolPct,
+      marginBuf: distRestart,
+      marginEwt: null,
+      modNum: 0,
+      lastPeak,
       summary: isPrep
         ? "Puffer sceso a soglia 7203: compressore in fase di preparazione / riavvio."
         : (distRestart != null && restartThr != null
@@ -923,11 +1062,17 @@ function computeWo1cCutoffMargin(d, samplesList) {
   if (buf == null || targetLwt == null) {
     return {
       mode: "heating",
-      title: "🛡️ Margine Anti-Stacco WO1C (7209)",
+      title: "🛡️ Anti-Stacco WO1C (7209)",
       badge: "IN MARCIA",
       tone: "safe",
       pct: 25,
       pctLabel: "--%",
+      satBufPct: 25,
+      satEwtPct: 25,
+      marginBuf: null,
+      marginEwt: null,
+      modNum,
+      lastPeak,
       summary: "Compressore attivo; in attesa di sonde Puffer/Target per calcolare il margine 7209.",
       chips: [
         { lbl: "Testa Puffer (BUF)", val: buf != null ? `${buf.toFixed(1)} °C` : "--", sub: "--" },
@@ -1008,11 +1153,17 @@ function computeWo1cCutoffMargin(d, samplesList) {
 
   return {
     mode: "heating",
-    title: "🛡️ Margine Anti-Stacco WO1C (7209)",
+    title: "🛡️ Anti-Stacco WO1C (7209)",
     badge,
     tone,
     pct: satPct,
     pctLabel: `${satPct}%`,
+    satBufPct: Math.round(satBuf * 100),
+    satEwtPct: Math.round(satEwt * 100),
+    marginBuf,
+    marginEwt,
+    modNum,
+    lastPeak,
     summary,
     chips: [
       {
@@ -1036,38 +1187,319 @@ function computeWo1cCutoffMargin(d, samplesList) {
   };
 }
 
+function wo1cTonePalette(tone) {
+  switch (tone) {
+    case "danger":  return { main: "#ef4444", glow: "rgba(239,68,68,0.45)", text: "#fca5a5" };
+    case "warn":    return { main: "#f59e0b", glow: "rgba(245,158,11,0.40)", text: "#fde68a" };
+    case "defrost": return { main: "#38bdf8", glow: "rgba(56,189,248,0.40)", text: "#bae6fd" };
+    case "pause":   return { main: "#a78bfa", glow: "rgba(167,139,250,0.40)", text: "#ddd6fe" };
+    case "safe":    return { main: "#10b981", glow: "rgba(16,185,129,0.40)", text: "#6ee7b7" };
+    default:        return { main: "#64748b", glow: "rgba(100,116,139,0.25)", text: "#94a3b8" };
+  }
+}
+
+function renderScadaArcDialInner(cx, cy, r, opts) {
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const pt = (rad, frac) => {
+    const f = clamp(frac, 0, 1);
+    const ang = Math.PI * (1.0 - f);
+    return [cx + rad * Math.cos(ang), cy - rad * Math.sin(ang)];
+  };
+  const arc = (rad, f0, f1) => {
+    const a0 = clamp(f0, 0, 0.998);
+    const a1 = clamp(f1, a0 + 0.002, 1.0);
+    const [x0, y0] = pt(rad, a0);
+    const [x1, y1] = pt(rad, a1);
+    return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${rad.toFixed(2)} ${rad.toFixed(2)} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+  };
+
+  const isStandby = opts.mode === "standby";
+  const pal = wo1cTonePalette(opts.tone);
+  const ghostPal = wo1cTonePalette(opts.ghostTone || "idle");
+  const activeFrac = isStandby
+    ? (opts.ghostPct != null ? clamp(opts.ghostPct / 100, 0.03, 1.0) : 0.04)
+    : clamp((opts.pct || 0) / 100, 0.03, 1.0);
+
+  const swOuter = Math.max(4.5, r * 0.15);
+  const rInner = r - swOuter * 0.92;
+
+  // Floating bezel pointer (leaves center 100% clear for digital readout!)
+  const pAng = Math.PI * (1.0 - activeFrac);
+  const cosA = Math.cos(pAng);
+  const sinA = Math.sin(pAng);
+  const pxTip = cx + (r - swOuter * 0.55) * cosA;
+  const pyTip = cy - (r - swOuter * 0.55) * sinA;
+  const baseR = r + swOuter * 0.62;
+  const perp = 2.6;
+  const bx1 = cx + baseR * cosA - perp * sinA;
+  const by1 = cy - baseR * sinA - perp * cosA;
+  const bx2 = cx + baseR * cosA + perp * sinA;
+  const by2 = cy - baseR * sinA + perp * cosA;
+
+  // Ticks at 0%, 39% (steady), 64% (warn), 85% (danger), 100%
+  const ticks = [0, 0.39, 0.64, 0.85, 1.0].map(tf => {
+    const [tx0, ty0] = pt(r - swOuter * 0.65, tf);
+    const [tx1, ty1] = pt(r - swOuter * 1.25, tf);
+    return `<line x1="${tx0.toFixed(1)}" y1="${ty0.toFixed(1)}" x2="${tx1.toFixed(1)}" y2="${ty1.toFixed(1)}" stroke="#475569" stroke-width="1.1" />`;
+  }).join("");
+
+  const ptrColor = isStandby ? (opts.ghostPct != null ? ghostPal.main : "#64748b") : "#f8fafc";
+  const progColor = isStandby ? ghostPal.main : pal.main;
+  const progDash = isStandby ? `stroke-dasharray="3,2" opacity="0.65"` : `opacity="0.95"`;
+  const valFontSize = opts.valFontSize || Math.round(r * 0.36);
+  const subFontSize = opts.subFontSize || Math.max(6.2, r * 0.16);
+
+  return `
+    <path d="${arc(r, 0, 1)}" fill="none" stroke="#09101d" stroke-width="${(swOuter + 2.5).toFixed(1)}" stroke-linecap="round" />
+    <path d="${arc(r, 0.00, 0.625)}" fill="none" stroke="#10b981" stroke-opacity="${isStandby ? 0.22 : 0.34}" stroke-width="${swOuter.toFixed(1)}" />
+    <path d="${arc(r, 0.640, 0.835)}" fill="none" stroke="#f59e0b" stroke-opacity="${isStandby ? 0.24 : 0.38}" stroke-width="${swOuter.toFixed(1)}" />
+    <path d="${arc(r, 0.850, 1.000)}" fill="none" stroke="#ef4444" stroke-opacity="${isStandby ? 0.26 : 0.44}" stroke-width="${swOuter.toFixed(1)}" />
+    ${ticks}
+    ${(!isStandby || opts.ghostPct != null)
+      ? `<path d="${arc(rInner, 0, activeFrac)}" fill="none" stroke="${progColor}" stroke-width="${Math.max(2.4, swOuter * 0.52).toFixed(1)}" stroke-linecap="round" ${progDash} />`
+      : ""}
+    <polygon points="${pxTip.toFixed(1)},${pyTip.toFixed(1)} ${bx1.toFixed(1)},${by1.toFixed(1)} ${bx2.toFixed(1)},${by2.toFixed(1)}"
+             fill="${ptrColor}" stroke="#0f172a" stroke-width="0.8" />
+    <text x="${cx}" y="${(cy - r * 0.28).toFixed(1)}" fill="${isStandby ? (opts.ghostPct != null ? ghostPal.text : '#94a3b8') : '#f8fafc'}"
+          font-size="${valFontSize}" font-weight="800" text-anchor="middle">${opts.centerText || "--"}</text>
+    <text x="${cx}" y="${(cy - 2).toFixed(1)}" fill="${isStandby ? '#64748b' : pal.text}"
+          font-size="${subFontSize.toFixed(1)}" font-weight="700" text-anchor="middle">${opts.subText || ""}</text>
+  `;
+}
+
+function buildWo1cTachometerSvg(info) {
+  const isStby = info.mode === "standby";
+  const centerText = isStby
+    ? (info.lastPeak ? `${info.lastPeak.maxPct}%` : "OFF")
+    : (info.pctLabel || `${info.pct || 0}%`);
+  const subText = isStby
+    ? (info.lastPeak ? "ULT. PICCO" : "STANDBY")
+    : (info.mode === "defrost" ? "BPHE LWT" : (info.mode === "pause" ? "RIAVVIO 7203" : "SATUR. 7209"));
+  return `
+    <svg viewBox="0 0 118 70" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
+      ${renderScadaArcDialInner(59, 61, 45, {
+        mode: info.mode,
+        tone: info.tone,
+        pct: info.pct,
+        ghostPct: info.ghostPct,
+        ghostTone: info.ghostTone,
+        centerText,
+        subText,
+        valFontSize: 15.5,
+        subFontSize: 6.8,
+      })}
+    </svg>
+  `;
+}
+
+function svgPufferAntiStaccoPortrait(x, y, w, h, g) {
+  const info = g || { mode: "standby", tone: "idle", pct: 0 };
+  const isStby = info.mode === "standby";
+  const pal = wo1cTonePalette(isStby && info.lastPeak ? info.lastPeak.maxTone : info.tone);
+  const borderCol = isStby ? "#334155" : pal.main;
+  const centerTxt = isStby
+    ? (info.lastPeak ? `${info.lastPeak.maxPct}%` : "STBY")
+    : (info.pctLabel || `${info.pct || 0}%`);
+  const subTxt = isStby ? (info.lastPeak ? "ULT.MAX" : "RIPOSO") : (info.mode === "defrost" ? "BPHE" : "7209");
+
+  let pillTxt = "STANDBY";
+  if (!isStby) {
+    if (info.mode === "defrost") pillTxt = "DEFROST BPHE";
+    else if (info.mode === "pause") pillTxt = "PAUSA 7203";
+    else if (info.tone === "danger") pillTxt = "RISCHIO STACCO";
+    else if (info.tone === "warn") pillTxt = "AVVICINAMENTO";
+    else pillTxt = "MARGINE OK";
+  } else if (info.lastPeak) {
+    pillTxt = `ULT. ${info.lastPeak.shortTime}`;
+  }
+
+  const bPct = Math.max(4, Math.min(100, Number(info.satBufPct || 0)));
+  const ePct = Math.max(4, Math.min(100, Number(info.satEwtPct || 0)));
+  const bCol = bPct >= 82 ? "#ef4444" : (bPct >= 62 ? "#f59e0b" : "#10b981");
+  const eCol = ePct >= 82 ? "#ef4444" : (ePct >= 62 ? "#f59e0b" : "#38bdf8");
+
+  let mBufStr = "--";
+  let mEwtStr = "--";
+  let footLine = "Attivo in marcia (stacco su Testa +2.5K & Fondo ≥ Tgt)";
+  if (!isStby && info.mode === "heating") {
+    mBufStr = info.marginBuf != null ? `${info.marginBuf >= 0 ? "+" : ""}${info.marginBuf.toFixed(1)}K` : "--";
+    mEwtStr = info.marginEwt != null ? `${info.marginEwt >= 0 ? "+" : ""}${info.marginEwt.toFixed(1)}K` : "--";
+    footLine = `Margine stacco: Testa ${mBufStr} · Fondo ${mEwtStr} · Mod ${(info.modNum || 0).toFixed(0)}%`;
+  } else if (!isStby && info.mode === "defrost") {
+    mBufStr = info.marginBuf != null ? `${info.marginBuf >= 0 ? "+" : ""}${info.marginBuf.toFixed(1)}K` : "--";
+    mEwtStr = info.marginEwt != null ? `${info.marginEwt >= 0 ? "+" : ""}${info.marginEwt.toFixed(1)}K` : "--";
+    footLine = `Riserva BPHE: LWT ${mEwtStr} su 12° · BUF ${mBufStr} su 17°`;
+  } else if (!isStby && info.mode === "pause") {
+    mBufStr = info.marginBuf != null ? `${Math.max(0, info.marginBuf).toFixed(1)}K` : "--";
+    footLine = `Attesa riavvio 7203 (−5.0K): mancano ${mBufStr}`;
+  } else if (info.lastPeak) {
+    mBufStr = `${info.lastPeak.marginBuf >= 0 ? "+" : ""}${info.lastPeak.marginBuf.toFixed(1)}K`;
+    mEwtStr = info.lastPeak.marginEwt != null ? `${info.lastPeak.marginEwt >= 0 ? "+" : ""}${info.lastPeak.marginEwt.toFixed(1)}K` : "--";
+    footLine = `Ult. ciclo (${info.lastPeak.timeStr}): picco ${info.lastPeak.maxPct}% (T ${mBufStr} / F ${mEwtStr})`;
+  }
+
+  return `
+    <g transform="translate(${x}, ${y})">
+      <rect x="0" y="0" width="${w}" height="${h}" rx="10" fill="#0b1220" stroke="${borderCol}" stroke-width="1.3" />
+      ${renderScadaArcDialInner(48, 56, 36, {
+        mode: info.mode,
+        tone: info.tone,
+        pct: info.pct,
+        ghostPct: info.ghostPct,
+        ghostTone: info.ghostTone,
+        centerText: centerTxt,
+        subText: subTxt,
+        valFontSize: 12.2,
+        subFontSize: 5.8,
+      })}
+      <text x="98" y="15" fill="#cbd5e1" font-size="7.6" font-weight="800">🛡️ ANTI-STACCO WO1C</text>
+      <rect x="${w - 86}" y="5" width="78" height="14" rx="7" fill="#162033" stroke="${pal.main}" stroke-width="0.9" />
+      <text x="${w - 47}" y="14.5" fill="${pal.text}" font-size="6.5" font-weight="800" text-anchor="middle">${pillTxt}</text>
+
+      <!-- Dual Head / Bottom Micro-Bars -->
+      <text x="98" y="31" fill="#94a3b8" font-size="6.4" font-weight="700">TESTA</text>
+      <rect x="126" y="25.5" width="66" height="6" rx="3" fill="#1e293b" />
+      <rect x="126" y="25.5" width="${Math.round(0.66 * bPct)}" height="6" rx="3" fill="${bCol}" opacity="${isStby ? 0.55 : 0.95}" />
+
+      <text x="202" y="31" fill="#94a3b8" font-size="6.4" font-weight="700">FONDO</text>
+      <rect x="232" y="25.5" width="66" height="6" rx="3" fill="#1e293b" />
+      <rect x="232" y="25.5" width="${Math.round(0.66 * ePct)}" height="6" rx="3" fill="${eCol}" opacity="${isStby ? 0.55 : 0.95}" />
+
+      <!-- Zone threshold mini ruler -->
+      <rect x="98" y="39" width="126" height="3.5" rx="1.7" fill="#10b981" opacity="0.32" />
+      <rect x="226" y="39" width="40" height="3.5" rx="1.7" fill="#f59e0b" opacity="0.36" />
+      <rect x="268" y="39" width="38" height="3.5" rx="1.7" fill="#ef4444" opacity="0.40" />
+
+      <text x="98" y="56" fill="#94a3b8" font-size="6.7" font-weight="600">${footLine}</text>
+    </g>
+  `;
+}
+
+function svgPufferAntiStaccoLandscape(x, y, w, h, g) {
+  const info = g || { mode: "standby", tone: "idle", pct: 0 };
+  const isStby = info.mode === "standby";
+  const pal = wo1cTonePalette(isStby && info.lastPeak ? info.lastPeak.maxTone : info.tone);
+  const borderCol = isStby ? "#334155" : pal.main;
+  const centerTxt = isStby
+    ? (info.lastPeak ? `${info.lastPeak.maxPct}%` : "STBY")
+    : (info.pctLabel || `${info.pct || 0}%`);
+  const subTxt = isStby
+    ? (info.lastPeak ? `ULT. ${info.lastPeak.shortTime}` : "STANDBY")
+    : (info.mode === "defrost" ? "BPHE LWT" : (info.mode === "pause" ? "PAUSA 7203" : "SATUR. 7209"));
+
+  const bPct = Math.max(4, Math.min(100, Number(info.satBufPct || 0)));
+  const ePct = Math.max(4, Math.min(100, Number(info.satEwtPct || 0)));
+  const bCol = bPct >= 82 ? "#ef4444" : (bPct >= 62 ? "#f59e0b" : "#10b981");
+  const eCol = ePct >= 82 ? "#ef4444" : (ePct >= 62 ? "#f59e0b" : "#38bdf8");
+
+  let mBufStr = "--";
+  let mEwtStr = "--";
+  if (!isStby && info.marginBuf != null) mBufStr = `${info.marginBuf >= 0 ? "+" : ""}${info.marginBuf.toFixed(1)}K`;
+  else if (isStby && info.lastPeak) mBufStr = `${info.lastPeak.marginBuf >= 0 ? "+" : ""}${info.lastPeak.marginBuf.toFixed(1)}K`;
+
+  if (!isStby && info.marginEwt != null) mEwtStr = `${info.marginEwt >= 0 ? "+" : ""}${info.marginEwt.toFixed(1)}K`;
+  else if (isStby && info.lastPeak && info.lastPeak.marginEwt != null) mEwtStr = `${info.lastPeak.marginEwt >= 0 ? "+" : ""}${info.lastPeak.marginEwt.toFixed(1)}K`;
+
+  const footerTxt = isStby
+    ? (info.lastPeak ? `Ult. picco ${info.lastPeak.timeStr}` : "Attivo a PdC accesa")
+    : (info.tone === "danger" ? "🔴 RISCHIO STACCO" : (info.tone === "warn" ? "🟡 IN AVVICINAMENTO" : "🟢 MARGINE SICURO"));
+
+  return `
+    <g transform="translate(${x}, ${y})">
+      <rect x="0" y="0" width="${w}" height="${h}" rx="10" fill="#0b1220" stroke="${borderCol}" stroke-width="1.3" />
+      <text x="${w / 2}" y="14" fill="#cbd5e1" font-size="7.4" font-weight="800" text-anchor="middle">🛡️ ANTI-STACCO 7209</text>
+      ${renderScadaArcDialInner(w / 2, 74, 41, {
+        mode: info.mode,
+        tone: info.tone,
+        pct: info.pct,
+        ghostPct: info.ghostPct,
+        ghostTone: info.ghostTone,
+        centerText: centerTxt,
+        subText: subTxt,
+        valFontSize: 13.5,
+        subFontSize: 6.2,
+      })}
+      <text x="8" y="95" fill="#94a3b8" font-size="6.4" font-weight="700">TESTA</text>
+      <rect x="38" y="89.5" width="54" height="5.5" rx="2.7" fill="#1e293b" />
+      <rect x="38" y="89.5" width="${Math.round(0.54 * bPct)}" height="5.5" rx="2.7" fill="${bCol}" opacity="${isStby ? 0.55 : 0.95}" />
+      <text x="${w - 7}" y="95" fill="#cbd5e1" font-size="6.4" font-weight="700" text-anchor="end">${mBufStr}</text>
+
+      <text x="8" y="113" fill="#94a3b8" font-size="6.4" font-weight="700">FONDO</text>
+      <rect x="38" y="107.5" width="54" height="5.5" rx="2.7" fill="#1e293b" />
+      <rect x="38" y="107.5" width="${Math.round(0.54 * ePct)}" height="5.5" rx="2.7" fill="${eCol}" opacity="${isStby ? 0.55 : 0.95}" />
+      <text x="${w - 7}" y="113" fill="#cbd5e1" font-size="6.4" font-weight="700" text-anchor="end">${mEwtStr}</text>
+
+      <line x1="10" y1="126" x2="${w - 10}" y2="126" stroke="#1e293b" stroke-width="1" />
+      <text x="${w / 2}" y="141" fill="${isStby ? '#94a3b8' : pal.text}" font-size="6.8" font-weight="700" text-anchor="middle">${footerTxt}</text>
+    </g>
+  `;
+}
+
 function renderWo1cCutoffMargin(sample) {
   const card = document.getElementById("wo1cCutoffMarginCard");
   if (!card) return;
   const samplesList = (typeof state !== "undefined" && Array.isArray(state.samples)) ? state.samples : [];
   const info = computeWo1cCutoffMargin(sample, samplesList);
 
+  const toggleEl = document.getElementById("wo1cCockpitToggle");
+  const dialEl = document.getElementById("wo1cGaugeDialBox");
   const titleEl = document.getElementById("wo1cMarginTitle");
   const badgeEl = document.getElementById("wo1cMarginBadge");
+  const markerEl = document.getElementById("wo1cZoneMarker");
   const bodyEl = document.getElementById("wo1cMarginBody");
-  const fillEl = document.getElementById("wo1cMarginBarFill");
-  const pctEl = document.getElementById("wo1cMarginPct");
   const sumEl = document.getElementById("wo1cMarginSummary");
 
-  card.className = `wo1c-margin-card tone-${info.tone || "idle"}${info.mode === "standby" ? " is-standby" : ""}`;
-  if (titleEl) titleEl.textContent = info.title || "🛡️ Margine Anti-Stacco WO1C (7209)";
+  if (toggleEl && !toggleEl.dataset.boundToggle) {
+    toggleEl.dataset.boundToggle = "1";
+    const onToggle = (ev) => {
+      if (ev.target && ev.target.closest && ev.target.closest(".help-info-btn")) return;
+      const b = document.getElementById("wo1cMarginBody");
+      if (!b) return;
+      const isHidden = b.style.display === "none";
+      b.style.display = isHidden ? "" : "none";
+      card.dataset.userToggled = isHidden ? "open" : "closed";
+    };
+    toggleEl.addEventListener("click", onToggle);
+    toggleEl.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        onToggle(ev);
+      }
+    });
+  }
+
+  const isStandby = info.mode === "standby";
+  card.className = `wo1c-margin-card tone-${info.tone || "idle"}${isStandby ? " is-standby" : ""}`;
+  if (titleEl) titleEl.textContent = info.title || "🛡️ Anti-Stacco WO1C (7209)";
   if (badgeEl) {
     badgeEl.textContent = info.badge || "STANDBY";
-    badgeEl.className = `wo1c-margin-badge tone-${info.tone || "idle"}`;
+    badgeEl.className = `wo1c-margin-badge tone-${isStandby && info.lastPeak ? info.lastPeak.maxTone : (info.tone || "idle")}`;
   }
-
-  if (info.mode === "standby") {
-    if (bodyEl) bodyEl.style.display = "none";
-    return;
+  if (dialEl) {
+    dialEl.innerHTML = buildWo1cTachometerSvg(info);
   }
-
-  if (bodyEl) bodyEl.style.display = "";
-  if (fillEl) {
-    fillEl.style.width = `${Math.max(4, Math.min(100, Number(info.pct || 0)))}%`;
-    fillEl.className = `wo1c-margin-bar-fill tone-${info.tone || "safe"}`;
+  if (markerEl) {
+    const markerPct = isStandby
+      ? (info.lastPeak ? info.lastPeak.maxPct : 4)
+      : Math.max(4, Math.min(98, Number(info.pct || 0)));
+    markerEl.style.left = `${markerPct}%`;
+    markerEl.style.opacity = isStandby ? (info.lastPeak ? "0.65" : "0.35") : "1";
   }
-  if (pctEl) pctEl.textContent = info.pctLabel || "--";
   if (sumEl) sumEl.textContent = info.summary || "--";
+
+  if (bodyEl) {
+    if (card.dataset.lastMode !== info.mode) {
+      card.dataset.lastMode = info.mode;
+      delete card.dataset.userToggled;
+    }
+    if (card.dataset.userToggled === "open") {
+      bodyEl.style.display = "";
+    } else if (card.dataset.userToggled === "closed") {
+      bodyEl.style.display = "none";
+    } else {
+      bodyEl.style.display = isStandby ? "none" : "";
+    }
+  }
 
   const c = Array.isArray(info.chips) ? info.chips : [];
   const ids = [

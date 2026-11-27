@@ -2512,61 +2512,89 @@ nav.bottom-nav {
   color: #38bdf8;
 }
 
-/* Live WO1C 7209 Anti-Cutoff Margin Gauge */
+/* Live SCADA WO1C 7209 Anti-Cutoff Tachometer Cockpit */
 .wo1c-margin-card {
   margin-top: 8px;
-  background: rgba(15, 23, 42, 0.88);
-  border: 1px solid #334155;
-  border-radius: 11px;
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.96), rgba(12, 19, 34, 0.94));
+  border: 1px solid rgba(56, 189, 248, 0.26);
+  border-radius: 12px;
   padding: 9px 11px;
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  transition: border-color 0.25s, background-color 0.25s;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
 }
 
 .wo1c-margin-card.is-standby {
-  padding: 6px 11px;
-  opacity: 0.84;
+  border-color: rgba(100, 116, 139, 0.35);
 }
 
 .wo1c-margin-card.tone-safe {
-  border-color: rgba(16, 185, 129, 0.52);
-  background: linear-gradient(180deg, rgba(16, 185, 129, 0.09), rgba(15, 23, 42, 0.92));
+  border-color: rgba(16, 185, 129, 0.58);
+  background: linear-gradient(145deg, rgba(16, 185, 129, 0.10), rgba(12, 19, 34, 0.95));
+  box-shadow: 0 4px 18px rgba(16, 185, 129, 0.12);
 }
 
 .wo1c-margin-card.tone-warn {
-  border-color: rgba(245, 158, 11, 0.68);
-  background: linear-gradient(180deg, rgba(245, 158, 11, 0.12), rgba(15, 23, 42, 0.92));
+  border-color: rgba(245, 158, 11, 0.72);
+  background: linear-gradient(145deg, rgba(245, 158, 11, 0.13), rgba(12, 19, 34, 0.95));
+  box-shadow: 0 4px 18px rgba(245, 158, 11, 0.15);
 }
 
 .wo1c-margin-card.tone-danger {
-  border-color: rgba(239, 68, 68, 0.82);
-  background: linear-gradient(180deg, rgba(239, 68, 68, 0.16), rgba(15, 23, 42, 0.94));
+  border-color: rgba(239, 68, 68, 0.88);
+  background: linear-gradient(145deg, rgba(239, 68, 68, 0.18), rgba(12, 19, 34, 0.96));
+  box-shadow: 0 4px 20px rgba(239, 68, 68, 0.22);
 }
 
 .wo1c-margin-card.tone-defrost {
-  border-color: rgba(56, 189, 248, 0.72);
-  background: linear-gradient(180deg, rgba(56, 189, 248, 0.13), rgba(15, 23, 42, 0.92));
+  border-color: rgba(56, 189, 248, 0.75);
+  background: linear-gradient(145deg, rgba(56, 189, 248, 0.14), rgba(12, 19, 34, 0.95));
 }
 
 .wo1c-margin-card.tone-pause {
-  border-color: rgba(192, 132, 252, 0.65);
-  background: linear-gradient(180deg, rgba(168, 85, 247, 0.12), rgba(15, 23, 42, 0.92));
+  border-color: rgba(192, 132, 252, 0.70);
+  background: linear-gradient(145deg, rgba(168, 85, 247, 0.13), rgba(12, 19, 34, 0.95));
+}
+
+.wo1c-cockpit-top {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.wo1c-dial-box {
+  flex: 0 0 104px;
+  width: 104px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wo1c-cockpit-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .wo1c-margin-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   font-size: 0.74rem;
   font-weight: 800;
   color: var(--text-main);
 }
 
 .wo1c-margin-badge {
-  font-size: 0.64rem;
+  font-size: 0.62rem;
   font-weight: 800;
   padding: 2px 7px;
   border-radius: 999px;
@@ -2574,58 +2602,69 @@ nav.bottom-nav {
   letter-spacing: 0.02em;
 }
 
-.wo1c-margin-badge.tone-idle { background: rgba(148, 163, 184, 0.16); color: #94a3b8; }
+.wo1c-margin-badge.tone-idle { background: rgba(148, 163, 184, 0.18); color: #cbd5e1; }
 .wo1c-margin-badge.tone-safe { background: rgba(16, 185, 129, 0.22); color: #6ee7b7; }
 .wo1c-margin-badge.tone-warn { background: rgba(245, 158, 11, 0.24); color: #fde68a; }
 .wo1c-margin-badge.tone-danger { background: rgba(239, 68, 68, 0.28); color: #fecaca; }
 .wo1c-margin-badge.tone-defrost { background: rgba(56, 189, 248, 0.22); color: #bae6fd; }
 .wo1c-margin-badge.tone-pause { background: rgba(168, 85, 247, 0.22); color: #e9d5ff; }
 
+.wo1c-zone-track {
+  position: relative;
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: visible;
+  background: #0b1120;
+  padding: 1px;
+  gap: 2px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.wo1c-zone-seg {
+  height: 100%;
+  border-radius: 999px;
+  opacity: 0.78;
+}
+
+.wo1c-zone-seg.seg-safe { width: 63%; background: linear-gradient(90deg, #059669, #10b981); }
+.wo1c-zone-seg.seg-warn { width: 21%; background: linear-gradient(90deg, #d97706, #f59e0b); }
+.wo1c-zone-seg.seg-danger { width: 16%; background: linear-gradient(90deg, #ea580c, #ef4444); }
+
+.wo1c-zone-marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #f8fafc;
+  border: 2.5px solid #0f172a;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.85);
+  transition: left 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+
+.wo1c-zone-ScaleLabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.56rem;
+  color: #64748b;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .wo1c-margin-body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-}
-
-.wo1c-margin-bar-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.wo1c-margin-bar-bg {
-  flex: 1;
-  height: 9px;
-  border-radius: 6px;
-  background: #1e293b;
-  overflow: hidden;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-}
-
-.wo1c-margin-bar-fill {
-  height: 100%;
-  border-radius: 6px;
-  transition: width 0.3s ease;
-}
-
-.wo1c-margin-bar-fill.tone-safe { background: linear-gradient(90deg, #10b981, #34d399); }
-.wo1c-margin-bar-fill.tone-warn { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
-.wo1c-margin-bar-fill.tone-danger { background: linear-gradient(90deg, #f97316, #ef4444); }
-.wo1c-margin-bar-fill.tone-defrost { background: linear-gradient(90deg, #0284c7, #38bdf8); }
-.wo1c-margin-bar-fill.tone-pause { background: linear-gradient(90deg, #9333ea, #c084fc); }
-
-.wo1c-margin-pct {
-  font-size: 0.74rem;
-  font-weight: 800;
-  min-width: 38px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-main);
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+  padding-top: 7px;
 }
 
 .wo1c-margin-summary {
-  font-size: 0.69rem;
-  line-height: 1.38;
+  font-size: 0.67rem;
+  line-height: 1.35;
   color: #cbd5e1;
 }
 
@@ -2635,15 +2674,20 @@ nav.bottom-nav {
   gap: 6px;
 }
 
-@media (max-width: 440px) {
+@media (max-width: 480px) {
+  .wo1c-dial-box {
+    flex: 0 0 92px;
+    width: 92px;
+    height: 58px;
+  }
   .wo1c-margin-chips {
     grid-template-columns: 1fr;
   }
 }
 
 .wo1c-chip {
-  background: rgba(15, 23, 42, 0.75);
-  border: 1px solid rgba(51, 65, 85, 0.8);
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(51, 65, 85, 0.85);
   border-radius: 7px;
   padding: 5px 7px;
   display: flex;
@@ -2653,7 +2697,7 @@ nav.bottom-nav {
 }
 
 .wo1c-chip-lbl {
-  font-size: 0.59rem;
+  font-size: 0.58rem;
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;

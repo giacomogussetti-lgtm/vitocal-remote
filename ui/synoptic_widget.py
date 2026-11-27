@@ -5,6 +5,7 @@ for the Vitocal 111-S Heat Pump, 200L Buffer, Grundfos Pump, and BTicino Smarthe
 Includes complete thermodynamic telemetry from Viessmann APIs with generous spacing
 to eliminate any label or badge overlapping.
 """
+import math
 from typing import Any, Optional
 from PyQt6.QtCore import Qt, QRectF, QPointF
 from PyQt6.QtGui import (
@@ -229,9 +230,9 @@ class SynopticCanvas(QWidget):
         self._draw_badge(
             painter,
             puffer_rect.center().x() - 65,
-            puffer_rect.center().y() - 68,
+            puffer_rect.top() + 58,
             130,
-            56,
+            52,
             "Sonda Accumulo 200L",
             f"{puffer_temp} °C",
             "#f59e0b",
@@ -256,12 +257,22 @@ class SynopticCanvas(QWidget):
         self._draw_badge(
             painter,
             puffer_rect.center().x() - 65,
-            puffer_rect.center().y() + 2,
+            puffer_rect.top() + 118,
             130,
-            56,
+            52,
             "Target Acqua (Puffer)",
             tgt_water_txt,
             "#e879f9",
+        )
+
+        # Live WO1C 7209 Anti-Stacco Gauge inside Puffer 200L
+        self._draw_wo1c_antistacco_gauge(
+            painter,
+            puffer_rect.center().x() - 66,
+            puffer_rect.top() + 180,
+            132,
+            116,
+            tgt_water if tgt_water is not None else ap_st.get("calculated_target_lwt_c"),
         )
 
         # Technical notes at the bottom of the puffer
@@ -427,6 +438,154 @@ class SynopticCanvas(QWidget):
         painter.setPen(QColor(color_hex))
         painter.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
         painter.drawText(QRectF(x + 8, y + 20, w - 16, 24), Qt.AlignmentFlag.AlignLeft, str(val))
+
+    def _draw_wo1c_antistacco_gauge(
+        self,
+        painter: QPainter,
+        x: float,
+        y: float,
+        w: float,
+        h: float,
+        target_lwt: Any,
+    ):
+        """Draws the live SCADA semicircular WO1C 7209 Anti-Stacco / 7203 / Defrost gauge inside the Puffer."""
+        d = self.data or {}
+        prog = str(d.get("active_program") or "standby").lower()
+        phase = str(d.get("compressor_phase") or "off").lower()
+        try:
+            mod = float(d.get("compressor_modulation_percent") or 0.0)
+        except (TypeError, ValueError):
+            mod = 0.0
+        comp_on = bool(d.get("compressor_active") == 1 or mod > 0.0)
+
+        def _f(val: Any) -> Optional[float]:
+            try:
+                return float(val) if val is not None and val != "--" else None
+            except (TypeError, ValueError):
+                return None
+
+        buf = _f(d.get("buffer_temp_c"))
+        ewt = _f(d.get("pdc_return_temp_c"))
+        lwt = _f(d.get("pdc_supply_temp_c"))
+        tgt = _f(target_lwt)
+
+        border_hex = "#334155"
+        accent_hex = "#64748b"
+        center_txt = "STBY"
+        sub_txt = "A RIPOSO"
+        foot_txt = "Attivo a PdC accesa"
+        frac = 0.04
+
+        if not comp_on and prog == "standby":
+            pass
+        elif "defrost" in phase:
+            lwt_m = (lwt - 12.0) if lwt is not None else 4.0
+            frac = max(0.06, min(1.0, (22.0 - (lwt if lwt is not None else 18.0)) / 10.0))
+            if lwt_m < 0.5:
+                border_hex = accent_hex = "#ef4444"
+                sub_txt = "BPHE CRIT."
+            elif lwt_m < 2.0:
+                border_hex = accent_hex = "#f59e0b"
+                sub_txt = "BPHE CALO"
+            else:
+                border_hex = accent_hex = "#38bdf8"
+                sub_txt = "DEFROST OK"
+            center_txt = f"{lwt:.1f}°" if lwt is not None else "DEF"
+            foot_txt = f"Marg. BPHE: {lwt_m:+.1f}K su 12°"
+        elif not comp_on and prog != "standby":
+            border_hex = accent_hex = "#a78bfa"
+            if buf is not None and tgt is not None:
+                rem = max(0.0, buf - (tgt - 5.0))
+                frac = max(0.06, min(1.0, ((tgt + 2.5) - buf) / 7.5))
+                center_txt = f"{rem:.1f}K"
+                sub_txt = "PAUSA 7203"
+                foot_txt = f"Riavvio a ≤{tgt - 5.0:.1f} °C"
+            else:
+                center_txt = "7203"
+                sub_txt = "PAUSA"
+                foot_txt = "Attesa discesa puffer"
+        elif buf is not None and tgt is not None:
+            m_buf = (tgt + 2.5) - buf
+            m_ewt = (tgt - ewt) if ewt is not None else None
+            s_buf = max(0.0, min(1.0, (buf - (tgt - 0.5)) / 3.0))
+            s_ewt = max(0.0, min(1.0, (ewt - (tgt - 2.5)) / 2.5)) if ewt is not None else (s_buf * 0.85)
+            frac = 0.50 * s_buf + 0.50 * s_ewt
+            if (buf - tgt) > 0.6 and mod >= 68.0:
+                frac = min(1.0, frac + 0.10)
+            if m_ewt is not None and m_ewt > 0.35:
+                frac = min(frac, 0.78)
+            if m_buf <= 0.8 and (m_ewt is None or m_ewt <= 0.30):
+                frac = max(frac, 0.88)
+            pct = int(round(max(0.04, min(1.0, frac)) * 100))
+            center_txt = f"{pct}%"
+            if pct >= 85:
+                border_hex = accent_hex = "#ef4444"
+                sub_txt = "RISCHIO 7209"
+            elif pct >= 64:
+                border_hex = accent_hex = "#f59e0b"
+                sub_txt = "AVVICINAM."
+            else:
+                border_hex = accent_hex = "#10b981"
+                sub_txt = "MARGINE OK"
+            ewt_part = f" / F {m_ewt:+.1f}K" if m_ewt is not None else ""
+            foot_txt = f"T {m_buf:+.1f}K{ewt_part}"
+        else:
+            border_hex = accent_hex = "#10b981"
+            center_txt = "ON"
+            sub_txt = "IN MARCIA"
+            foot_txt = f"Mod {mod:.0f}%"
+
+        box = QRectF(x, y, w, h)
+        painter.setBrush(QBrush(QColor("#0b1220")))
+        painter.setPen(QPen(QColor(border_hex), 1.3))
+        painter.drawRoundedRect(box, 8, 8)
+
+        painter.setPen(QColor("#cbd5e1"))
+        painter.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+        painter.drawText(QRectF(x + 4, y + 4, w - 8, 14), Qt.AlignmentFlag.AlignCenter, "ANTI-STACCO 7209")
+
+        cx = x + w / 2.0
+        cy = y + 66.0
+        r = 36.0
+        arc_rect = QRectF(cx - r, cy - r, 2 * r, 2 * r)
+
+        # Semicircular 3-zone track (180 deg clockwise to 0 deg)
+        def _draw_zone(f0: float, f1: float, col: str, alpha: int, width: float):
+            c = QColor(col)
+            c.setAlpha(alpha)
+            pen = QPen(c, width, Qt.PenStyle.SolidLine, Qt.PenCapStyle.FlatCap)
+            painter.setPen(pen)
+            s_deg = 180.0 * (1.0 - f0)
+            sp_deg = -180.0 * (f1 - f0)
+            painter.drawArc(arc_rect, int(round(s_deg * 16)), int(round(sp_deg * 16)))
+
+        _draw_zone(0.00, 0.625, "#10b981", 90, 6.0)
+        _draw_zone(0.640, 0.835, "#f59e0b", 100, 6.0)
+        _draw_zone(0.850, 1.000, "#ef4444", 115, 6.0)
+
+        if comp_on or prog != "standby":
+            inner_r = r - 5.5
+            in_rect = QRectF(cx - inner_r, cy - inner_r, 2 * inner_r, 2 * inner_r)
+            painter.setPen(QPen(QColor(accent_hex), 3.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            painter.drawArc(in_rect, 180 * 16, int(round(-180.0 * max(0.04, min(1.0, frac)) * 16)))
+
+            ang = math.pi * (1.0 - max(0.03, min(1.0, frac)))
+            p_in = QPointF(cx + (r - 4.0) * math.cos(ang), cy - (r - 4.0) * math.sin(ang))
+            p_out = QPointF(cx + (r + 4.0) * math.cos(ang), cy - (r + 4.0) * math.sin(ang))
+            painter.setPen(QPen(QColor("#f8fafc"), 2.4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            painter.drawLine(p_in, p_out)
+
+        painter.setPen(QColor("#f8fafc" if (comp_on or prog != "standby") else "#94a3b8"))
+        painter.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        painter.drawText(QRectF(x + 8, cy - 22, w - 16, 18), Qt.AlignmentFlag.AlignCenter, center_txt)
+
+        painter.setPen(QColor(accent_hex))
+        painter.setFont(QFont("Segoe UI", 6, QFont.Weight.Bold))
+        painter.drawText(QRectF(x + 6, cy - 4, w - 12, 13), Qt.AlignmentFlag.AlignCenter, sub_txt)
+
+        painter.setPen(QColor("#94a3b8"))
+        painter.setFont(QFont("Segoe UI", 7, QFont.Weight.DemiBold))
+        painter.drawText(QRectF(x + 4, y + h - 22, w - 8, 18), Qt.AlignmentFlag.AlignCenter, foot_txt)
 
     def _draw_pipe_sensor_tag(
         self,
