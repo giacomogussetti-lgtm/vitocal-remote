@@ -797,16 +797,16 @@
     }
   ],
   "calibration": {
-    "oat_samples_matched": 22,
-    "oat_bias_c": 0.81,
-    "oat_raw_mae_c": 1.23,
-    "oat_mae_c": 0.71,
-    "oat_max_abs_err_c": 1.39,
+    "oat_samples_matched": 21,
+    "oat_bias_c": 0.76,
+    "oat_raw_mae_c": 1.21,
+    "oat_mae_c": 0.72,
+    "oat_max_abs_err_c": 1.44,
     "frost_active_hours_matched": 3,
     "frost_penalty_scale": 1.0,
-    "tin_proj_samples_matched": 19,
-    "tin_projection_mae_c": 0.21,
-    "calibrated_utc": "2026-11-27T13:31:39.290420+00:00"
+    "tin_proj_samples_matched": 18,
+    "tin_projection_mae_c": 0.18,
+    "calibrated_utc": "2026-11-27T13:32:31.609350+00:00"
   },
   "calibration_history": [
     {
@@ -2610,7 +2610,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "27/11 14:31",
+    "evaluated_local": "27/11 14:32",
     "effective_window_start": "11:00",
     "effective_window_end": "16:00",
     "window_locked": true,
@@ -2618,7 +2618,7 @@
     "committed_window_start": "11:00",
     "committed_window_end": "16:00",
     "in_window_now": true,
-    "remaining_window_min": 89,
+    "remaining_window_min": 88,
     "next_hour_cop_net": 5.04,
     "next_hour_label": "Oggi 14:00",
     "today_window": {
@@ -2665,7 +2665,7 @@
       "end_tin_c": 7.21,
       "hours_simulated": 18.5,
       "target_local": "28/11 09:00",
-      "first_below_tmin_local": "28/11 04:31",
+      "first_below_tmin_local": "28/11 04:32",
       "first_below_safe_local": null
     },
     "short_cycle_action": "normal",
@@ -2674,7 +2674,7 @@
     "prearm_reason": null,
     "defer_recommended": false,
     "defer_reason": null,
-    "decision_summary": "☀️ In finestra COP attiva (11:00–16:00, restano 89m)",
+    "decision_summary": "☀️ In finestra COP attiva (11:00–16:00, restano 88m)",
     "decision_trace": [
       "Finestra Oggi: 11:00–16:00 🔒 (COP netto stimato 4.91, OAT +3.8°C, RH 94%, Brina MEDIO, allineata a statica).",
       "Finestra Domani: 09:00–14:00 (COP netto 4.81, OAT +2.3°C, RH 82%, Brina MEDIO).",
@@ -2690,13 +2690,13 @@
       "safe_floor_c": 7.2,
       "min_cycle_minutes": 120,
       "arbitrage_cop_delta": 0.25,
-      "oat_bias_c": 0.81,
-      "oat_raw_mae_c": 1.23,
-      "oat_mae_c": 0.71,
-      "oat_max_abs_err_c": 1.39,
-      "oat_samples_matched": 22,
+      "oat_bias_c": 0.76,
+      "oat_raw_mae_c": 1.21,
+      "oat_mae_c": 0.72,
+      "oat_max_abs_err_c": 1.44,
+      "oat_samples_matched": 21,
       "frost_penalty_scale": 1.0,
-      "tin_projection_mae_c": 0.21
+      "tin_projection_mae_c": 0.18
     }
   }
 }
