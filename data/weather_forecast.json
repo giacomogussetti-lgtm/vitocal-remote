@@ -806,7 +806,7 @@
     "frost_penalty_scale": 0.88,
     "tin_proj_samples_matched": 0,
     "tin_projection_mae_c": null,
-    "calibrated_utc": "2026-11-27T15:01:22.454072+00:00"
+    "calibrated_utc": "2026-11-27T15:01:46.347258+00:00"
   },
   "calibration_history": [
     {
@@ -1874,7 +1874,7 @@
       "tin_projection_mae_c": null
     },
     {
-      "ts_utc": "2026-11-27T15:01:22.454066+00:00",
+      "ts_utc": "2026-11-27T15:01:46.347253+00:00",
       "oat_samples_matched": 5,
       "oat_bias_c": 0.71,
       "oat_raw_mae_c": 2.46,

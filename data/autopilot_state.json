@@ -1,12 +1,12 @@
 {
   "state": "PUFFER_DRAIN",
-  "state_since_utc": "2026-11-27T15:01:22.434088+00:00",
+  "state_since_utc": "2026-11-27T15:01:46.327329+00:00",
   "below_threshold_since_utc": "2026-11-27T10:01:18.065407+00:00",
   "cycle_started_utc": "2026-11-27T10:35:40.628623+00:00",
   "cycle_is_emergency": false,
-  "drain_started_utc": "2026-11-27T15:01:22.434088+00:00",
-  "last_eval_utc": "2026-11-27T15:01:22.434088+00:00",
-  "last_action_utc": "2026-11-27T15:01:22.434088+00:00",
+  "drain_started_utc": "2026-11-27T15:01:46.327329+00:00",
+  "last_eval_utc": "2026-11-27T15:01:46.327329+00:00",
+  "last_action_utc": "2026-11-27T15:01:46.327329+00:00",
   "last_action_reason": "Stop PdC (Fine finestra COP (16:00)), avvio scarico puffer 25 min. Modalità PdC impostata e verificata: standby | Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual)",
   "indoor_slope_c_per_h": 0.173,
   "calculated_target_lwt_c": 23.7,
@@ -22,7 +22,7 @@
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": -1,
   "soft_curve_last_trim_utc": "2026-11-27T11:02:36.054104+00:00",
-  "last_grundfos_run_utc": "2026-11-27T15:01:22.434088+00:00",
+  "last_grundfos_run_utc": "2026-11-27T15:01:46.327329+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
@@ -2559,14 +2559,14 @@
         "gh": 1
       },
       {
-        "ts": "2026-11-27T15:01:22.431806+00:00",
+        "ts": "2026-11-27T15:01:46.325308+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
         "gh": 1
       },
       {
-        "ts": "2026-11-27T15:01:28.380239+00:00",
+        "ts": "2026-11-27T15:01:48.836206+00:00",
         "lbl": "ap_stop_pdc_drain",
         "vr": 2,
         "vw": 1,
