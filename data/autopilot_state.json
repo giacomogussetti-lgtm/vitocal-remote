@@ -5,10 +5,10 @@
   "cycle_started_utc": "2026-11-27T10:35:40.628623+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-27T13:54:00.051031+00:00",
+  "last_eval_utc": "2026-11-27T13:54:32.982054+00:00",
   "last_action_utc": "2026-11-27T11:02:36.054104+00:00",
   "last_action_reason": "Defrost Guard (0 brin., ΔEvap=15K): ridotto SP −1°C -> 13°C (Target Acqua 23.7°C) per modulare dolce senza stacchi.",
-  "indoor_slope_c_per_h": 0.226,
+  "indoor_slope_c_per_h": 0.224,
   "calculated_target_lwt_c": 23.7,
   "calculated_pdc_setpoint_c": 13,
   "target_pdc_setpoint_c": 15,
@@ -22,7 +22,7 @@
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": -1,
   "soft_curve_last_trim_utc": "2026-11-27T11:02:36.054104+00:00",
-  "last_grundfos_run_utc": "2026-11-27T13:54:00.051031+00:00",
+  "last_grundfos_run_utc": "2026-11-27T13:54:32.982054+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
@@ -122,8 +122,8 @@
     },
     "projection_to_tomorrow": {
       "start_tin_c": 8.1,
-      "min_tin_c": 7.2,
-      "end_tin_c": 7.2,
+      "min_tin_c": 7.21,
+      "end_tin_c": 7.21,
       "hours_simulated": 18.1,
       "target_local": "28/11 09:00",
       "first_below_tmin_local": "28/11 04:54",
@@ -157,17 +157,17 @@
       "oat_max_abs_err_c": 1.63,
       "oat_samples_matched": 16,
       "frost_penalty_scale": 1.0,
-      "tin_projection_mae_c": 0.08
+      "tin_projection_mae_c": 0.07
     }
   },
   "api_usage": {
     "date_utc": "2026-11-27",
-    "viessmann_reads": 486,
+    "viessmann_reads": 488,
     "viessmann_writes": 8,
-    "bticino_reads": 475,
+    "bticino_reads": 477,
     "bticino_writes": 1,
     "cronjob_patches": 2,
-    "github_runs": 237,
+    "github_runs": 238,
     "recent_events": [
       {
         "ts": "2026-11-26T13:54:33.291390+00:00",
@@ -2371,6 +2371,13 @@
       },
       {
         "ts": "2026-11-27T13:54:00.047606+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-27T13:54:32.978810+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,

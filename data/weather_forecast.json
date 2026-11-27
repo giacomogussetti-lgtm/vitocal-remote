@@ -805,8 +805,8 @@
     "frost_active_hours_matched": 3,
     "frost_penalty_scale": 1.0,
     "tin_proj_samples_matched": 13,
-    "tin_projection_mae_c": 0.08,
-    "calibrated_utc": "2026-11-27T13:54:00.079283+00:00"
+    "tin_projection_mae_c": 0.07,
+    "calibrated_utc": "2026-11-27T13:54:33.014039+00:00"
   },
   "calibration_history": [
     {
@@ -2661,8 +2661,8 @@
     },
     "projection_to_tomorrow": {
       "start_tin_c": 8.1,
-      "min_tin_c": 7.2,
-      "end_tin_c": 7.2,
+      "min_tin_c": 7.21,
+      "end_tin_c": 7.21,
       "hours_simulated": 18.1,
       "target_local": "28/11 09:00",
       "first_below_tmin_local": "28/11 04:54",
@@ -2696,7 +2696,7 @@
       "oat_max_abs_err_c": 1.63,
       "oat_samples_matched": 16,
       "frost_penalty_scale": 1.0,
-      "tin_projection_mae_c": 0.08
+      "tin_projection_mae_c": 0.07
     }
   }
 }
