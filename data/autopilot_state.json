@@ -5,10 +5,10 @@
   "cycle_started_utc": "2026-11-27T10:35:40.628623+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-27T11:31:07.577749+00:00",
+  "last_eval_utc": "2026-11-27T11:31:27.711988+00:00",
   "last_action_utc": "2026-11-27T11:02:36.054104+00:00",
   "last_action_reason": "Defrost Guard (0 brin., ΔEvap=15K): ridotto SP −1°C -> 13°C (Target Acqua 23.7°C) per modulare dolce senza stacchi.",
-  "indoor_slope_c_per_h": 0.012,
+  "indoor_slope_c_per_h": 0.015,
   "calculated_target_lwt_c": 23.7,
   "calculated_pdc_setpoint_c": 13,
   "target_pdc_setpoint_c": 15,
@@ -22,7 +22,7 @@
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": -1,
   "soft_curve_last_trim_utc": "2026-11-27T11:02:36.054104+00:00",
-  "last_grundfos_run_utc": "2026-11-27T11:31:07.577749+00:00",
+  "last_grundfos_run_utc": "2026-11-27T11:31:27.711988+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
@@ -162,20 +162,13 @@
   },
   "api_usage": {
     "date_utc": "2026-11-27",
-    "viessmann_reads": 208,
+    "viessmann_reads": 210,
     "viessmann_writes": 8,
-    "bticino_reads": 197,
+    "bticino_reads": 199,
     "bticino_writes": 1,
     "cronjob_patches": 2,
-    "github_runs": 98,
+    "github_runs": 99,
     "recent_events": [
-      {
-        "ts": "2026-11-26T11:31:08.549176+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-26T11:31:33.819349+00:00",
         "lbl": "telemetry_poll",
@@ -2386,6 +2379,13 @@
       },
       {
         "ts": "2026-11-27T11:31:07.574353+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-27T11:31:27.708783+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
