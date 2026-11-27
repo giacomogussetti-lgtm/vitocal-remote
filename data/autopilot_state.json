@@ -5,10 +5,10 @@
   "cycle_started_utc": null,
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-27T01:45:49.054646+00:00",
+  "last_eval_utc": "2026-11-27T02:01:16.617879+00:00",
   "last_action_utc": "2026-11-26T14:27:31.343850+00:00",
-  "last_action_reason": "Standby OK: T=7.9°C > 7.5°C (pendenza -0.01°C/h). 🕒 Fuori finestra (11:00–16:00): attesa ora migliore o emergenza ≤ 6.8°C",
-  "indoor_slope_c_per_h": -0.013,
+  "last_action_reason": "Standby OK: T=7.9°C > 7.5°C (pendenza -0.02°C/h). 🕒 Fuori finestra (11:00–16:00): attesa ora migliore o emergenza ≤ 6.8°C",
+  "indoor_slope_c_per_h": -0.024,
   "calculated_target_lwt_c": 26.3,
   "calculated_pdc_setpoint_c": 15,
   "target_pdc_setpoint_c": 15,
@@ -69,9 +69,9 @@
   "min_end_ext_count": 0,
   "weather_plan": {
     "available": true,
-    "source": "open_meteo_live",
+    "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "27/11 02:45",
+    "evaluated_local": "27/11 03:01",
     "effective_window_start": "11:00",
     "effective_window_end": "16:00",
     "window_locked": false,
@@ -124,10 +124,10 @@
       "start_tin_c": 7.9,
       "min_tin_c": 6.59,
       "end_tin_c": 6.59,
-      "hours_simulated": 30.2,
+      "hours_simulated": 30.0,
       "target_local": "28/11 09:00",
-      "first_below_tmin_local": "27/11 11:45",
-      "first_below_safe_local": "27/11 20:45"
+      "first_below_tmin_local": "27/11 12:01",
+      "first_below_safe_local": "27/11 21:01"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -139,7 +139,7 @@
     "decision_trace": [
       "Finestra Oggi: 11:00–16:00 (COP netto stimato 5.20, OAT +4.3°C, RH 92%, Brina MEDIO, allineata a statica).",
       "Finestra Domani: 09:00–14:00 (COP netto 5.11, OAT +2.6°C, RH 76%, Brina MEDIO).",
-      "Proiezione prudenziale sicurezza fino a domani 09:00 (30.2h, UA×1.15=0.207): 7.9°C → 6.6°C (min 6.6°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.180)."
+      "Proiezione prudenziale sicurezza fino a domani 09:00 (30.0h, UA×1.15=0.207): 7.9°C → 6.6°C (min 6.6°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.180)."
     ],
     "assumptions": {
       "ua_raw_c_24h_k": 0.18,
@@ -151,52 +151,24 @@
       "safe_floor_c": 7.2,
       "min_cycle_minutes": 120,
       "arbitrage_cop_delta": 0.25,
-      "oat_bias_c": 0.67,
-      "oat_raw_mae_c": 1.25,
-      "oat_mae_c": 0.61,
-      "oat_max_abs_err_c": 1.33,
-      "oat_samples_matched": 15,
+      "oat_bias_c": 0.66,
+      "oat_raw_mae_c": 1.19,
+      "oat_mae_c": 0.64,
+      "oat_max_abs_err_c": 1.34,
+      "oat_samples_matched": 16,
       "frost_penalty_scale": 0.88,
-      "tin_projection_mae_c": 0.25
+      "tin_projection_mae_c": 0.24
     }
   },
   "api_usage": {
     "date_utc": "2026-11-27",
-    "viessmann_reads": 16,
+    "viessmann_reads": 18,
     "viessmann_writes": 0,
-    "bticino_reads": 16,
+    "bticino_reads": 18,
     "bticino_writes": 0,
     "cronjob_patches": 0,
-    "github_runs": 8,
+    "github_runs": 9,
     "recent_events": [
-      {
-        "ts": "2026-11-26T01:45:49.990338+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-26T01:50:59.946576+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-26T01:55:37.383138+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-26T02:01:15.674390+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-26T02:06:00.195946+00:00",
         "lbl": "telemetry_poll",
@@ -3699,6 +3671,13 @@
       },
       {
         "ts": "2026-11-27T01:45:49.051787+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-27T02:01:16.614684+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,

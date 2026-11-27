@@ -797,16 +797,16 @@
     }
   ],
   "calibration": {
-    "oat_samples_matched": 15,
-    "oat_bias_c": 0.67,
-    "oat_raw_mae_c": 1.25,
-    "oat_mae_c": 0.61,
-    "oat_max_abs_err_c": 1.33,
+    "oat_samples_matched": 16,
+    "oat_bias_c": 0.66,
+    "oat_raw_mae_c": 1.19,
+    "oat_mae_c": 0.64,
+    "oat_max_abs_err_c": 1.34,
     "frost_active_hours_matched": 4,
     "frost_penalty_scale": 0.88,
-    "tin_proj_samples_matched": 6,
-    "tin_projection_mae_c": 0.25,
-    "calibrated_utc": "2026-11-27T01:45:49.210235+00:00"
+    "tin_proj_samples_matched": 7,
+    "tin_projection_mae_c": 0.24,
+    "calibrated_utc": "2026-11-27T02:01:16.637261+00:00"
   },
   "calibration_history": [
     {
@@ -1796,13 +1796,6 @@
   ],
   "recent_oat_checks": [
     {
-      "time_local": "2026-11-26T15:00",
-      "forecast_raw_c": 4.1,
-      "forecast_corr_c": 4.8,
-      "actual_oat_c": 4.7,
-      "err_corr_c": -0.1
-    },
-    {
       "time_local": "2026-11-26T16:00",
       "forecast_raw_c": 3.5,
       "forecast_corr_c": 4.2,
@@ -1878,6 +1871,13 @@
       "forecast_corr_c": 2.8,
       "actual_oat_c": 2.7,
       "err_corr_c": -0.1
+    },
+    {
+      "time_local": "2026-11-27T03:00",
+      "forecast_raw_c": 2.0,
+      "forecast_corr_c": 2.7,
+      "actual_oat_c": 1.7,
+      "err_corr_c": -1.0
     }
   ],
   "prediction_history": [
@@ -2008,24 +2008,15 @@
       "state": "IDLE",
       "target_local": "2026-11-27T08:00",
       "pred_tin_c": 7.72
+    },
+    {
+      "created_utc": "2026-11-27T02:01:16.617879+00:00",
+      "state": "IDLE",
+      "target_local": "2026-11-27T09:00",
+      "pred_tin_c": 7.64
     }
   ],
   "hourly_preview": [
-    {
-      "time_local": "2026-11-27T02:00",
-      "hh": "02:00",
-      "day_tag": "Oggi",
-      "icon": "☁️",
-      "temp_c": 2.8,
-      "rh_pct": 89,
-      "cop_net": 4.72,
-      "frost_risk": "MEDIO",
-      "precip_mm": 0.0,
-      "solar_wm2": 0.0,
-      "tin_proj_c": 7.9,
-      "tin_mode": "now",
-      "in_window": false
-    },
     {
       "time_local": "2026-11-27T03:00",
       "hh": "03:00",
@@ -2037,8 +2028,8 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.86,
-      "tin_mode": "cool",
+      "tin_proj_c": 7.9,
+      "tin_mode": "now",
       "in_window": false
     },
     {
@@ -2052,7 +2043,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.82,
+      "tin_proj_c": 7.86,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2067,7 +2058,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.78,
+      "tin_proj_c": 7.81,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2082,7 +2073,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.73,
+      "tin_proj_c": 7.77,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2097,7 +2088,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.68,
+      "tin_proj_c": 7.72,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2112,7 +2103,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 3.0,
-      "tin_proj_c": 7.64,
+      "tin_proj_c": 7.68,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2127,7 +2118,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 61.0,
-      "tin_proj_c": 7.6,
+      "tin_proj_c": 7.64,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2142,7 +2133,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 140.0,
-      "tin_proj_c": 7.57,
+      "tin_proj_c": 7.6,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2157,7 +2148,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 223.0,
-      "tin_proj_c": 7.54,
+      "tin_proj_c": 7.58,
       "tin_mode": "cool",
       "in_window": true
     },
@@ -2172,7 +2163,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 232.0,
-      "tin_proj_c": 7.52,
+      "tin_proj_c": 7.55,
       "tin_mode": "cool",
       "in_window": true
     },
@@ -2187,7 +2178,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 238.0,
-      "tin_proj_c": 7.49,
+      "tin_proj_c": 7.53,
       "tin_mode": "cool",
       "in_window": true
     },
@@ -2202,7 +2193,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 204.0,
-      "tin_proj_c": 7.47,
+      "tin_proj_c": 7.51,
       "tin_mode": "cool",
       "in_window": true
     },
@@ -2217,7 +2208,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 148.0,
-      "tin_proj_c": 7.45,
+      "tin_proj_c": 7.48,
       "tin_mode": "cool",
       "in_window": true
     },
@@ -2232,7 +2223,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 58.0,
-      "tin_proj_c": 7.42,
+      "tin_proj_c": 7.45,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2247,7 +2238,7 @@
       "frost_risk": "ALTO",
       "precip_mm": 0.0,
       "solar_wm2": 5.0,
-      "tin_proj_c": 7.39,
+      "tin_proj_c": 7.42,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2262,7 +2253,7 @@
       "frost_risk": "ALTO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.35,
+      "tin_proj_c": 7.39,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2277,7 +2268,7 @@
       "frost_risk": "ALTO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.32,
+      "tin_proj_c": 7.35,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2292,7 +2283,7 @@
       "frost_risk": "ALTO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.28,
+      "tin_proj_c": 7.31,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2307,7 +2298,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.25,
+      "tin_proj_c": 7.28,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2322,7 +2313,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.21,
+      "tin_proj_c": 7.24,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2337,7 +2328,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.17,
+      "tin_proj_c": 7.21,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2352,7 +2343,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.13,
+      "tin_proj_c": 7.16,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2367,7 +2358,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.08,
+      "tin_proj_c": 7.12,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2382,7 +2373,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.04,
+      "tin_proj_c": 7.07,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2397,7 +2388,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 6.99,
+      "tin_proj_c": 7.02,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2412,7 +2403,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 6.94,
+      "tin_proj_c": 6.97,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2427,7 +2418,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 6.89,
+      "tin_proj_c": 6.92,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2442,7 +2433,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 6.84,
+      "tin_proj_c": 6.87,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2457,16 +2448,31 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 6.79,
+      "tin_proj_c": 6.82,
+      "tin_mode": "cool",
+      "in_window": false
+    },
+    {
+      "time_local": "2026-11-28T08:00",
+      "hh": "08:00",
+      "day_tag": "Dom",
+      "icon": "🌙",
+      "temp_c": 0.4,
+      "rh_pct": 60,
+      "cop_net": 4.94,
+      "frost_risk": "BASSO",
+      "precip_mm": 0.0,
+      "solar_wm2": 3.0,
+      "tin_proj_c": 6.77,
       "tin_mode": "cool",
       "in_window": false
     }
   ],
   "plan": {
     "available": true,
-    "source": "open_meteo_live",
+    "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "27/11 02:45",
+    "evaluated_local": "27/11 03:01",
     "effective_window_start": "11:00",
     "effective_window_end": "16:00",
     "window_locked": false,
@@ -2519,10 +2525,10 @@
       "start_tin_c": 7.9,
       "min_tin_c": 6.59,
       "end_tin_c": 6.59,
-      "hours_simulated": 30.2,
+      "hours_simulated": 30.0,
       "target_local": "28/11 09:00",
-      "first_below_tmin_local": "27/11 11:45",
-      "first_below_safe_local": "27/11 20:45"
+      "first_below_tmin_local": "27/11 12:01",
+      "first_below_safe_local": "27/11 21:01"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -2534,7 +2540,7 @@
     "decision_trace": [
       "Finestra Oggi: 11:00–16:00 (COP netto stimato 5.20, OAT +4.3°C, RH 92%, Brina MEDIO, allineata a statica).",
       "Finestra Domani: 09:00–14:00 (COP netto 5.11, OAT +2.6°C, RH 76%, Brina MEDIO).",
-      "Proiezione prudenziale sicurezza fino a domani 09:00 (30.2h, UA×1.15=0.207): 7.9°C → 6.6°C (min 6.6°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.180)."
+      "Proiezione prudenziale sicurezza fino a domani 09:00 (30.0h, UA×1.15=0.207): 7.9°C → 6.6°C (min 6.6°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.180)."
     ],
     "assumptions": {
       "ua_raw_c_24h_k": 0.18,
@@ -2546,13 +2552,13 @@
       "safe_floor_c": 7.2,
       "min_cycle_minutes": 120,
       "arbitrage_cop_delta": 0.25,
-      "oat_bias_c": 0.67,
-      "oat_raw_mae_c": 1.25,
-      "oat_mae_c": 0.61,
-      "oat_max_abs_err_c": 1.33,
-      "oat_samples_matched": 15,
+      "oat_bias_c": 0.66,
+      "oat_raw_mae_c": 1.19,
+      "oat_mae_c": 0.64,
+      "oat_max_abs_err_c": 1.34,
+      "oat_samples_matched": 16,
       "frost_penalty_scale": 0.88,
-      "tin_projection_mae_c": 0.25
+      "tin_projection_mae_c": 0.24
     }
   }
 }
