@@ -5,10 +5,10 @@
   "cycle_started_utc": "2026-11-27T10:35:40.628623+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-27T12:38:31.415410+00:00",
+  "last_eval_utc": "2026-11-27T12:39:27.581805+00:00",
   "last_action_utc": "2026-11-27T11:02:36.054104+00:00",
   "last_action_reason": "Defrost Guard (0 brin., ΔEvap=15K): ridotto SP −1°C -> 13°C (Target Acqua 23.7°C) per modulare dolce senza stacchi.",
-  "indoor_slope_c_per_h": 0.233,
+  "indoor_slope_c_per_h": 0.234,
   "calculated_target_lwt_c": 23.7,
   "calculated_pdc_setpoint_c": 13,
   "target_pdc_setpoint_c": 15,
@@ -22,7 +22,7 @@
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": -1,
   "soft_curve_last_trim_utc": "2026-11-27T11:02:36.054104+00:00",
-  "last_grundfos_run_utc": "2026-11-27T12:38:31.415410+00:00",
+  "last_grundfos_run_utc": "2026-11-27T12:39:27.581805+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
@@ -71,7 +71,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "27/11 13:38",
+    "evaluated_local": "27/11 13:39",
     "effective_window_start": "11:00",
     "effective_window_end": "16:00",
     "window_locked": true,
@@ -79,7 +79,7 @@
     "committed_window_start": "11:00",
     "committed_window_end": "16:00",
     "in_window_now": true,
-    "remaining_window_min": 142,
+    "remaining_window_min": 141,
     "next_hour_cop_net": 5.04,
     "next_hour_label": "Oggi 14:00",
     "today_window": {
@@ -121,13 +121,13 @@
       "is_dynamic_shifted": true
     },
     "projection_to_tomorrow": {
-      "start_tin_c": 7.9,
-      "min_tin_c": 7.02,
-      "end_tin_c": 7.02,
-      "hours_simulated": 19.4,
+      "start_tin_c": 8.0,
+      "min_tin_c": 7.1,
+      "end_tin_c": 7.1,
+      "hours_simulated": 19.3,
       "target_local": "28/11 09:00",
-      "first_below_tmin_local": "28/11 00:38",
-      "first_below_safe_local": "28/11 06:38"
+      "first_below_tmin_local": "28/11 02:39",
+      "first_below_safe_local": "28/11 07:39"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -135,11 +135,11 @@
     "prearm_reason": null,
     "defer_recommended": false,
     "defer_reason": null,
-    "decision_summary": "☀️ In finestra COP attiva (11:00–16:00, restano 142m)",
+    "decision_summary": "☀️ In finestra COP attiva (11:00–16:00, restano 141m)",
     "decision_trace": [
       "Finestra Oggi: 11:00–16:00 🔒 (COP netto stimato 4.91, OAT +3.8°C, RH 94%, Brina MEDIO, allineata a statica).",
       "Finestra Domani: 09:00–14:00 (COP netto 4.81, OAT +2.3°C, RH 82%, Brina MEDIO).",
-      "Proiezione prudenziale sicurezza fino a domani 09:00 (19.4h, UA×1.15=0.207): 7.9°C → 7.0°C (min 7.0°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.180)."
+      "Proiezione prudenziale sicurezza fino a domani 09:00 (19.3h, UA×1.15=0.207): 8.0°C → 7.1°C (min 7.1°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.180)."
     ],
     "assumptions": {
       "ua_raw_c_24h_k": 0.18,
@@ -162,20 +162,13 @@
   },
   "api_usage": {
     "date_utc": "2026-11-27",
-    "viessmann_reads": 340,
+    "viessmann_reads": 342,
     "viessmann_writes": 8,
-    "bticino_reads": 329,
+    "bticino_reads": 331,
     "bticino_writes": 1,
     "cronjob_patches": 2,
-    "github_runs": 164,
+    "github_runs": 165,
     "recent_events": [
-      {
-        "ts": "2026-11-26T12:38:32.698623+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-26T12:39:32.723039+00:00",
         "lbl": "telemetry_poll",
@@ -2383,6 +2376,13 @@
         "vr": 2,
         "br": 2,
         "gh": 1
+      },
+      {
+        "ts": "2026-11-27T12:39:27.579349+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
       }
     ]
   },
@@ -2394,7 +2394,7 @@
     "defrost_lwt_drop_p90_k": 9.1,
     "ua_building_c_24h_per_k": 0.18,
     "recommended_target_lwt_c": 26.5,
-    "pred_autonomy_hours": 64.2,
+    "pred_autonomy_hours": 61.9,
     "updated_utc": "2026-11-26T14:27:37.027634+00:00"
   }
 }
