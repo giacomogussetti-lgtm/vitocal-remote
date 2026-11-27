@@ -5,10 +5,10 @@
   "cycle_started_utc": "2026-11-27T10:35:40.628623+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-27T14:16:30.632892+00:00",
+  "last_eval_utc": "2026-11-27T14:17:31.264387+00:00",
   "last_action_utc": "2026-11-27T11:02:36.054104+00:00",
   "last_action_reason": "Defrost Guard (0 brin., ΔEvap=15K): ridotto SP −1°C -> 13°C (Target Acqua 23.7°C) per modulare dolce senza stacchi.",
-  "indoor_slope_c_per_h": 0.179,
+  "indoor_slope_c_per_h": 0.177,
   "calculated_target_lwt_c": 23.7,
   "calculated_pdc_setpoint_c": 13,
   "target_pdc_setpoint_c": 15,
@@ -18,43 +18,43 @@
   "current_cron_interval_min": 1,
   "defrost_detected_today": 3,
   "cycle_defrost_episodes": 3,
-  "prev_phase_was_defrost": true,
+  "prev_phase_was_defrost": false,
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": -1,
   "soft_curve_last_trim_utc": "2026-11-27T11:02:36.054104+00:00",
-  "last_grundfos_run_utc": "2026-11-27T14:16:30.632892+00:00",
+  "last_grundfos_run_utc": "2026-11-27T14:17:31.264387+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
     {
-      "ts": "2026-11-27T14:05:47.000Z",
+      "ts": "2026-11-27T15:14:25.000Z",
       "actor": "Valvola 4-Vie Defrost",
       "desc": "Inversione Defrost ON",
       "info_s": 900
     },
     {
-      "ts": "2026-11-27T13:19:32.000Z",
-      "actor": "Valvola 4-Vie Defrost",
-      "desc": "Fine Defrost -> Riscald.",
-      "info_s": 0
+      "ts": "2026-11-27T14:46:31.000Z",
+      "actor": "Compressore",
+      "desc": "Compressore ON",
+      "info_s": 362
     },
     {
-      "ts": "2026-11-27T13:12:55.000Z",
-      "actor": "Valvola 4-Vie Defrost",
-      "desc": "Inversione Defrost ON",
-      "info_s": 900
+      "ts": "2026-11-27T14:44:31.000Z",
+      "actor": "PRIMAERQUELLE1",
+      "desc": "Stato=100",
+      "info_s": 120
     },
     {
-      "ts": "2026-11-27T12:27:00.000Z",
-      "actor": "Valvola 4-Vie Defrost",
-      "desc": "Fine Defrost -> Riscald.",
-      "info_s": 0
+      "ts": "2026-11-27T14:44:31.000Z",
+      "actor": "Circolatore P1",
+      "desc": "Pompa P1 -> 100%",
+      "info_s": 120
     },
     {
-      "ts": "2026-11-27T12:21:55.000Z",
-      "actor": "Valvola 4-Vie Defrost",
-      "desc": "Inversione Defrost ON",
-      "info_s": 900
+      "ts": "2026-11-27T14:31:24.000Z",
+      "actor": "Circolatore P1",
+      "desc": "Pompa P1 -> 0%",
+      "info_s": 120
     }
   ],
   "active_window_start_local": "11:00",
@@ -71,7 +71,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "27/11 15:16",
+    "evaluated_local": "27/11 15:17",
     "effective_window_start": "11:00",
     "effective_window_end": "16:00",
     "window_locked": true,
@@ -79,7 +79,7 @@
     "committed_window_start": "11:00",
     "committed_window_end": "16:00",
     "in_window_now": true,
-    "remaining_window_min": 44,
+    "remaining_window_min": 43,
     "next_hour_cop_net": 4.71,
     "next_hour_label": "Oggi 15:00",
     "today_window": {
@@ -126,7 +126,7 @@
       "end_tin_c": 7.16,
       "hours_simulated": 17.7,
       "target_local": "28/11 09:00",
-      "first_below_tmin_local": "28/11 04:16",
+      "first_below_tmin_local": "28/11 04:17",
       "first_below_safe_local": "28/11 09:00"
     },
     "short_cycle_action": "normal",
@@ -135,7 +135,7 @@
     "prearm_reason": null,
     "defer_recommended": false,
     "defer_reason": null,
-    "decision_summary": "☀️ In finestra COP attiva (11:00–16:00, restano 44m)",
+    "decision_summary": "☀️ In finestra COP attiva (11:00–16:00, restano 43m)",
     "decision_trace": [
       "Finestra Oggi: 11:00–16:00 🔒 (COP netto stimato 4.74, OAT +3.3°C, RH 95%, Brina ALTO, allineata a statica).",
       "Finestra Domani: 09:00–14:00 (COP netto 4.89, OAT +2.1°C, RH 80%, Brina MEDIO).",
@@ -162,27 +162,13 @@
   },
   "api_usage": {
     "date_utc": "2026-11-27",
-    "viessmann_reads": 530,
+    "viessmann_reads": 532,
     "viessmann_writes": 8,
-    "bticino_reads": 519,
+    "bticino_reads": 521,
     "bticino_writes": 1,
     "cronjob_patches": 2,
-    "github_runs": 259,
+    "github_runs": 260,
     "recent_events": [
-      {
-        "ts": "2026-11-26T14:16:33.411107+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-26T14:17:28.955220+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-26T14:18:37.573001+00:00",
         "lbl": "telemetry_poll",
@@ -2370,6 +2356,13 @@
       },
       {
         "ts": "2026-11-27T14:16:30.630464+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-27T14:17:31.261176+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
