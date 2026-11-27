@@ -5,10 +5,10 @@
   "cycle_started_utc": "2026-11-27T10:35:40.628623+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": "2026-11-27T15:01:46.327329+00:00",
-  "last_eval_utc": "2026-11-27T15:12:43.246064+00:00",
+  "last_eval_utc": "2026-11-27T15:13:31.400502+00:00",
   "last_action_utc": "2026-11-27T15:01:46.327329+00:00",
   "last_action_reason": "Stop PdC (Fine finestra COP (16:00)), avvio scarico puffer 25 min. Modalità PdC impostata e verificata: standby | Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual)",
-  "indoor_slope_c_per_h": 0.186,
+  "indoor_slope_c_per_h": 0.188,
   "calculated_target_lwt_c": 23.7,
   "calculated_pdc_setpoint_c": 13,
   "target_pdc_setpoint_c": 15,
@@ -22,7 +22,7 @@
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": -1,
   "soft_curve_last_trim_utc": "2026-11-27T11:02:36.054104+00:00",
-  "last_grundfos_run_utc": "2026-11-27T15:12:43.246064+00:00",
+  "last_grundfos_run_utc": "2026-11-27T15:13:31.400502+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
@@ -71,7 +71,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "27/11 16:12",
+    "evaluated_local": "27/11 16:13",
     "effective_window_start": "11:00",
     "effective_window_end": "16:00",
     "window_locked": true,
@@ -163,12 +163,12 @@
   },
   "api_usage": {
     "date_utc": "2026-11-27",
-    "viessmann_reads": 642,
+    "viessmann_reads": 644,
     "viessmann_writes": 9,
-    "bticino_reads": 630,
+    "bticino_reads": 632,
     "bticino_writes": 2,
     "cronjob_patches": 2,
-    "github_runs": 314,
+    "github_runs": 315,
     "recent_events": [
       {
         "ts": "2026-11-26T15:15:53.003415+00:00",
@@ -2646,6 +2646,13 @@
       },
       {
         "ts": "2026-11-27T15:12:43.243817+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-27T15:13:31.397155+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
