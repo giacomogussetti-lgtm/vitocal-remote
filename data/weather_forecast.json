@@ -802,11 +802,11 @@
     "oat_raw_mae_c": 0.99,
     "oat_mae_c": 0.54,
     "oat_max_abs_err_c": 1.34,
-    "frost_active_hours_matched": 3,
+    "frost_active_hours_matched": 2,
     "frost_penalty_scale": 1.0,
     "tin_proj_samples_matched": 14,
     "tin_projection_mae_c": 0.09,
-    "calibrated_utc": "2026-11-27T10:41:00.356251+00:00"
+    "calibrated_utc": "2026-11-27T10:41:31.036148+00:00"
   },
   "calibration_history": [
     {

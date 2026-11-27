@@ -5,10 +5,10 @@
   "cycle_started_utc": "2026-11-27T10:35:40.628623+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-27T10:41:00.336153+00:00",
+  "last_eval_utc": "2026-11-27T10:41:31.015939+00:00",
   "last_action_utc": "2026-11-27T10:35:40.628623+00:00",
   "last_action_reason": "Avvio ciclo (Finestra Alto COP): Target Acqua 23.7°C (SP=13°C, Shift=+1) (Soft-Start da 13°C -> regime 15°C). Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual) | Temperatura Ridotta impostata e verificata con successo: 13 °C | Curva impostata e verificata con successo: Inclinazione=0.6, Livello=1 | Modalità PdC impostata e verificata: dhwAndHeating",
-  "indoor_slope_c_per_h": -0.055,
+  "indoor_slope_c_per_h": -0.054,
   "calculated_target_lwt_c": 23.7,
   "calculated_pdc_setpoint_c": 13,
   "target_pdc_setpoint_c": 15,
@@ -22,7 +22,7 @@
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": 0,
   "soft_curve_last_trim_utc": null,
-  "last_grundfos_run_utc": "2026-11-27T10:41:00.336153+00:00",
+  "last_grundfos_run_utc": "2026-11-27T10:41:31.015939+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
@@ -162,20 +162,13 @@
   },
   "api_usage": {
     "date_utc": "2026-11-27",
-    "viessmann_reads": 104,
+    "viessmann_reads": 106,
     "viessmann_writes": 4,
-    "bticino_reads": 99,
+    "bticino_reads": 101,
     "bticino_writes": 1,
     "cronjob_patches": 2,
-    "github_runs": 49,
+    "github_runs": 50,
     "recent_events": [
-      {
-        "ts": "2026-11-26T10:41:30.900579+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-26T10:42:30.102508+00:00",
         "lbl": "telemetry_poll",
@@ -2367,6 +2360,13 @@
       },
       {
         "ts": "2026-11-27T10:41:00.333555+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-27T10:41:31.012933+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
