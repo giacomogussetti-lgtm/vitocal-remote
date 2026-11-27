@@ -797,16 +797,16 @@
     }
   ],
   "calibration": {
-    "oat_samples_matched": 9,
-    "oat_bias_c": 0.99,
-    "oat_raw_mae_c": 2.1,
-    "oat_mae_c": 1.11,
-    "oat_max_abs_err_c": 1.61,
+    "oat_samples_matched": 10,
+    "oat_bias_c": 0.98,
+    "oat_raw_mae_c": 1.93,
+    "oat_mae_c": 1.15,
+    "oat_max_abs_err_c": 1.62,
     "frost_active_hours_matched": 3,
     "frost_penalty_scale": 1.0,
-    "tin_proj_samples_matched": 0,
+    "tin_proj_samples_matched": 1,
     "tin_projection_mae_c": null,
-    "calibrated_utc": "2026-11-27T20:46:00.778282+00:00"
+    "calibrated_utc": "2026-11-27T21:01:27.489352+00:00"
   },
   "calibration_history": [
     {
@@ -1947,6 +1947,13 @@
       "forecast_corr_c": 3.1,
       "actual_oat_c": 3.2,
       "err_corr_c": 0.1
+    },
+    {
+      "time_local": "2026-11-27T22:00",
+      "forecast_raw_c": 2.1,
+      "forecast_corr_c": 3.1,
+      "actual_oat_c": 1.7,
+      "err_corr_c": -1.4
     }
   ],
   "prediction_history": [
@@ -2167,24 +2174,15 @@
       "state": "IDLE",
       "target_local": "2026-11-28T03:00",
       "pred_tin_c": 8.08
+    },
+    {
+      "created_utc": "2026-11-27T21:01:27.467495+00:00",
+      "state": "IDLE",
+      "target_local": "2026-11-28T04:00",
+      "pred_tin_c": 8.07
     }
   ],
   "hourly_preview": [
-    {
-      "time_local": "2026-11-27T21:00",
-      "hh": "21:00",
-      "day_tag": "Oggi",
-      "icon": "🌧️",
-      "temp_c": 3.1,
-      "rh_pct": 89,
-      "cop_net": 4.7,
-      "frost_risk": "MEDIO",
-      "precip_mm": 0.3,
-      "solar_wm2": 0.0,
-      "tin_proj_c": 8.4,
-      "tin_mode": "now",
-      "in_window": false
-    },
     {
       "time_local": "2026-11-27T22:00",
       "hh": "22:00",
@@ -2196,8 +2194,8 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.1,
       "solar_wm2": 0.0,
-      "tin_proj_c": 8.36,
-      "tin_mode": "cool",
+      "tin_proj_c": 8.4,
+      "tin_mode": "now",
       "in_window": false
     },
     {
@@ -2211,7 +2209,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 8.31,
+      "tin_proj_c": 8.35,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2226,7 +2224,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 8.26,
+      "tin_proj_c": 8.3,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2241,7 +2239,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 8.2,
+      "tin_proj_c": 8.24,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2256,7 +2254,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 8.14,
+      "tin_proj_c": 8.18,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2271,7 +2269,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 8.09,
+      "tin_proj_c": 8.13,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2286,7 +2284,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 8.03,
+      "tin_proj_c": 8.07,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2301,7 +2299,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.97,
+      "tin_proj_c": 8.01,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2316,7 +2314,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.91,
+      "tin_proj_c": 7.95,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2331,7 +2329,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.85,
+      "tin_proj_c": 7.89,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2346,7 +2344,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 4.0,
-      "tin_proj_c": 7.79,
+      "tin_proj_c": 7.83,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2361,7 +2359,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 85.0,
-      "tin_proj_c": 7.74,
+      "tin_proj_c": 7.78,
       "tin_mode": "cool",
       "in_window": true
     },
@@ -2376,7 +2374,7 @@
       "frost_risk": "MEDIO",
       "precip_mm": 0.0,
       "solar_wm2": 214.0,
-      "tin_proj_c": 7.7,
+      "tin_proj_c": 7.73,
       "tin_mode": "cool",
       "in_window": true
     },
@@ -2391,7 +2389,7 @@
       "frost_risk": "ALTO",
       "precip_mm": 0.0,
       "solar_wm2": 311.0,
-      "tin_proj_c": 7.66,
+      "tin_proj_c": 7.69,
       "tin_mode": "cool",
       "in_window": true
     },
@@ -2406,7 +2404,7 @@
       "frost_risk": "ALTO",
       "precip_mm": 0.0,
       "solar_wm2": 328.0,
-      "tin_proj_c": 7.62,
+      "tin_proj_c": 7.66,
       "tin_mode": "cool",
       "in_window": true
     },
@@ -2421,7 +2419,7 @@
       "frost_risk": "ALTO",
       "precip_mm": 0.0,
       "solar_wm2": 296.0,
-      "tin_proj_c": 7.58,
+      "tin_proj_c": 7.62,
       "tin_mode": "cool",
       "in_window": true
     },
@@ -2436,7 +2434,7 @@
       "frost_risk": "ALTO",
       "precip_mm": 0.0,
       "solar_wm2": 229.0,
-      "tin_proj_c": 7.54,
+      "tin_proj_c": 7.58,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2451,7 +2449,7 @@
       "frost_risk": "ALTO",
       "precip_mm": 0.0,
       "solar_wm2": 163.0,
-      "tin_proj_c": 7.51,
+      "tin_proj_c": 7.54,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2466,7 +2464,7 @@
       "frost_risk": "ALTO",
       "precip_mm": 0.0,
       "solar_wm2": 66.0,
-      "tin_proj_c": 7.47,
+      "tin_proj_c": 7.5,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2481,7 +2479,7 @@
       "frost_risk": "ALTO",
       "precip_mm": 0.0,
       "solar_wm2": 8.0,
-      "tin_proj_c": 7.42,
+      "tin_proj_c": 7.46,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2496,7 +2494,7 @@
       "frost_risk": "ALTO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.38,
+      "tin_proj_c": 7.41,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2511,7 +2509,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.33,
+      "tin_proj_c": 7.37,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2526,7 +2524,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.29,
+      "tin_proj_c": 7.32,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2541,7 +2539,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.24,
+      "tin_proj_c": 7.28,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2556,7 +2554,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.19,
+      "tin_proj_c": 7.23,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2571,7 +2569,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.14,
+      "tin_proj_c": 7.18,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2586,7 +2584,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.09,
+      "tin_proj_c": 7.13,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2601,7 +2599,7 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.04,
+      "tin_proj_c": 7.08,
       "tin_mode": "cool",
       "in_window": false
     },
@@ -2616,7 +2614,22 @@
       "frost_risk": "BASSO",
       "precip_mm": 0.0,
       "solar_wm2": 0.0,
-      "tin_proj_c": 7.0,
+      "tin_proj_c": 7.03,
+      "tin_mode": "cool",
+      "in_window": false
+    },
+    {
+      "time_local": "2026-11-29T03:00",
+      "hh": "03:00",
+      "day_tag": "29/11",
+      "icon": "🌙",
+      "temp_c": 1.4,
+      "rh_pct": 56,
+      "cop_net": 5.1,
+      "frost_risk": "BASSO",
+      "precip_mm": 0.0,
+      "solar_wm2": 0.0,
+      "tin_proj_c": 6.99,
       "tin_mode": "cool",
       "in_window": false
     }
@@ -2625,7 +2638,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "27/11 21:46",
+    "evaluated_local": "27/11 22:01",
     "effective_window_start": "11:00",
     "effective_window_end": "16:00",
     "window_locked": true,
@@ -2678,7 +2691,7 @@
       "start_tin_c": 8.4,
       "min_tin_c": 7.71,
       "end_tin_c": 7.71,
-      "hours_simulated": 11.2,
+      "hours_simulated": 11.0,
       "target_local": "28/11 09:00",
       "first_below_tmin_local": null,
       "first_below_safe_local": null
@@ -2694,7 +2707,7 @@
       "Finestra Oggi: 11:00–16:00 🔒 (COP netto stimato 4.83, OAT +3.7°C, RH 95%, Brina ALTO, allineata a statica).",
       "Finestra bloccata 🔒 (11:00–16:00): entro 90m dall'avvio non slitta più.",
       "Finestra Domani: 09:00–14:00 (COP netto 4.78, OAT +2.3°C, RH 84%, Brina MEDIO).",
-      "Proiezione prudenziale sicurezza fino a domani 09:00 (11.2h, UA×1.15=0.216): 8.4°C → 7.7°C (min 7.7°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.188)."
+      "Proiezione prudenziale sicurezza fino a domani 09:00 (11.0h, UA×1.15=0.216): 8.4°C → 7.7°C (min 7.7°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.188)."
     ],
     "assumptions": {
       "ua_raw_c_24h_k": 0.188,
@@ -2706,11 +2719,11 @@
       "safe_floor_c": 7.2,
       "min_cycle_minutes": 120,
       "arbitrage_cop_delta": 0.25,
-      "oat_bias_c": 0.99,
-      "oat_raw_mae_c": 2.1,
-      "oat_mae_c": 1.11,
-      "oat_max_abs_err_c": 1.61,
-      "oat_samples_matched": 9,
+      "oat_bias_c": 0.98,
+      "oat_raw_mae_c": 1.93,
+      "oat_mae_c": 1.15,
+      "oat_max_abs_err_c": 1.62,
+      "oat_samples_matched": 10,
       "frost_penalty_scale": 1.0,
       "tin_projection_mae_c": null
     }
