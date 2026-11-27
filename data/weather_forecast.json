@@ -806,7 +806,7 @@
     "frost_penalty_scale": 0.95,
     "tin_proj_samples_matched": 1,
     "tin_projection_mae_c": null,
-    "calibrated_utc": "2026-11-27T15:25:50.695077+00:00"
+    "calibrated_utc": "2026-11-27T15:26:30.894019+00:00"
   },
   "calibration_history": [
     {
@@ -2561,7 +2561,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "27/11 16:25",
+    "evaluated_local": "27/11 16:26",
     "effective_window_start": "11:00",
     "effective_window_end": "16:00",
     "window_locked": true,
