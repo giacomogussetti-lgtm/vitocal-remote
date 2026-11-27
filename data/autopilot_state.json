@@ -5,7 +5,7 @@
   "cycle_started_utc": "2026-11-27T10:35:40.628623+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": "2026-11-27T15:01:46.327329+00:00",
-  "last_eval_utc": "2026-11-27T15:14:33.551251+00:00",
+  "last_eval_utc": "2026-11-27T15:15:52.372638+00:00",
   "last_action_utc": "2026-11-27T15:01:46.327329+00:00",
   "last_action_reason": "Stop PdC (Fine finestra COP (16:00)), avvio scarico puffer 25 min. Modalità PdC impostata e verificata: standby | Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual)",
   "indoor_slope_c_per_h": 0.189,
@@ -22,7 +22,7 @@
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": -1,
   "soft_curve_last_trim_utc": "2026-11-27T11:02:36.054104+00:00",
-  "last_grundfos_run_utc": "2026-11-27T15:14:33.551251+00:00",
+  "last_grundfos_run_utc": "2026-11-27T15:15:52.372638+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
@@ -71,7 +71,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "27/11 16:14",
+    "evaluated_local": "27/11 16:15",
     "effective_window_start": "11:00",
     "effective_window_end": "16:00",
     "window_locked": true,
@@ -124,7 +124,7 @@
       "start_tin_c": 8.5,
       "min_tin_c": 7.55,
       "end_tin_c": 7.55,
-      "hours_simulated": 16.8,
+      "hours_simulated": 16.7,
       "target_local": "28/11 09:00",
       "first_below_tmin_local": null,
       "first_below_safe_local": null
@@ -140,7 +140,7 @@
       "Finestra Oggi: 11:00–16:00 🔒 (COP netto stimato 4.83, OAT +3.4°C, RH 95%, Brina MEDIO, allineata a statica).",
       "Finestra bloccata 🔒 (11:00–16:00): entro 90m dall'avvio non slitta più.",
       "Finestra Domani: 09:00–14:00 (COP netto 4.94, OAT +2.2°C, RH 80%, Brina MEDIO).",
-      "Proiezione prudenziale sicurezza fino a domani 09:00 (16.8h, UA×1.15=0.207): 8.5°C → 7.5°C (min 7.5°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.180)."
+      "Proiezione prudenziale sicurezza fino a domani 09:00 (16.7h, UA×1.15=0.207): 8.5°C → 7.5°C (min 7.5°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.180)."
     ],
     "assumptions": {
       "ua_raw_c_24h_k": 0.18,
@@ -163,12 +163,12 @@
   },
   "api_usage": {
     "date_utc": "2026-11-27",
-    "viessmann_reads": 646,
+    "viessmann_reads": 648,
     "viessmann_writes": 9,
-    "bticino_reads": 634,
+    "bticino_reads": 636,
     "bticino_writes": 2,
     "cronjob_patches": 2,
-    "github_runs": 316,
+    "github_runs": 317,
     "recent_events": [
       {
         "ts": "2026-11-26T15:15:53.003415+00:00",
@@ -2660,6 +2660,13 @@
       },
       {
         "ts": "2026-11-27T15:14:33.547910+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-27T15:15:52.369316+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
