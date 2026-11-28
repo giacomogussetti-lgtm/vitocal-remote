@@ -797,16 +797,16 @@
     }
   ],
   "calibration": {
-    "oat_samples_matched": 15,
+    "oat_samples_matched": 14,
     "oat_bias_c": 0.0,
-    "oat_raw_mae_c": 0.55,
-    "oat_mae_c": 0.55,
+    "oat_raw_mae_c": 0.52,
+    "oat_mae_c": 0.52,
     "oat_max_abs_err_c": 1.4,
     "frost_active_hours_matched": 4,
     "frost_penalty_scale": 1.27,
-    "tin_proj_samples_matched": 12,
+    "tin_proj_samples_matched": 11,
     "tin_projection_mae_c": 0.1,
-    "calibrated_utc": "2026-11-28T11:31:30.559823+00:00"
+    "calibrated_utc": "2026-11-28T11:32:31.258341+00:00"
   },
   "calibration_history": [
     {
@@ -2886,7 +2886,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "28/11 12:31",
+    "evaluated_local": "28/11 12:32",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": true,
@@ -2894,7 +2894,7 @@
     "committed_window_start": "09:00",
     "committed_window_end": "14:00",
     "in_window_now": true,
-    "remaining_window_min": 89,
+    "remaining_window_min": 88,
     "next_hour_cop_net": 4.62,
     "next_hour_label": "Oggi 12:00",
     "today_window": {
@@ -2941,8 +2941,8 @@
       "end_tin_c": 7.0,
       "hours_simulated": 22.5,
       "target_local": "29/11 11:00",
-      "first_below_tmin_local": "29/11 03:31",
-      "first_below_safe_local": "29/11 08:31"
+      "first_below_tmin_local": "29/11 03:32",
+      "first_below_safe_local": "29/11 08:32"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -2950,7 +2950,7 @@
     "prearm_reason": null,
     "defer_recommended": false,
     "defer_reason": null,
-    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 89m)",
+    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 88m)",
     "decision_trace": [
       "Finestra Oggi: 09:00–14:00 🔒 (COP netto stimato 4.70, OAT +1.0°C, RH 76%, Brina MEDIO, +0.10 vs statica).",
       "Finestra Domani: 11:00–16:00 (COP netto 5.29, OAT +1.7°C, RH 62%, Brina BASSO).",
@@ -2967,10 +2967,10 @@
       "min_cycle_minutes": 120,
       "arbitrage_cop_delta": 0.25,
       "oat_bias_c": 0.0,
-      "oat_raw_mae_c": 0.55,
-      "oat_mae_c": 0.55,
+      "oat_raw_mae_c": 0.52,
+      "oat_mae_c": 0.52,
       "oat_max_abs_err_c": 1.4,
-      "oat_samples_matched": 15,
+      "oat_samples_matched": 14,
       "frost_penalty_scale": 1.27,
       "tin_projection_mae_c": 0.1
     }
