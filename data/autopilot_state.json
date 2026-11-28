@@ -5,10 +5,10 @@
   "cycle_started_utc": "2026-11-28T08:05:55.013503+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-28T12:36:34.255046+00:00",
+  "last_eval_utc": "2026-11-28T12:37:27.828822+00:00",
   "last_action_utc": "2026-11-28T08:05:55.013503+00:00",
   "last_action_reason": "Avvio ciclo (Pre-Armamento Predittivo): Target Acqua 23.5°C (SP=13°C, Shift=-1). Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual) | Temperatura Ridotta impostata e verificata con successo: 13 °C | Curva inviata con successo (Slope: 0.6, Shift: -1). Sincronizzazione cloud in corso (letti: Slope 0.6, Shift 0). | Modalità PdC 'dhwAndHeating' inviata con successo. Sincronizzazione cloud in corso (letta: standby).",
-  "indoor_slope_c_per_h": 0.151,
+  "indoor_slope_c_per_h": 0.149,
   "calculated_target_lwt_c": 23.5,
   "calculated_pdc_setpoint_c": 13,
   "target_pdc_setpoint_c": 13,
@@ -22,7 +22,7 @@
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": 0,
   "soft_curve_last_trim_utc": null,
-  "last_grundfos_run_utc": "2026-11-28T12:36:34.255046+00:00",
+  "last_grundfos_run_utc": "2026-11-28T12:37:27.828822+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
@@ -71,7 +71,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "28/11 13:36",
+    "evaluated_local": "28/11 13:37",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": true,
@@ -79,7 +79,7 @@
     "committed_window_start": "09:00",
     "committed_window_end": "14:00",
     "in_window_now": true,
-    "remaining_window_min": 24,
+    "remaining_window_min": 23,
     "next_hour_cop_net": 4.89,
     "next_hour_label": "Oggi 14:00",
     "today_window": {
@@ -126,7 +126,7 @@
       "end_tin_c": 7.23,
       "hours_simulated": 21.4,
       "target_local": "29/11 11:00",
-      "first_below_tmin_local": "29/11 07:36",
+      "first_below_tmin_local": "29/11 07:37",
       "first_below_safe_local": null
     },
     "short_cycle_action": "normal",
@@ -135,7 +135,7 @@
     "prearm_reason": null,
     "defer_recommended": false,
     "defer_reason": null,
-    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 24m)",
+    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 23m)",
     "decision_trace": [
       "Finestra Oggi: 09:00–14:00 🔒 (COP netto stimato 4.87, OAT +2.4°C, RH 80%, Brina MEDIO, allineata a statica).",
       "Finestra Domani: 11:00–16:00 (COP netto 5.11, OAT +1.8°C, RH 68%, Brina BASSO).",
@@ -162,12 +162,12 @@
   },
   "api_usage": {
     "date_utc": "2026-11-28",
-    "viessmann_reads": 604,
+    "viessmann_reads": 606,
     "viessmann_writes": 5,
-    "bticino_reads": 597,
+    "bticino_reads": 599,
     "bticino_writes": 1,
     "cronjob_patches": 2,
-    "github_runs": 298,
+    "github_runs": 299,
     "recent_events": [
       {
         "ts": "2026-11-27T12:37:28.363351+00:00",
@@ -3696,6 +3696,13 @@
       },
       {
         "ts": "2026-11-28T12:36:34.251477+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-28T12:37:27.824376+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
