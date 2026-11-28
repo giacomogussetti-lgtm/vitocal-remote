@@ -806,7 +806,7 @@
     "frost_penalty_scale": 1.0,
     "tin_proj_samples_matched": 9,
     "tin_projection_mae_c": 0.16,
-    "calibrated_utc": "2026-11-28T04:15:58.463746+00:00"
+    "calibrated_utc": "2026-11-28T04:31:05.424429+00:00"
   },
   "calibration_history": [
     {
@@ -2862,7 +2862,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "28/11 05:15",
+    "evaluated_local": "28/11 05:31",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": false,
@@ -2913,12 +2913,12 @@
     },
     "projection_to_tomorrow": {
       "start_tin_c": 8.1,
-      "min_tin_c": 6.56,
-      "end_tin_c": 6.56,
-      "hours_simulated": 29.7,
+      "min_tin_c": 6.57,
+      "end_tin_c": 6.57,
+      "hours_simulated": 29.5,
       "target_local": "29/11 11:00",
-      "first_below_tmin_local": "28/11 16:15",
-      "first_below_safe_local": "28/11 22:15"
+      "first_below_tmin_local": "28/11 16:31",
+      "first_below_safe_local": "28/11 22:31"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -2930,7 +2930,7 @@
     "decision_trace": [
       "Finestra Oggi: 09:00–14:00 (COP netto stimato 4.65, OAT +1.7°C, RH 85%, Brina MEDIO, +0.09 vs statica).",
       "Finestra Domani: 11:00–16:00 (COP netto 5.34, OAT +2.5°C, RH 66%, Brina BASSO).",
-      "Proiezione prudenziale sicurezza fino a domani 11:00 (29.7h, UA×1.15=0.216): 8.1°C → 6.6°C (min 6.6°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.188)."
+      "Proiezione prudenziale sicurezza fino a domani 11:00 (29.5h, UA×1.15=0.216): 8.1°C → 6.6°C (min 6.6°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.188)."
     ],
     "assumptions": {
       "ua_raw_c_24h_k": 0.188,
