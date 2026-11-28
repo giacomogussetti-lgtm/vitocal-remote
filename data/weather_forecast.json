@@ -806,7 +806,7 @@
     "frost_penalty_scale": 1.0,
     "tin_proj_samples_matched": 13,
     "tin_projection_mae_c": 0.17,
-    "calibrated_utc": "2026-11-28T10:41:00.434693+00:00"
+    "calibrated_utc": "2026-11-28T10:41:35.662141+00:00"
   },
   "calibration_history": [
     {

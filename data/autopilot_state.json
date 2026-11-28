@@ -5,7 +5,7 @@
   "cycle_started_utc": "2026-11-28T08:05:55.013503+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-28T10:41:00.411662+00:00",
+  "last_eval_utc": "2026-11-28T10:41:35.638046+00:00",
   "last_action_utc": "2026-11-28T08:05:55.013503+00:00",
   "last_action_reason": "Avvio ciclo (Pre-Armamento Predittivo): Target Acqua 23.5°C (SP=13°C, Shift=-1). Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual) | Temperatura Ridotta impostata e verificata con successo: 13 °C | Curva inviata con successo (Slope: 0.6, Shift: -1). Sincronizzazione cloud in corso (letti: Slope 0.6, Shift 0). | Modalità PdC 'dhwAndHeating' inviata con successo. Sincronizzazione cloud in corso (letta: standby).",
   "indoor_slope_c_per_h": 0.214,
@@ -22,7 +22,7 @@
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": 0,
   "soft_curve_last_trim_utc": null,
-  "last_grundfos_run_utc": "2026-11-28T10:41:00.411662+00:00",
+  "last_grundfos_run_utc": "2026-11-28T10:41:35.638046+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
@@ -162,20 +162,13 @@
   },
   "api_usage": {
     "date_utc": "2026-11-28",
-    "viessmann_reads": 376,
+    "viessmann_reads": 378,
     "viessmann_writes": 5,
-    "bticino_reads": 369,
+    "bticino_reads": 371,
     "bticino_writes": 1,
     "cronjob_patches": 2,
-    "github_runs": 184,
+    "github_runs": 185,
     "recent_events": [
-      {
-        "ts": "2026-11-27T10:41:31.012933+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-27T10:42:36.265066+00:00",
         "lbl": "telemetry_poll",
@@ -3701,6 +3694,13 @@
       },
       {
         "ts": "2026-11-28T10:41:00.408230+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-28T10:41:35.634337+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
