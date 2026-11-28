@@ -5,7 +5,7 @@
   "cycle_started_utc": "2026-11-28T08:05:55.013503+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-28T10:38:34.180783+00:00",
+  "last_eval_utc": "2026-11-28T10:39:29.995504+00:00",
   "last_action_utc": "2026-11-28T08:05:55.013503+00:00",
   "last_action_reason": "Avvio ciclo (Pre-Armamento Predittivo): Target Acqua 23.5°C (SP=13°C, Shift=-1). Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual) | Temperatura Ridotta impostata e verificata con successo: 13 °C | Curva inviata con successo (Slope: 0.6, Shift: -1). Sincronizzazione cloud in corso (letti: Slope 0.6, Shift 0). | Modalità PdC 'dhwAndHeating' inviata con successo. Sincronizzazione cloud in corso (letta: standby).",
   "indoor_slope_c_per_h": 0.214,
@@ -22,10 +22,28 @@
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": 0,
   "soft_curve_last_trim_utc": null,
-  "last_grundfos_run_utc": "2026-11-28T10:38:34.180783+00:00",
+  "last_grundfos_run_utc": "2026-11-28T10:39:29.995504+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
+    {
+      "ts": "2026-11-28T11:43:04.000Z",
+      "actor": "Compressore",
+      "desc": "Compressore ON",
+      "info_s": 362
+    },
+    {
+      "ts": "2026-11-28T11:41:04.000Z",
+      "actor": "PRIMAERQUELLE1",
+      "desc": "Stato=100",
+      "info_s": 120
+    },
+    {
+      "ts": "2026-11-28T11:41:04.000Z",
+      "actor": "Circolatore P1",
+      "desc": "Pompa P1 -> 100%",
+      "info_s": 120
+    },
     {
       "ts": "2026-11-28T11:28:05.000Z",
       "actor": "Circolatore P1",
@@ -37,24 +55,6 @@
       "actor": "Circolatore P1",
       "desc": "Pompa P1 -> 100%",
       "info_s": 117
-    },
-    {
-      "ts": "2026-11-28T11:26:06.000Z",
-      "actor": "Compressore",
-      "desc": "Arresto / Pausa Compressore",
-      "info_s": 180
-    },
-    {
-      "ts": "2026-11-28T11:07:40.000Z",
-      "actor": "Valvola 4-Vie Defrost",
-      "desc": "Fine Defrost -> Riscald.",
-      "info_s": 0
-    },
-    {
-      "ts": "2026-11-28T11:02:04.000Z",
-      "actor": "Valvola 4-Vie Defrost",
-      "desc": "Inversione Defrost ON",
-      "info_s": 900
     }
   ],
   "active_window_start_local": "09:00",
@@ -71,7 +71,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "28/11 11:38",
+    "evaluated_local": "28/11 11:39",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": true,
@@ -79,7 +79,7 @@
     "committed_window_start": "09:00",
     "committed_window_end": "14:00",
     "in_window_now": true,
-    "remaining_window_min": 142,
+    "remaining_window_min": 141,
     "next_hour_cop_net": 4.78,
     "next_hour_label": "Oggi 12:00",
     "today_window": {
@@ -124,10 +124,10 @@
       "start_tin_c": 8.3,
       "min_tin_c": 6.89,
       "end_tin_c": 6.89,
-      "hours_simulated": 23.4,
+      "hours_simulated": 23.3,
       "target_local": "29/11 11:00",
-      "first_below_tmin_local": "29/11 01:38",
-      "first_below_safe_local": "29/11 06:38"
+      "first_below_tmin_local": "29/11 01:39",
+      "first_below_safe_local": "29/11 06:39"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -135,11 +135,11 @@
     "prearm_reason": null,
     "defer_recommended": false,
     "defer_reason": null,
-    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 142m)",
+    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 141m)",
     "decision_trace": [
       "Finestra Oggi: 09:00–14:00 🔒 (COP netto stimato 4.76, OAT +1.7°C, RH 83%, Brina MEDIO, allineata a statica).",
       "Finestra Domani: 11:00–16:00 (COP netto 5.31, OAT +1.8°C, RH 62%, Brina BASSO).",
-      "Proiezione prudenziale sicurezza fino a domani 11:00 (23.4h, UA×1.15=0.216): 8.3°C → 6.9°C (min 6.9°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.188)."
+      "Proiezione prudenziale sicurezza fino a domani 11:00 (23.3h, UA×1.15=0.216): 8.3°C → 6.9°C (min 6.9°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.188)."
     ],
     "assumptions": {
       "ua_raw_c_24h_k": 0.188,
@@ -162,12 +162,12 @@
   },
   "api_usage": {
     "date_utc": "2026-11-28",
-    "viessmann_reads": 372,
+    "viessmann_reads": 374,
     "viessmann_writes": 5,
-    "bticino_reads": 365,
+    "bticino_reads": 367,
     "bticino_writes": 1,
     "cronjob_patches": 2,
-    "github_runs": 182,
+    "github_runs": 183,
     "recent_events": [
       {
         "ts": "2026-11-27T10:39:35.731259+00:00",
@@ -3701,6 +3701,13 @@
       },
       {
         "ts": "2026-11-28T10:38:34.176975+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-28T10:39:29.991011+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
