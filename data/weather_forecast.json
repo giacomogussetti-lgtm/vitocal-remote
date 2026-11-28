@@ -797,16 +797,16 @@
     }
   ],
   "calibration": {
-    "oat_samples_matched": 13,
-    "oat_bias_c": 0.0,
-    "oat_raw_mae_c": 0.55,
-    "oat_mae_c": 0.55,
-    "oat_max_abs_err_c": 1.4,
+    "oat_samples_matched": 12,
+    "oat_bias_c": 0.02,
+    "oat_raw_mae_c": 0.51,
+    "oat_mae_c": 0.51,
+    "oat_max_abs_err_c": 1.38,
     "frost_active_hours_matched": 4,
     "frost_penalty_scale": 1.27,
-    "tin_proj_samples_matched": 10,
-    "tin_projection_mae_c": 0.09,
-    "calibrated_utc": "2026-11-28T11:39:27.945349+00:00"
+    "tin_proj_samples_matched": 9,
+    "tin_projection_mae_c": 0.08,
+    "calibrated_utc": "2026-11-28T11:40:56.119495+00:00"
   },
   "calibration_history": [
     {
@@ -2886,7 +2886,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "28/11 12:39",
+    "evaluated_local": "28/11 12:40",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": true,
@@ -2894,7 +2894,7 @@
     "committed_window_start": "09:00",
     "committed_window_end": "14:00",
     "in_window_now": true,
-    "remaining_window_min": 81,
+    "remaining_window_min": 80,
     "next_hour_cop_net": 4.52,
     "next_hour_label": "Oggi 13:00",
     "today_window": {
@@ -2941,8 +2941,8 @@
       "end_tin_c": 7.01,
       "hours_simulated": 22.3,
       "target_local": "29/11 11:00",
-      "first_below_tmin_local": "29/11 03:39",
-      "first_below_safe_local": "29/11 08:39"
+      "first_below_tmin_local": "29/11 03:40",
+      "first_below_safe_local": "29/11 08:40"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -2950,7 +2950,7 @@
     "prearm_reason": null,
     "defer_recommended": false,
     "defer_reason": null,
-    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 81m)",
+    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 80m)",
     "decision_trace": [
       "Finestra Oggi: 09:00–14:00 🔒 (COP netto stimato 4.70, OAT +1.0°C, RH 76%, Brina MEDIO, +0.10 vs statica).",
       "Finestra Domani: 11:00–16:00 (COP netto 5.29, OAT +1.7°C, RH 62%, Brina BASSO).",
@@ -2966,13 +2966,13 @@
       "safe_floor_c": 7.2,
       "min_cycle_minutes": 120,
       "arbitrage_cop_delta": 0.25,
-      "oat_bias_c": 0.0,
-      "oat_raw_mae_c": 0.55,
-      "oat_mae_c": 0.55,
-      "oat_max_abs_err_c": 1.4,
-      "oat_samples_matched": 13,
+      "oat_bias_c": 0.02,
+      "oat_raw_mae_c": 0.51,
+      "oat_mae_c": 0.51,
+      "oat_max_abs_err_c": 1.38,
+      "oat_samples_matched": 12,
       "frost_penalty_scale": 1.27,
-      "tin_projection_mae_c": 0.09
+      "tin_projection_mae_c": 0.08
     }
   }
 }
