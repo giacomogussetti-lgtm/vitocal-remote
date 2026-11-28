@@ -5,7 +5,7 @@
   "cycle_started_utc": "2026-11-28T08:05:55.013503+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-28T08:19:30.636556+00:00",
+  "last_eval_utc": "2026-11-28T08:20:50.752872+00:00",
   "last_action_utc": "2026-11-28T08:05:55.013503+00:00",
   "last_action_reason": "Avvio ciclo (Pre-Armamento Predittivo): Target Acqua 23.5°C (SP=13°C, Shift=-1). Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual) | Temperatura Ridotta impostata e verificata con successo: 13 °C | Curva inviata con successo (Slope: 0.6, Shift: -1). Sincronizzazione cloud in corso (letti: Slope 0.6, Shift 0). | Modalità PdC 'dhwAndHeating' inviata con successo. Sincronizzazione cloud in corso (letta: standby).",
   "indoor_slope_c_per_h": -0.079,
@@ -18,14 +18,26 @@
   "current_cron_interval_min": 1,
   "defrost_detected_today": 1,
   "cycle_defrost_episodes": 1,
-  "prev_phase_was_defrost": true,
+  "prev_phase_was_defrost": false,
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": 0,
   "soft_curve_last_trim_utc": null,
-  "last_grundfos_run_utc": "2026-11-28T08:19:30.636556+00:00",
+  "last_grundfos_run_utc": "2026-11-28T08:20:50.752872+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
+    {
+      "ts": "2026-11-28T09:23:47.000Z",
+      "actor": "Valvola 4-Vie Defrost",
+      "desc": "Fine Defrost -> Riscald.",
+      "info_s": 0
+    },
+    {
+      "ts": "2026-11-28T09:20:14.000Z",
+      "actor": "Valvola 4-Vie Defrost",
+      "desc": "Inversione Defrost ON",
+      "info_s": 900
+    },
     {
       "ts": "2026-11-28T09:12:39.000Z",
       "actor": "Compressore",
@@ -43,18 +55,6 @@
       "actor": "Circolatore P1",
       "desc": "Pompa P1 -> 100%",
       "info_s": 120
-    },
-    {
-      "ts": "2026-11-27T16:02:11.000Z",
-      "actor": "Circolatore P1",
-      "desc": "Pompa P1 -> 0%",
-      "info_s": 120
-    },
-    {
-      "ts": "2026-11-27T16:00:15.000Z",
-      "actor": "Circolatore P1",
-      "desc": "Pompa P1 -> 100%",
-      "info_s": 117
     }
   ],
   "active_window_start_local": "09:00",
@@ -71,7 +71,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "28/11 09:19",
+    "evaluated_local": "28/11 09:20",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": true,
@@ -79,7 +79,7 @@
     "committed_window_start": "09:00",
     "committed_window_end": "14:00",
     "in_window_now": true,
-    "remaining_window_min": 281,
+    "remaining_window_min": 280,
     "next_hour_cop_net": 4.94,
     "next_hour_label": "Oggi 09:00",
     "today_window": {
@@ -126,8 +126,8 @@
       "end_tin_c": 6.43,
       "hours_simulated": 25.7,
       "target_local": "29/11 11:00",
-      "first_below_tmin_local": "28/11 15:19",
-      "first_below_safe_local": "28/11 20:19"
+      "first_below_tmin_local": "28/11 15:20",
+      "first_below_safe_local": "28/11 20:20"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -135,7 +135,7 @@
     "prearm_reason": null,
     "defer_recommended": false,
     "defer_reason": null,
-    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 281m)",
+    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 280m)",
     "decision_trace": [
       "Finestra Oggi: 09:00–14:00 🔒 (COP netto stimato 4.74, OAT +2.0°C, RH 85%, Brina MEDIO, allineata a statica).",
       "Finestra Domani: 11:00–16:00 (COP netto 5.32, OAT +1.9°C, RH 61%, Brina BASSO).",
@@ -162,12 +162,12 @@
   },
   "api_usage": {
     "date_utc": "2026-11-28",
-    "viessmann_reads": 102,
+    "viessmann_reads": 104,
     "viessmann_writes": 5,
-    "bticino_reads": 95,
+    "bticino_reads": 97,
     "bticino_writes": 1,
     "cronjob_patches": 2,
-    "github_runs": 47,
+    "github_runs": 48,
     "recent_events": [
       {
         "ts": "2026-11-27T08:31:35.771458+00:00",
@@ -2865,6 +2865,13 @@
       },
       {
         "ts": "2026-11-28T08:19:30.632539+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-28T08:20:50.749228+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
