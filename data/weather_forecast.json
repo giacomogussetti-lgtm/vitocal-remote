@@ -806,7 +806,7 @@
     "frost_penalty_scale": 1.27,
     "tin_proj_samples_matched": 8,
     "tin_projection_mae_c": 0.08,
-    "calibrated_utc": "2026-11-28T11:44:33.144826+00:00"
+    "calibrated_utc": "2026-11-28T11:45:49.969610+00:00"
   },
   "calibration_history": [
     {
@@ -2879,7 +2879,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "28/11 12:44",
+    "evaluated_local": "28/11 12:45",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": true,
@@ -2887,7 +2887,7 @@
     "committed_window_start": "09:00",
     "committed_window_end": "14:00",
     "in_window_now": true,
-    "remaining_window_min": 76,
+    "remaining_window_min": 75,
     "next_hour_cop_net": 4.53,
     "next_hour_label": "Oggi 13:00",
     "today_window": {
@@ -2932,10 +2932,10 @@
       "start_tin_c": 8.4,
       "min_tin_c": 7.03,
       "end_tin_c": 7.03,
-      "hours_simulated": 22.3,
+      "hours_simulated": 22.2,
       "target_local": "29/11 11:00",
-      "first_below_tmin_local": "29/11 03:44",
-      "first_below_safe_local": "29/11 08:44"
+      "first_below_tmin_local": "29/11 03:45",
+      "first_below_safe_local": "29/11 08:45"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -2943,11 +2943,11 @@
     "prearm_reason": null,
     "defer_recommended": false,
     "defer_reason": null,
-    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 76m)",
+    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 75m)",
     "decision_trace": [
       "Finestra Oggi: 09:00–14:00 🔒 (COP netto stimato 4.71, OAT +1.1°C, RH 76%, Brina MEDIO, +0.10 vs statica).",
       "Finestra Domani: 11:00–16:00 (COP netto 5.29, OAT +1.8°C, RH 62%, Brina BASSO).",
-      "Proiezione prudenziale sicurezza fino a domani 11:00 (22.3h, UA×1.15=0.216): 8.4°C → 7.0°C (min 7.0°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.188)."
+      "Proiezione prudenziale sicurezza fino a domani 11:00 (22.2h, UA×1.15=0.216): 8.4°C → 7.0°C (min 7.0°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.188)."
     ],
     "assumptions": {
       "ua_raw_c_24h_k": 0.188,
