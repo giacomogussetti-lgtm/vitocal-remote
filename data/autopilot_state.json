@@ -5,10 +5,10 @@
   "cycle_started_utc": "2026-11-28T08:05:55.013503+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-28T12:31:08.895896+00:00",
+  "last_eval_utc": "2026-11-28T12:31:29.736185+00:00",
   "last_action_utc": "2026-11-28T08:05:55.013503+00:00",
   "last_action_reason": "Avvio ciclo (Pre-Armamento Predittivo): Target Acqua 23.5°C (SP=13°C, Shift=-1). Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual) | Temperatura Ridotta impostata e verificata con successo: 13 °C | Curva inviata con successo (Slope: 0.6, Shift: -1). Sincronizzazione cloud in corso (letti: Slope 0.6, Shift 0). | Modalità PdC 'dhwAndHeating' inviata con successo. Sincronizzazione cloud in corso (letta: standby).",
-  "indoor_slope_c_per_h": 0.157,
+  "indoor_slope_c_per_h": 0.156,
   "calculated_target_lwt_c": 23.5,
   "calculated_pdc_setpoint_c": 13,
   "target_pdc_setpoint_c": 13,
@@ -22,7 +22,7 @@
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": 0,
   "soft_curve_last_trim_utc": null,
-  "last_grundfos_run_utc": "2026-11-28T12:31:08.895896+00:00",
+  "last_grundfos_run_utc": "2026-11-28T12:31:29.736185+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
@@ -162,20 +162,13 @@
   },
   "api_usage": {
     "date_utc": "2026-11-28",
-    "viessmann_reads": 592,
+    "viessmann_reads": 594,
     "viessmann_writes": 5,
-    "bticino_reads": 585,
+    "bticino_reads": 587,
     "bticino_writes": 1,
     "cronjob_patches": 2,
-    "github_runs": 292,
+    "github_runs": 293,
     "recent_events": [
-      {
-        "ts": "2026-11-27T12:31:28.757638+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-27T12:32:38.037756+00:00",
         "lbl": "telemetry_poll",
@@ -3696,6 +3689,13 @@
       },
       {
         "ts": "2026-11-28T12:31:08.891452+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-28T12:31:29.732612+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
