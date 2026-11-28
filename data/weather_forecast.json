@@ -799,14 +799,14 @@
   "calibration": {
     "oat_samples_matched": 20,
     "oat_bias_c": 0.12,
-    "oat_raw_mae_c": 0.9,
-    "oat_mae_c": 0.89,
-    "oat_max_abs_err_c": 2.48,
+    "oat_raw_mae_c": 0.87,
+    "oat_mae_c": 0.86,
+    "oat_max_abs_err_c": 2.18,
     "frost_active_hours_matched": 3,
     "frost_penalty_scale": 1.0,
     "tin_proj_samples_matched": 13,
     "tin_projection_mae_c": 0.18,
-    "calibrated_utc": "2026-11-28T10:49:29.047965+00:00"
+    "calibrated_utc": "2026-11-28T10:50:54.340604+00:00"
   },
   "calibration_history": [
     {
@@ -2886,7 +2886,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "28/11 11:49",
+    "evaluated_local": "28/11 11:50",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": true,
@@ -2894,7 +2894,7 @@
     "committed_window_start": "09:00",
     "committed_window_end": "14:00",
     "in_window_now": true,
-    "remaining_window_min": 131,
+    "remaining_window_min": 130,
     "next_hour_cop_net": 4.78,
     "next_hour_label": "Oggi 12:00",
     "today_window": {
@@ -2941,8 +2941,8 @@
       "end_tin_c": 6.9,
       "hours_simulated": 23.2,
       "target_local": "29/11 11:00",
-      "first_below_tmin_local": "29/11 01:49",
-      "first_below_safe_local": "29/11 06:49"
+      "first_below_tmin_local": "29/11 01:50",
+      "first_below_safe_local": "29/11 06:50"
     },
     "short_cycle_action": "normal",
     "extended_end_hhmm": null,
@@ -2950,7 +2950,7 @@
     "prearm_reason": null,
     "defer_recommended": false,
     "defer_reason": null,
-    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 131m)",
+    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 130m)",
     "decision_trace": [
       "Finestra Oggi: 09:00–14:00 🔒 (COP netto stimato 4.76, OAT +1.7°C, RH 83%, Brina MEDIO, allineata a statica).",
       "Finestra Domani: 11:00–16:00 (COP netto 5.31, OAT +1.8°C, RH 62%, Brina BASSO).",
@@ -2967,9 +2967,9 @@
       "min_cycle_minutes": 120,
       "arbitrage_cop_delta": 0.25,
       "oat_bias_c": 0.12,
-      "oat_raw_mae_c": 0.9,
-      "oat_mae_c": 0.89,
-      "oat_max_abs_err_c": 2.48,
+      "oat_raw_mae_c": 0.87,
+      "oat_mae_c": 0.86,
+      "oat_max_abs_err_c": 2.18,
       "oat_samples_matched": 20,
       "frost_penalty_scale": 1.0,
       "tin_projection_mae_c": 0.18
