@@ -5,7 +5,7 @@
   "cycle_started_utc": "2026-11-28T08:05:55.013503+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-28T11:31:09.536439+00:00",
+  "last_eval_utc": "2026-11-28T11:31:30.539089+00:00",
   "last_action_utc": "2026-11-28T08:05:55.013503+00:00",
   "last_action_reason": "Avvio ciclo (Pre-Armamento Predittivo): Target Acqua 23.5°C (SP=13°C, Shift=-1). Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual) | Temperatura Ridotta impostata e verificata con successo: 13 °C | Curva inviata con successo (Slope: 0.6, Shift: -1). Sincronizzazione cloud in corso (letti: Slope 0.6, Shift 0). | Modalità PdC 'dhwAndHeating' inviata con successo. Sincronizzazione cloud in corso (letta: standby).",
   "indoor_slope_c_per_h": 0.206,
@@ -22,7 +22,7 @@
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": 0,
   "soft_curve_last_trim_utc": null,
-  "last_grundfos_run_utc": "2026-11-28T11:31:09.536439+00:00",
+  "last_grundfos_run_utc": "2026-11-28T11:31:30.539089+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
@@ -152,8 +152,8 @@
       "min_cycle_minutes": 120,
       "arbitrage_cop_delta": 0.25,
       "oat_bias_c": 0.0,
-      "oat_raw_mae_c": 0.51,
-      "oat_mae_c": 0.51,
+      "oat_raw_mae_c": 0.55,
+      "oat_mae_c": 0.55,
       "oat_max_abs_err_c": 1.4,
       "oat_samples_matched": 15,
       "frost_penalty_scale": 1.27,
@@ -162,20 +162,13 @@
   },
   "api_usage": {
     "date_utc": "2026-11-28",
-    "viessmann_reads": 474,
+    "viessmann_reads": 476,
     "viessmann_writes": 5,
-    "bticino_reads": 467,
+    "bticino_reads": 469,
     "bticino_writes": 1,
     "cronjob_patches": 2,
-    "github_runs": 233,
+    "github_runs": 234,
     "recent_events": [
-      {
-        "ts": "2026-11-27T11:31:27.708783+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-27T11:32:32.986801+00:00",
         "lbl": "telemetry_poll",
@@ -3689,6 +3682,13 @@
       },
       {
         "ts": "2026-11-28T11:31:09.532032+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-28T11:31:30.536485+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
