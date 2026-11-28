@@ -5,7 +5,7 @@
   "cycle_started_utc": "2026-11-28T08:05:55.013503+00:00",
   "cycle_is_emergency": false,
   "drain_started_utc": "2026-11-28T13:01:52.197114+00:00",
-  "last_eval_utc": "2026-11-28T13:03:29.621188+00:00",
+  "last_eval_utc": "2026-11-28T13:04:40.912299+00:00",
   "last_action_utc": "2026-11-28T13:01:52.197114+00:00",
   "last_action_reason": "Stop PdC (Fine finestra COP (14:00)), avvio scarico puffer 25 min. Modalità PdC impostata e verificata: standby | Setpoint BTicino aggiornato con successo a 18.0 °C (modalità: manual)",
   "indoor_slope_c_per_h": 0.143,
@@ -22,10 +22,22 @@
   "heating_rod_delta_s": 0,
   "soft_curve_trim_k": 0,
   "soft_curve_last_trim_utc": null,
-  "last_grundfos_run_utc": "2026-11-28T13:03:29.621188+00:00",
+  "last_grundfos_run_utc": "2026-11-28T13:04:40.912299+00:00",
   "last_anti_seize_utc": null,
   "error_counter_d6": 0,
   "recent_wo1c_events": [
+    {
+      "ts": "2026-11-28T14:06:07.000Z",
+      "actor": "Circolatore P1",
+      "desc": "Pompa P1 -> 100%",
+      "info_s": 117
+    },
+    {
+      "ts": "2026-11-28T14:06:04.000Z",
+      "actor": "Compressore",
+      "desc": "Arresto / Pausa Compressore",
+      "info_s": 180
+    },
     {
       "ts": "2026-11-28T13:05:25.000Z",
       "actor": "Valvola 4-Vie Defrost",
@@ -43,18 +55,6 @@
       "actor": "Valvola 4-Vie Defrost",
       "desc": "Fine Defrost -> Riscald.",
       "info_s": 0
-    },
-    {
-      "ts": "2026-11-28T12:10:52.000Z",
-      "actor": "Valvola 4-Vie Defrost",
-      "desc": "Inversione Defrost ON",
-      "info_s": 900
-    },
-    {
-      "ts": "2026-11-28T11:43:04.000Z",
-      "actor": "Compressore",
-      "desc": "Compressore ON",
-      "info_s": 362
     }
   ],
   "active_window_start_local": "09:00",
@@ -71,7 +71,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "28/11 14:03",
+    "evaluated_local": "28/11 14:04",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": true,
@@ -126,7 +126,7 @@
       "end_tin_c": 7.32,
       "hours_simulated": 20.9,
       "target_local": "29/11 11:00",
-      "first_below_tmin_local": "29/11 09:03",
+      "first_below_tmin_local": "29/11 09:04",
       "first_below_safe_local": null
     },
     "short_cycle_action": "normal",
@@ -163,27 +163,13 @@
   },
   "api_usage": {
     "date_utc": "2026-11-28",
-    "viessmann_reads": 658,
+    "viessmann_reads": 660,
     "viessmann_writes": 6,
-    "bticino_reads": 650,
+    "bticino_reads": 652,
     "bticino_writes": 2,
     "cronjob_patches": 2,
-    "github_runs": 324,
+    "github_runs": 325,
     "recent_events": [
-      {
-        "ts": "2026-11-27T13:03:41.462662+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-27T13:04:32.852772+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-27T13:05:40.070539+00:00",
         "lbl": "telemetry_poll",
@@ -3712,6 +3698,13 @@
       },
       {
         "ts": "2026-11-28T13:03:29.618144+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-28T13:04:40.908610+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
