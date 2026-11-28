@@ -806,7 +806,7 @@
     "frost_penalty_scale": 1.06,
     "tin_proj_samples_matched": 0,
     "tin_projection_mae_c": null,
-    "calibrated_utc": "2026-11-28T13:01:52.227484+00:00"
+    "calibrated_utc": "2026-11-28T13:02:43.488316+00:00"
   },
   "calibration_history": [
     {
@@ -2394,7 +2394,7 @@
       "precip_mm": 0.0,
       "solar_wm2": 320.0,
       "tin_proj_c": 8.6,
-      "tin_mode": "heat",
+      "tin_mode": "now",
       "in_window": false
     },
     {
@@ -2837,7 +2837,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "28/11 14:01",
+    "evaluated_local": "28/11 14:02",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": true,
@@ -2892,7 +2892,7 @@
       "end_tin_c": 7.32,
       "hours_simulated": 21.0,
       "target_local": "29/11 11:00",
-      "first_below_tmin_local": "29/11 09:01",
+      "first_below_tmin_local": "29/11 09:02",
       "first_below_safe_local": null
     },
     "short_cycle_action": "normal",
@@ -2904,6 +2904,7 @@
     "decision_summary": "🕒 Fuori finestra (09:00–14:00): attesa ora migliore o emergenza ≤ 6.8°C",
     "decision_trace": [
       "Finestra Oggi: 09:00–14:00 🔒 (COP netto stimato 4.92, OAT +2.4°C, RH 80%, Brina MEDIO, allineata a statica).",
+      "Finestra bloccata 🔒 (09:00–14:00): entro 90m dall'avvio non slitta più.",
       "Finestra Domani: 11:00–16:00 (COP netto 5.13, OAT +1.8°C, RH 68%, Brina BASSO).",
       "Proiezione prudenziale sicurezza fino a domani 11:00 (21.0h, UA×1.15=0.216): 8.6°C → 7.3°C (min 7.3°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.188)."
     ],
