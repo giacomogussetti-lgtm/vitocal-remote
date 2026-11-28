@@ -797,16 +797,16 @@
     }
   ],
   "calibration": {
-    "oat_samples_matched": 7,
+    "oat_samples_matched": 6,
     "oat_bias_c": 0.22,
-    "oat_raw_mae_c": 0.66,
-    "oat_mae_c": 0.53,
+    "oat_raw_mae_c": 0.73,
+    "oat_mae_c": 0.55,
     "oat_max_abs_err_c": 1.08,
     "frost_active_hours_matched": 5,
     "frost_penalty_scale": 1.28,
-    "tin_proj_samples_matched": 3,
-    "tin_projection_mae_c": 0.05,
-    "calibrated_utc": "2026-11-28T12:07:31.398196+00:00"
+    "tin_proj_samples_matched": 2,
+    "tin_projection_mae_c": 0.06,
+    "calibrated_utc": "2026-11-28T12:08:33.269985+00:00"
   },
   "calibration_history": [
     {
@@ -2054,13 +2054,6 @@
   ],
   "recent_oat_checks": [
     {
-      "time_local": "2026-11-28T07:00",
-      "forecast_raw_c": -0.3,
-      "forecast_corr_c": -0.1,
-      "actual_oat_c": -0.5,
-      "err_corr_c": -0.4
-    },
-    {
       "time_local": "2026-11-28T08:00",
       "forecast_raw_c": -0.6,
       "forecast_corr_c": -0.4,
@@ -2851,7 +2844,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "28/11 13:07",
+    "evaluated_local": "28/11 13:08",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": true,
@@ -2859,7 +2852,7 @@
     "committed_window_start": "09:00",
     "committed_window_end": "14:00",
     "in_window_now": true,
-    "remaining_window_min": 53,
+    "remaining_window_min": 52,
     "next_hour_cop_net": 4.79,
     "next_hour_label": "Oggi 13:00",
     "today_window": {
@@ -2906,7 +2899,7 @@
       "end_tin_c": 7.2,
       "hours_simulated": 21.9,
       "target_local": "29/11 11:00",
-      "first_below_tmin_local": "29/11 07:07",
+      "first_below_tmin_local": "29/11 07:08",
       "first_below_safe_local": null
     },
     "short_cycle_action": "normal",
@@ -2915,7 +2908,7 @@
     "prearm_reason": null,
     "defer_recommended": false,
     "defer_reason": null,
-    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 53m)",
+    "decision_summary": "☀️ In finestra COP attiva (09:00–14:00, restano 52m)",
     "decision_trace": [
       "Finestra Oggi: 09:00–14:00 🔒 (COP netto stimato 4.81, OAT +2.4°C, RH 80%, Brina MEDIO, allineata a statica).",
       "Finestra Domani: 11:00–16:00 (COP netto 5.09, OAT +1.8°C, RH 68%, Brina BASSO).",
@@ -2932,12 +2925,12 @@
       "min_cycle_minutes": 120,
       "arbitrage_cop_delta": 0.25,
       "oat_bias_c": 0.22,
-      "oat_raw_mae_c": 0.66,
-      "oat_mae_c": 0.53,
+      "oat_raw_mae_c": 0.73,
+      "oat_mae_c": 0.55,
       "oat_max_abs_err_c": 1.08,
-      "oat_samples_matched": 7,
+      "oat_samples_matched": 6,
       "frost_penalty_scale": 1.28,
-      "tin_projection_mae_c": 0.05
+      "tin_projection_mae_c": 0.06
     }
   }
 }
