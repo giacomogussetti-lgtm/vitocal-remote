@@ -5,11 +5,11 @@
   "cycle_started_utc": null,
   "cycle_is_emergency": false,
   "drain_started_utc": null,
-  "last_eval_utc": "2026-11-28T13:27:24.630907+00:00",
+  "last_eval_utc": "2026-11-28T13:31:08.252466+00:00",
   "last_action_utc": "2026-11-28T13:27:24.630907+00:00",
-  "last_action_reason": "Ciclo completato (Timeout scarico (26 min)) -> ritorno in IDLE. Modalità BTicino aggiornata su 'hg' | Modalità PdC impostata e verificata: standby",
-  "indoor_slope_c_per_h": 0.137,
-  "calculated_target_lwt_c": 23.5,
+  "last_action_reason": "Standby OK: T=8.7°C > 7.5°C (pendenza +0.14°C/h). 🕒 Fuori finestra (09:00–14:00): attesa ora migliore o emergenza ≤ 6.8°C",
+  "indoor_slope_c_per_h": 0.136,
+  "calculated_target_lwt_c": 23.8,
   "calculated_pdc_setpoint_c": 13,
   "target_pdc_setpoint_c": 13,
   "calculated_curve_shift": 0,
@@ -71,7 +71,7 @@
     "available": true,
     "source": "cache",
     "fallback_reason": null,
-    "evaluated_local": "28/11 14:27",
+    "evaluated_local": "28/11 14:31",
     "effective_window_start": "09:00",
     "effective_window_end": "14:00",
     "window_locked": true,
@@ -121,12 +121,12 @@
       "is_dynamic_shifted": false
     },
     "projection_to_tomorrow": {
-      "start_tin_c": 8.6,
-      "min_tin_c": 7.35,
-      "end_tin_c": 7.35,
+      "start_tin_c": 8.7,
+      "min_tin_c": 7.5,
+      "end_tin_c": 7.5,
       "hours_simulated": 20.5,
       "target_local": "29/11 11:00",
-      "first_below_tmin_local": "29/11 09:27",
+      "first_below_tmin_local": null,
       "first_below_safe_local": null
     },
     "short_cycle_action": "normal",
@@ -140,12 +140,12 @@
       "Finestra Oggi: 09:00–14:00 🔒 (COP netto stimato 4.98, OAT +2.4°C, RH 80%, Brina MEDIO, allineata a statica).",
       "Finestra bloccata 🔒 (09:00–14:00): entro 90m dall'avvio non slitta più.",
       "Finestra Domani: 11:00–16:00 (COP netto 5.15, OAT +1.8°C, RH 68%, Brina BASSO).",
-      "Proiezione prudenziale sicurezza fino a domani 11:00 (20.5h, UA×1.15=0.216): 8.6°C → 7.3°C (min 7.3°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.188)."
+      "Proiezione prudenziale sicurezza fino a domani 11:00 (20.5h, UA×1.15=0.204): 8.7°C → 7.5°C (min 7.5°C vs pavimento sicurezza 7.2°C; pillole orarie su UA reale=0.177)."
     ],
     "assumptions": {
-      "ua_raw_c_24h_k": 0.188,
+      "ua_raw_c_24h_k": 0.177,
       "ua_safety_factor": 1.15,
-      "ua_effective_c_24h_k": 0.216,
+      "ua_effective_c_24h_k": 0.204,
       "t_evap_offset_k": 6.5,
       "lwt_ref_c": 23.0,
       "p_atm_hpa": 900.0,
@@ -163,27 +163,13 @@
   },
   "api_usage": {
     "date_utc": "2026-11-28",
-    "viessmann_reads": 714,
+    "viessmann_reads": 716,
     "viessmann_writes": 11,
-    "bticino_reads": 699,
+    "bticino_reads": 701,
     "bticino_writes": 3,
     "cronjob_patches": 3,
-    "github_runs": 348,
+    "github_runs": 349,
     "recent_events": [
-      {
-        "ts": "2026-11-27T13:28:32.430383+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
-      {
-        "ts": "2026-11-27T13:29:31.570908+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-27T13:31:39.262682+00:00",
         "lbl": "telemetry_poll",
@@ -3722,6 +3708,13 @@
         "ts": "2026-11-28T13:27:37.582601+00:00",
         "lbl": "ap_cron_adapt",
         "cp": 1
+      },
+      {
+        "ts": "2026-11-28T13:31:08.247993+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
       }
     ]
   },
@@ -3733,7 +3726,7 @@
     "defrost_lwt_drop_p90_k": 9.1,
     "ua_building_c_24h_per_k": 0.177,
     "recommended_target_lwt_c": 24.1,
-    "pred_autonomy_hours": 31.5,
+    "pred_autonomy_hours": 30.9,
     "updated_utc": "2026-11-28T13:27:37.062086+00:00"
   }
 }
