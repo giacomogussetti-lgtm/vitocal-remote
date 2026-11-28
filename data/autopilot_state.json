@@ -162,20 +162,13 @@
   },
   "api_usage": {
     "date_utc": "2026-11-28",
-    "viessmann_reads": 650,
+    "viessmann_reads": 652,
     "viessmann_writes": 5,
-    "bticino_reads": 643,
+    "bticino_reads": 645,
     "bticino_writes": 1,
     "cronjob_patches": 2,
-    "github_runs": 321,
+    "github_runs": 322,
     "recent_events": [
-      {
-        "ts": "2026-11-27T12:59:31.505963+00:00",
-        "lbl": "telemetry_poll",
-        "vr": 2,
-        "br": 2,
-        "gh": 1
-      },
       {
         "ts": "2026-11-27T13:01:44.333081+00:00",
         "lbl": "telemetry_poll",
@@ -3703,6 +3696,13 @@
       },
       {
         "ts": "2026-11-28T12:59:30.820719+00:00",
+        "lbl": "telemetry_poll",
+        "vr": 2,
+        "br": 2,
+        "gh": 1
+      },
+      {
+        "ts": "2026-11-28T13:01:25.017466+00:00",
         "lbl": "telemetry_poll",
         "vr": 2,
         "br": 2,
